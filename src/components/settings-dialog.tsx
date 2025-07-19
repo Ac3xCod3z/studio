@@ -40,6 +40,7 @@ import type { RolloverPreference } from "@/lib/types";
 import { getRolloverRecommendation } from "@/ai/flows/rollover-optimization";
 import { useToast } from "@/hooks/use-toast";
 import { timezones } from "@/lib/timezones";
+import { ScrollArea } from "./ui/scroll-area";
 
 const formSchema = z.object({
   incomeLevel: z.coerce.number().positive({ message: "Income must be a positive number." }),
@@ -92,108 +93,110 @@ export function SettingsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-md grid-rows-[auto_minmax(0,1fr)_auto] p-0 max-h-[90vh]">
+        <DialogHeader className="p-6 pb-2">
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
             Manage your application preferences.
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4 py-2">
-           <div className="space-y-2">
-            <Label htmlFor="timezone" className="font-semibold">Timezone</Label>
-             <p className="text-sm text-muted-foreground">Select your local timezone to ensure dates are handled correctly.</p>
-            <Select onValueChange={onTimezoneChange} defaultValue={timezone}>
-              <SelectTrigger id="timezone" className="w-full">
-                <SelectValue placeholder="Select a timezone" />
-              </SelectTrigger>
-              <SelectContent>
-                {timezones.map((tz) => (
-                  <SelectItem key={tz} value={tz}>
-                    {tz}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <ScrollArea className="px-6">
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="timezone" className="font-semibold">Timezone</Label>
+              <p className="text-sm text-muted-foreground">Select your local timezone to ensure dates are handled correctly.</p>
+              <Select onValueChange={onTimezoneChange} defaultValue={timezone}>
+                <SelectTrigger id="timezone" className="w-full">
+                  <SelectValue placeholder="Select a timezone" />
+                </SelectTrigger>
+                <SelectContent>
+                  {timezones.map((tz) => (
+                    <SelectItem key={tz} value={tz}>
+                      {tz}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Separator />
+            
+            <div className="space-y-4">
+                <h3 className="font-semibold">Rollover Preference</h3>
+                <p className="text-sm text-muted-foreground">Choose how leftover funds are handled at the end of each month.</p>
+                <RadioGroup
+                    value={rolloverPreference}
+                    onValueChange={(value) => onRolloverPreferenceChange(value as RolloverPreference)}
+                    className="space-y-2"
+                >
+                    <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="carryover" id="carryover" />
+                        <Label htmlFor="carryover" className="font-bold">Carry Over</Label>
+                    </div>
+                    <p className="pl-6 text-sm text-muted-foreground">Any leftover funds from this month will be added to next month's starting balance.</p>
+
+                    <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="reset" id="reset" />
+                        <Label htmlFor="reset" className="font-bold">Reset</Label>
+                    </div>
+                    <p className="pl-6 text-sm text-muted-foreground">Each month starts fresh. Leftover funds are not automatically tracked into the next month.</p>
+                </RadioGroup>
+            </div>
+
+            <Separator />
+            
+            <div className="space-y-4">
+                <h3 className="font-semibold flex items-center gap-2"><Sparkles className="h-5 w-5 text-accent-foreground/80" /> AI Recommendation</h3>
+                <p className="text-sm text-muted-foreground">Not sure which rollover option to choose? Let our AI help you decide based on your goals.</p>
+                <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <FormField
+                        control={form.control}
+                        name="incomeLevel"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Average Monthly Income</FormLabel>
+                            <FormControl>
+                                <Input type="number" placeholder="e.g. 5000" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="financialGoals"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Financial Goals</FormLabel>
+                            <FormControl>
+                                <Textarea placeholder="e.g. Pay off debt, save for vacation..." {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <Button type="submit" disabled={isLoading} className="w-full">
+                        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                        Get Recommendation
+                    </Button>
+                </form>
+                </Form>
+                {recommendation && (
+                    <Alert>
+                        <AlertTitle>AI Suggestion</AlertTitle>
+                        <AlertDescription>
+                            {recommendation}
+                        </AlertDescription>
+                    </Alert>
+                )}
+            </div>
           </div>
-        </div>
-
-        <Separator />
+        </ScrollArea>
         
-        <div className="space-y-4 py-2">
-            <h3 className="font-semibold">Rollover Preference</h3>
-            <p className="text-sm text-muted-foreground">Choose how leftover funds are handled at the end of each month.</p>
-            <RadioGroup
-                value={rolloverPreference}
-                onValueChange={(value) => onRolloverPreferenceChange(value as RolloverPreference)}
-                className="space-y-2"
-            >
-                <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="carryover" id="carryover" />
-                    <Label htmlFor="carryover" className="font-bold">Carry Over</Label>
-                </div>
-                <p className="pl-6 text-sm text-muted-foreground">Any leftover funds from this month will be added to next month's starting balance.</p>
-
-                <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="reset" id="reset" />
-                    <Label htmlFor="reset" className="font-bold">Reset</Label>
-                </div>
-                 <p className="pl-6 text-sm text-muted-foreground">Each month starts fresh. Leftover funds are not automatically tracked into the next month.</p>
-            </RadioGroup>
-        </div>
-
-        <Separator />
-        
-        <div className="space-y-4">
-            <h3 className="font-semibold flex items-center gap-2"><Sparkles className="h-5 w-5 text-accent-foreground/80" /> AI Recommendation</h3>
-             <p className="text-sm text-muted-foreground">Not sure which rollover option to choose? Let our AI help you decide based on your goals.</p>
-            <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                 <FormField
-                    control={form.control}
-                    name="incomeLevel"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Average Monthly Income</FormLabel>
-                        <FormControl>
-                            <Input type="number" placeholder="e.g. 5000" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                 <FormField
-                    control={form.control}
-                    name="financialGoals"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Financial Goals</FormLabel>
-                        <FormControl>
-                            <Textarea placeholder="e.g. Pay off debt, save for vacation..." {...field} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                 <Button type="submit" disabled={isLoading} className="w-full">
-                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                    Get Recommendation
-                </Button>
-            </form>
-            </Form>
-            {recommendation && (
-                 <Alert>
-                    <AlertTitle>AI Suggestion</AlertTitle>
-                    <AlertDescription>
-                        {recommendation}
-                    </AlertDescription>
-                </Alert>
-            )}
-        </div>
-
-        <DialogFooter>
-          <Button type="button" onClick={onClose}>
+        <DialogFooter className="p-6 pt-2">
+          <Button type="button" onClick={onClose} className="w-full">
             Done
           </Button>
         </DialogFooter>
