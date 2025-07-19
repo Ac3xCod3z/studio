@@ -32,7 +32,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn, formatCurrency } from "@/lib/utils";
-import type { Entry, RolloverPreference, MonthlyLeftovers, RecurrenceInterval } from "@/lib/types";
+import type { Entry, RolloverPreference, MonthlyLeftovers } from "@/lib/types";
 import { recurrenceIntervalMonths } from "@/lib/constants";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -167,6 +167,7 @@ export function FiscalFlowCalendar({
           .map(recurringDate => ({
             ...e,
             date: format(recurringDate, 'yyyy-MM-dd'),
+            id: `${e.id}-${format(recurringDate, 'yyyy-MM-dd')}` // Unique ID for recurring instance
           }));
       }
 
@@ -256,10 +257,13 @@ export function FiscalFlowCalendar({
 
   useEffect(() => {
     const { monthKey, endOfMonthBalance } = monthlyTotals;
-    if (monthlyLeftovers[monthKey] !== endOfMonthBalance) {
-      setMonthlyLeftovers(prev => ({...prev, [monthKey]: endOfMonthBalance }));
-    }
-  }, [monthlyTotals.monthKey, monthlyTotals.endOfMonthBalance, setMonthlyLeftovers, monthlyLeftovers]);
+    setMonthlyLeftovers(prev => {
+        if (prev[monthKey] !== endOfMonthBalance) {
+            return {...prev, [monthKey]: endOfMonthBalance };
+        }
+        return prev;
+    });
+  }, [monthlyTotals.monthKey, monthlyTotals.endOfMonthBalance, setMonthlyLeftovers]);
 
   const Sidebar = () => (
     <SidebarContent 
@@ -318,7 +322,7 @@ export function FiscalFlowCalendar({
 
               return (
                 <div
-                  key={day.toString()}
+                  key={dayKey}
                   className={cn(
                     "relative flex flex-col h-24 sm:h-32 rounded-lg p-1 sm:p-2 border transition-colors",
                     !isSelectionMode && "cursor-pointer",
@@ -350,13 +354,13 @@ export function FiscalFlowCalendar({
                     <div className="space-y-1 text-[10px] sm:text-xs">
                       {dayEntries.map(entry => (
                           <div 
-                              key={entry.id + entry.date} 
+                              key={entry.id}
                               onClick={(e) => { if (!isSelectionMode) { e.stopPropagation(); openEditEntryDialog(entry); } }}
                               onDragStart={(e) => handleDragStart(e, entry.id)}
-                              draggable={!isSelectionMode}
+                              draggable={!isSelectionMode && !entry.recurrence?.includes('weekly')}
                               className={cn(
                                   "p-1 rounded-md truncate",
-                                  !isSelectionMode && "cursor-grab active:cursor-grabbing",
+                                  !isSelectionMode && !entry.recurrence?.includes('weekly') && "cursor-grab active:cursor-grabbing",
                                   entry.type === 'bill' ? 'bg-destructive text-destructive-foreground' : 'bg-accent text-accent-foreground',
                                   draggingEntryId === entry.id && 'opacity-50',
                                   isSelectionMode && 'opacity-70'
@@ -386,22 +390,24 @@ export function FiscalFlowCalendar({
                 amount={monthlyTotals.bills}
                 icon={<ArrowDown className="text-destructive" />}
               />
-              <SummaryCard
-                title="Monthly Net"
-                amount={monthlyTotals.net}
-                variant={monthlyTotals.net >= 0 ? 'positive' : 'negative'}
-              />
-              <SummaryCard
+               <SummaryCard
                 title="Rollover"
                 amount={monthlyTotals.rollover}
                 icon={<Repeat />}
                 description="From previous month"
               />
               <SummaryCard
+                title="Monthly Net"
+                amount={monthlyTotals.net}
+                variant={monthlyTotals.net >= 0 ? 'positive' : 'negative'}
+                description="Income - Bills"
+              />
+              <SummaryCard
                 title="End-of-Month Balance"
                 amount={monthlyTotals.endOfMonthBalance}
                 variant={monthlyTotals.endOfMonthBalance >= 0 ? 'positive' : 'negative'}
                 className="md:col-span-2 lg:col-span-4"
+                description="(Income + Rollover) - Bills"
               />
             </div>
           </div>

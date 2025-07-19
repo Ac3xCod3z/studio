@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import type { Entry, RolloverPreference } from "@/lib/types";
 import { FiscalFlowCalendar, SidebarContent } from "./fiscal-flow-calendar";
-import { format, subMonths, startOfMonth, endOfMonth, eachWeekOfInterval, getWeek, isSameMonth, parseISO, isBefore, differenceInCalendarMonths, getDate, endOfWeek, getDay } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, eachWeekOfInterval, getWeek, isSameMonth, parseISO, isBefore, differenceInCalendarMonths, getDate, endOfWeek, getDay, eachDayOfInterval, setDate } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { recurrenceIntervalMonths } from "@/lib/constants";
 
@@ -35,7 +35,7 @@ export default function FiscalFlowDashboard() {
 
   useEffect(() => {
     setIsClient(true);
-    if (localStorage.getItem('fiscalFlowTimezone') === null) {
+    if (!localStorage.getItem('fiscalFlowTimezone')) {
         setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
     }
      if ('serviceWorker' in navigator) {
@@ -91,7 +91,7 @@ export default function FiscalFlowDashboard() {
 
       if (e.recurrence === 'weekly') {
         const originalDayOfWeek = getDay(originalEntryDate);
-        const daysInCurrentMonth = eachWeekOfInterval({
+        const daysInCurrentMonth = eachDayOfInterval({
           start: startOfMonth(currentMonth),
           end: endOfMonth(currentMonth),
         });
@@ -114,7 +114,7 @@ export default function FiscalFlowDashboard() {
         const lastDayOfCurrentMonth = endOfMonth(currentMonth).getDate();
         const originalDay = getDate(originalEntryDate);
         const dayForCurrentMonth = Math.min(originalDay, lastDayOfCurrentMonth);
-        const recurringDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), dayForCurrentMonth);
+        const recurringDate = setDate(currentMonth, dayForCurrentMonth);
         
         return [{ ...e, date: format(recurringDate, 'yyyy-MM-dd') }];
       } else {

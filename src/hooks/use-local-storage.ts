@@ -4,25 +4,25 @@ import { useState, useEffect, useCallback } from 'react';
 
 function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val: T) => T)) => void] {
   const [storedValue, setStoredValue] = useState<T>(initialValue);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
     // This effect runs once on mount to read from localStorage.
-    // It will not run on the server.
     try {
       const item = window.localStorage.getItem(key);
       if (item) {
         setStoredValue(JSON.parse(item));
-      } else {
-        setStoredValue(initialValue);
       }
     } catch (error) {
       console.error(error);
       setStoredValue(initialValue);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    setIsInitialized(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 
   const setValue = useCallback((value: T | ((val: T) => T)) => {
+    if(!isInitialized) return;
     try {
       const valueToStore = value instanceof Function ? value(storedValue) : value;
       setStoredValue(valueToStore);
@@ -32,7 +32,7 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val
     } catch (error) {
       console.error(error);
     }
-  }, [key, storedValue]);
+  }, [key, storedValue, isInitialized]);
 
 
   return [storedValue, setValue];

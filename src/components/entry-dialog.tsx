@@ -31,7 +31,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import type { Entry, RecurrenceInterval } from "@/lib/types";
+import type { Entry } from "@/lib/types";
 
 const formSchema = z.object({
   type: z.enum(["bill", "income"], { required_error: "You need to select an entry type." }),
@@ -70,27 +70,14 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
 
    React.useEffect(() => {
     if (isOpen) {
-      if (entry) {
-        // When editing, parse the stored date string in the context of the selected timezone
-        const entryDateInTimezone = parseDateInTimezone(entry.date, timezone);
-        form.reset({
-          type: entry.type,
-          name: entry.name,
-          amount: entry.amount,
-          date: entryDateInTimezone,
-          recurrence: entry.recurrence || 'none',
-        });
-      } else {
-        // For new entries, use the selectedDate from the calendar directly.
-        // It's already a Date object from the user's interaction.
-        form.reset({
-          type: "bill",
-          name: "",
-          amount: 0,
-          date: selectedDate,
-          recurrence: 'none',
-        });
-      }
+      const resetDate = entry ? parseDateInTimezone(entry.date, timezone) : selectedDate;
+      form.reset({
+        type: entry?.type || "bill",
+        name: entry?.name || "",
+        amount: entry?.amount || 0,
+        date: resetDate,
+        recurrence: entry?.recurrence || 'none',
+      });
     }
   }, [isOpen, selectedDate, entry, form, timezone]);
 
@@ -227,7 +214,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
               render={({ field }) => (
                 <FormItem>
                    <FormLabel>Recurrence</FormLabel>
-                   <Select onValueChange={field.onChange} defaultValue={field.value}>
+                   <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a recurrence interval" />
