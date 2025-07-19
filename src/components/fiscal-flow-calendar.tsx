@@ -19,6 +19,7 @@ import {
   setMonth,
   setYear,
   parseISO,
+  isBefore,
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { ChevronLeft, ChevronRight, Plus, Menu, ArrowUp, ArrowDown } from "lucide-react";
@@ -90,8 +91,14 @@ export function FiscalFlowCalendar({
     const previousMonthLeftover = (rollover === 'carryover' && monthlyLeftovers[prevMonthKey]) || 0;
 
     const entriesForCurrentMonth = entries.flatMap((e) => {
-      const originalEntryDate = parseISO(e.date);
       if (e.recurring) {
+        const originalEntryDate = parseISO(e.date);
+        
+        // Don't show recurring entries for months before they were created.
+        if (isBefore(startOfMonth(currentMonth), startOfMonth(originalEntryDate))) {
+            return [];
+        }
+
         const lastDayOfCurrentMonth = endOfMonth(currentMonth).getDate();
         const originalDay = getDate(originalEntryDate);
         
