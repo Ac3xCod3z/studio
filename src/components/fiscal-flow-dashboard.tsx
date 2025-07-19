@@ -2,14 +2,17 @@
 
 import React, { useState, useEffect } from "react";
 import useLocalStorage from "@/hooks/use-local-storage";
+import { useMedia } from "react-use";
+
 import { EntryDialog } from "./entry-dialog";
 import { SettingsDialog } from "./settings-dialog";
 import { Logo } from "./icons";
 import { Settings, Menu, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import type { Entry, RolloverPreference } from "@/lib/types";
-import { FiscalFlowCalendar } from "./fiscal-flow-calendar";
+import { FiscalFlowCalendar, SidebarContent } from "./fiscal-flow-calendar";
 
 export default function FiscalFlowDashboard() {
   const [isClient, setIsClient] = useState(false);
@@ -19,8 +22,11 @@ export default function FiscalFlowDashboard() {
   
   const [isEntryDialogOpen, setEntryDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setSettingsDialogOpen] = useState(false);
+  const [isMobileSheetOpen, setMobileSheetOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
+
+  const isMobile = useMedia("(max-width: 1024px)", false);
 
   useEffect(() => {
     setIsClient(true);
@@ -96,6 +102,16 @@ export default function FiscalFlowDashboard() {
           <Button onClick={() => setSettingsDialogOpen(true)} variant="ghost" size="icon">
             <Settings className="h-5 w-5" />
           </Button>
+          {isMobile && (
+            <Sheet open={isMobileSheetOpen} onOpenChange={setMobileSheetOpen}>
+              <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon"><Menu /></Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[300px] sm:w-[400px] p-0">
+                  {/* The content is rendered dynamically inside the sheet based on a dummy calendar instance */}
+              </SheetContent>
+            </Sheet>
+          )}
         </div>
       </header>
       
@@ -108,6 +124,8 @@ export default function FiscalFlowDashboard() {
         setEditingEntry={setEditingEntry}
         setSelectedDate={setSelectedDate}
         setEntryDialogOpen={setEntryDialogOpen}
+        isMobile={isMobile}
+        openMobileSheet={() => setMobileSheetOpen(true)}
       />
       
       <EntryDialog 

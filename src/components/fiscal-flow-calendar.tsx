@@ -25,12 +25,11 @@ import {
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { ChevronLeft, ChevronRight, Plus, Menu, ArrowUp, ArrowDown, Repeat } from "lucide-react";
-import { useMedia } from "react-use";
 
 import useLocalStorage from "@/hooks/use-local-storage";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { Entry, RolloverPreference, MonthlyLeftovers, RecurrenceInterval } from "@/lib/types";
 
@@ -61,6 +60,8 @@ type FiscalFlowCalendarProps = {
     setEditingEntry: (entry: Entry | null) => void;
     setSelectedDate: (date: Date) => void;
     setEntryDialogOpen: (isOpen: boolean) => void;
+    isMobile: boolean;
+    openMobileSheet: () => void;
 }
 
 export function FiscalFlowCalendar({
@@ -71,14 +72,14 @@ export function FiscalFlowCalendar({
     openNewEntryDialog,
     setEditingEntry,
     setSelectedDate: setGlobalSelectedDate,
-    setEntryDialogOpen
+    setEntryDialogOpen,
+    isMobile,
+    openMobileSheet,
 }: FiscalFlowCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [monthlyLeftovers, setMonthlyLeftovers] = useLocalStorage<MonthlyLeftovers>("fiscalFlowLeftovers", {});
   const [draggingEntryId, setDraggingEntryId] = useState<string | null>(null);
-
-  const isMobile = useMedia("(max-width: 768px)", false);
 
   const daysInMonth = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth));
@@ -89,6 +90,9 @@ export function FiscalFlowCalendar({
   const handleDayClick = (day: Date) => {
       setSelectedDate(day);
       setGlobalSelectedDate(day);
+      if (isMobile) {
+        openMobileSheet();
+      }
   }
 
   const openEditEntryDialog = (entry: Entry) => {
@@ -226,42 +230,46 @@ export function FiscalFlowCalendar({
 
 
   const SidebarContent = () => (
-    <div className="flex flex-col gap-6 p-4 md:p-6 h-full bg-card md:bg-transparent">
-        <h2 className="text-2xl font-bold">Summary</h2>
-        <div className="space-y-4">
-            <h3 className="font-semibold text-lg">Week {weeklyTotals.week}</h3>
-            <SummaryCard title="Income" amount={weeklyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
-            <SummaryCard title="Bills Due" amount={weeklyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
-            {weeklyTotals.rolloverApplied > 0 && (
-                <SummaryCard title="Rollover Applied" amount={weeklyTotals.rolloverApplied} icon={<Repeat />} />
-            )}
-            <SummaryCard title="Weekly Net" amount={weeklyTotals.net} variant={weeklyTotals.net >= 0 ? 'positive' : 'negative'} />
-        </div>
-        <div className="space-y-4">
-            <h3 className="font-semibold text-lg">Month</h3>
-            <SummaryCard title="Total Income" amount={monthlyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
-            <SummaryCard title="Total Bills" amount={monthlyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
-            <SummaryCard title="Monthly Net" amount={monthlyTotals.net} variant={monthlyTotals.net >= 0 ? 'positive' : 'negative'} />
-        </div>
-    </div>
+    <ScrollArea className="h-full">
+      <div className="flex flex-col gap-6 p-4 md:p-6">
+          <h2 className="text-2xl font-bold">
+            {isMobile ? format(selectedDate, "MMM d, yyyy") : "Summary"}
+          </h2>
+          <div className="space-y-4">
+              <h3 className="font-semibold text-lg">Week {weeklyTotals.week}</h3>
+              <SummaryCard title="Income" amount={weeklyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
+              <SummaryCard title="Bills Due" amount={weeklyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
+              {weeklyTotals.rolloverApplied > 0 && (
+                  <SummaryCard title="Rollover Applied" amount={weeklyTotals.rolloverApplied} icon={<Repeat />} />
+              )}
+              <SummaryCard title="Weekly Net" amount={weeklyTotals.net} variant={weeklyTotals.net >= 0 ? 'positive' : 'negative'} />
+          </div>
+          <div className="space-y-4">
+              <h3 className="font-semibold text-lg">Month</h3>
+              <SummaryCard title="Total Income" amount={monthlyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
+              <SummaryCard title="Total Bills" amount={monthlyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
+              <SummaryCard title="Monthly Net" amount={monthlyTotals.net} variant={monthlyTotals.net >= 0 ? 'positive' : 'negative'} />
+          </div>
+      </div>
+    </ScrollArea>
   );
 
   return (
     <div className="flex flex-1 overflow-hidden">
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <main className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-6">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-2xl font-bold">{format(currentMonth, "MMMM yyyy")}</h1>
-            <div className="flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-bold">{format(currentMonth, "MMMM yyyy")}</h1>
+            <div className="flex items-center gap-1 sm:gap-2">
               <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button variant="outline" onClick={() => setCurrentMonth(new Date())}>Today</Button>
+              <Button variant="outline" onClick={() => setCurrentMonth(new Date())} className="px-2 sm:px-4">Today</Button>
               <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
-          <div className="grid grid-cols-7 gap-1 text-center font-semibold text-muted-foreground text-sm">
+          <div className="grid grid-cols-7 gap-1 text-center font-semibold text-muted-foreground text-xs sm:text-sm">
             {WEEKDAYS.map((day) => (<div key={day}>{day}</div>))}
           </div>
           <div className="grid grid-cols-7 grid-rows-5 gap-1 mt-1">
@@ -281,7 +289,7 @@ export function FiscalFlowCalendar({
                 <div
                   key={day.toString()}
                   className={cn(
-                    "relative flex flex-col h-32 rounded-lg p-2 border transition-colors cursor-pointer",
+                    "relative flex flex-col h-24 sm:h-32 rounded-lg p-1 sm:p-2 border transition-colors cursor-pointer",
                     !isSameMonth(day, currentMonth) ? "bg-muted/50 text-muted-foreground" : "bg-card hover:bg-card/80",
                     isToday(day) && "border-primary",
                     isSameDay(day, selectedDate) && "ring-2 ring-primary"
@@ -291,28 +299,30 @@ export function FiscalFlowCalendar({
                   onDrop={(e) => handleDrop(e, day)}
                 >
                   <div className="flex justify-between items-center">
-                    <span className="font-bold">{format(day, "d")}</span>
+                    <span className="font-bold text-xs sm:text-base">{format(day, "d")}</span>
                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); openNewEntryDialog(day); }}>
                         <Plus className="h-4 w-4" />
                     </Button>
                   </div>
-                  <div className="flex-1 overflow-y-auto mt-1 space-y-1 text-xs">
-                    {dayEntries.map(entry => (
-                        <div 
-                            key={entry.id} 
-                            onClick={(e) => { e.stopPropagation(); openEditEntryDialog(entry); }}
-                            onDragStart={(e) => handleDragStart(e, entry.id)}
-                            draggable="true"
-                            className={cn(
-                                "p-1 rounded-md truncate cursor-grab active:cursor-grabbing",
-                                entry.type === 'bill' ? 'bg-destructive text-destructive-foreground' : 'bg-accent text-accent-foreground',
-                                draggingEntryId === entry.id && 'opacity-50'
-                            )}
-                        >
-                            {entry.name}: {formatCurrency(entry.amount)}
-                        </div>
-                    ))}
-                  </div>
+                  <ScrollArea className="flex-1 mt-1">
+                    <div className="space-y-1 text-[10px] sm:text-xs">
+                      {dayEntries.map(entry => (
+                          <div 
+                              key={entry.id} 
+                              onClick={(e) => { e.stopPropagation(); openEditEntryDialog(entry); }}
+                              onDragStart={(e) => handleDragStart(e, entry.id)}
+                              draggable="true"
+                              className={cn(
+                                  "p-1 rounded-md truncate cursor-grab active:cursor-grabbing",
+                                  entry.type === 'bill' ? 'bg-destructive text-destructive-foreground' : 'bg-accent text-accent-foreground',
+                                  draggingEntryId === entry.id && 'opacity-50'
+                              )}
+                          >
+                              <span className="hidden sm:inline">{entry.name}: </span>{formatCurrency(entry.amount)}
+                          </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
                 </div>
               );
             })}
@@ -353,20 +363,10 @@ export function FiscalFlowCalendar({
           </div>
         </main>
         {!isMobile && (
-          <aside className="w-[350px] border-l overflow-y-auto">
+          <aside className="w-[350px] border-l overflow-y-auto hidden lg:block">
             <SidebarContent />
           </aside>
         )}
-        {isMobile && (
-             <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon"><Menu /></Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-[300px] sm:w-[400px] p-0">
-                <SidebarContent />
-              </SheetContent>
-            </Sheet>
-          )}
       </div>
   );
 }
@@ -387,3 +387,44 @@ function SummaryCard({ title, amount, icon, description, variant = 'default', cl
         </Card>
     );
 }
+
+export const MobileSidebar = ({ children }: { children: React.ReactNode }) => (
+  <div className="flex flex-col gap-6 p-4 h-full bg-card">
+    {children}
+  </div>
+);
+
+export const SidebarContent = ({
+  weeklyTotals,
+  monthlyTotals,
+  isMobile,
+  selectedDate,
+}: {
+  weeklyTotals: any,
+  monthlyTotals: any,
+  isMobile: boolean,
+  selectedDate: Date,
+}) => (
+  <ScrollArea className="h-full">
+    <div className="flex flex-col gap-6 p-4 md:p-6">
+        <h2 className="text-2xl font-bold">
+          {isMobile ? format(selectedDate, "MMM d, yyyy") : "Summary"}
+        </h2>
+        <div className="space-y-4">
+            <h3 className="font-semibold text-lg">Week {weeklyTotals.week}</h3>
+            <SummaryCard title="Income" amount={weeklyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
+            <SummaryCard title="Bills Due" amount={weeklyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
+            {weeklyTotals.rolloverApplied > 0 && (
+                <SummaryCard title="Rollover Applied" amount={weeklyTotals.rolloverApplied} icon={<Repeat />} />
+            )}
+            <SummaryCard title="Weekly Net" amount={weeklyTotals.net} variant={weeklyTotals.net >= 0 ? 'positive' : 'negative'} />
+        </div>
+        <div className="space-y-4">
+            <h3 className="font-semibold text-lg">Month</h3>
+            <SummaryCard title="Total Income" amount={monthlyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
+            <SummaryCard title="Total Bills" amount={monthlyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
+            <SummaryCard title="Monthly Net" amount={monthlyTotals.net} variant={monthlyTotals.net >= 0 ? 'positive' : 'negative'} />
+        </div>
+    </div>
+  </ScrollArea>
+);
