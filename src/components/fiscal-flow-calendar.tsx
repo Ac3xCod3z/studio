@@ -94,7 +94,6 @@ export function FiscalFlowCalendar({
       if (e.recurring) {
         const originalEntryDate = parseISO(e.date);
         
-        // Don't show recurring entries for months before they were created.
         if (isBefore(startOfMonth(currentMonth), startOfMonth(originalEntryDate))) {
             return [];
         }
@@ -102,7 +101,6 @@ export function FiscalFlowCalendar({
         const lastDayOfCurrentMonth = endOfMonth(currentMonth).getDate();
         const originalDay = getDate(originalEntryDate);
         
-        // If original day is greater than the last day of current month, use the last day.
         const dayForCurrentMonth = Math.min(originalDay, lastDayOfCurrentMonth);
 
         const recurringDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), dayForCurrentMonth);
@@ -112,7 +110,6 @@ export function FiscalFlowCalendar({
         }
         return [];
       } else {
-        // Non-recurring entries
         const entryDate = parseDateInTimezone(e.date, timezone);
         if (isSameMonth(entryDate, currentMonth)) {
           return [e];
@@ -122,8 +119,11 @@ export function FiscalFlowCalendar({
     });
 
     const monthlyBills = entriesForCurrentMonth.filter((e) => e.type === "bill").reduce((sum, e) => sum + e.amount, 0);
-    const monthlyIncome = entriesForCurrentMonth.filter((e) => e.type === "income").reduce((sum, e) => sum + e.amount, 0) + previousMonthLeftover;
-    const monthlyNet = monthlyIncome - monthlyBills;
+    const currentMonthIncome = entriesForCurrentMonth.filter((e) => e.type === "income").reduce((sum, e) => sum + e.amount, 0);
+    
+    const totalIncome = currentMonthIncome + previousMonthLeftover;
+    const monthlyNet = currentMonthIncome - monthlyBills;
+    const endOfMonthBalance = totalIncome - monthlyBills;
 
     const start = startOfWeek(selectedDate);
     const end = endOfWeek(selectedDate);
@@ -137,7 +137,7 @@ export function FiscalFlowCalendar({
     const weeklyNet = weeklyIncome - weeklyBills;
     
     return {
-      monthlyTotals: { bills: monthlyBills, income: monthlyIncome, net: monthlyNet, monthKey },
+      monthlyTotals: { bills: monthlyBills, income: totalIncome, net: monthlyNet, endOfMonthBalance: endOfMonthBalance, monthKey },
       weeklyTotals: { bills: weeklyBills, income: weeklyIncome, net: weeklyNet, week: getWeek(selectedDate) },
       previousMonthLeftover,
       entriesForCurrentMonth,
@@ -145,11 +145,12 @@ export function FiscalFlowCalendar({
   }, [entries, currentMonth, selectedDate, rollover, monthlyLeftovers, timezone]);
 
   useEffect(() => {
-    const { monthKey, net } = monthlyTotals;
-    if (monthlyLeftovers[monthKey] !== net) {
-      setMonthlyLeftovers(prev => ({...prev, [monthKey]: net }));
+    const { monthKey, endOfMonthBalance } = monthlyTotals;
+    if (monthlyLeftovers[monthKey] !== endOfMonthBalance) {
+      setMonthlyLeftovers(prev => ({...prev, [monthKey]: endOfMonthBalance }));
     }
-  }, [monthlyTotals.monthKey, monthlyTotals.net, setMonthlyLeftovers, monthlyLeftovers]);
+  }, [monthlyTotals.monthKey, monthlyTotals.endOfMonthBalance, setMonthlyLeftovers, monthlyLeftovers]);
+
 
   const SidebarContent = () => (
     <div className="flex flex-col gap-6 p-4 md:p-6 h-full bg-card md:bg-transparent">
@@ -230,7 +231,7 @@ export function FiscalFlowCalendar({
             <h2 className="text-xl font-bold mb-4 text-center md:text-left">
               {format(currentMonth, "MMMM")} Summary
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <SummaryCard
                 title="Total Income"
                 amount={monthlyTotals.income}
@@ -243,9 +244,14 @@ export function FiscalFlowCalendar({
                 icon={<ArrowDown className="text-destructive" />}
               />
               <SummaryCard
-                title="Month Net"
+                title="Monthly Net"
                 amount={monthlyTotals.net}
                 variant={monthlyTotals.net >= 0 ? 'positive' : 'negative'}
+              />
+              <SummaryCard
+                title="End-of-Month Balance"
+                amount={monthlyTotals.endOfMonthBalance}
+                variant={monthlyTotals.endOfMonthBalance >= 0 ? 'positive' : 'negative'}
               />
             </div>
           </div>
