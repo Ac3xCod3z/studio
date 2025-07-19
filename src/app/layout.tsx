@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster"
 export const metadata: Metadata = {
   title: 'FiscalFlow',
   description: 'Your personal finance tracker',
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({
