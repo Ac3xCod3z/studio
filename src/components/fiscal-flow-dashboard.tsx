@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import useLocalStorage from "@/hooks/use-local-storage";
 import { useMedia } from "react-use";
 
@@ -13,13 +13,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import type { Entry, RolloverPreference } from "@/lib/types";
 import { FiscalFlowCalendar, SidebarContent } from "./fiscal-flow-calendar";
+import { format, subMonths, startOfMonth, endOfMonth, eachWeekOfInterval, getWeek, isSameMonth, parseISO, isBefore, differenceInCalendarMonths, getDate, endOfWeek } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
+import { recurrenceIntervalMonths } from "@/lib/constants";
+
 
 export default function FiscalFlowDashboard() {
   const [isClient, setIsClient] = useState(false);
   const [entries, setEntries] = useLocalStorage<Entry[]>("fiscalFlowEntries", []);
   const [rollover, setRollover] = useLocalStorage<RolloverPreference>("fiscalFlowRollover", "carryover");
   const [timezone, setTimezone] = useLocalStorage<string>('fiscalFlowTimezone', 'UTC');
-  
+  const [monthlyLeftovers, setMonthlyLeftovers] = useLocalStorage<any>("fiscalFlowLeftovers", {});
+
   const [isEntryDialogOpen, setEntryDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [isMobileSheetOpen, setMobileSheetOpen] = useState(false);
@@ -30,7 +35,6 @@ export default function FiscalFlowDashboard() {
 
   useEffect(() => {
     setIsClient(true);
-    // Set default timezone on client if not already set
     if (localStorage.getItem('fiscalFlowTimezone') === null) {
         setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
     }
@@ -63,6 +67,92 @@ export default function FiscalFlowDashboard() {
     setEditingEntry(null);
     setEntryDialogOpen(true);
   };
+  
+  const parseDateInTimezone = (dateString: string, timeZone: string) => {
+    const [year, month, day] = dateString.split('-').map(Number);
+    return toZonedTime(new Date(year, month - 1, day), timeZone);
+  };
+
+  const mobileSummaryData = useMemo(() => {
+    if (!isMobile) return null;
+
+    const currentMonth = selectedDate; // Use selected date for context
+    const monthKey = format(currentMonth, 'yyyy-MM');
+    const prevMonth = subMonths(currentMonth, 1);
+    const prevMonthKey = format(prevMonth, 'yyyy-MM');
+    const previousMonthLeftover = (rollover === 'carryover' && monthlyLeftovers[prevMonthKey]) || 0;
+
+    const entriesForCurrentMonth = entries.flatMap((e) => {
+      const recurrenceInterval = e.recurrence ? recurrenceIntervalMonths[e.recurrence] : 0;
+      if (e.recurrence && e.recurrence !== 'none' && recurrenceInterval > 0) {
+        const originalEntryDate = parseISO(e.date);
+        
+        if (isBefore(startOfMonth(currentMonth), startOfMonth(originalEntryDate))) {
+            return [];
+        }
+
+        const monthDiff = differenceInCalendarMonths(currentMonth, originalEntryDate);
+        if (monthDiff < 0 || monthDiff % recurrenceInterval !== 0) {
+            return [];
+        }
+        
+        const lastDayOfCurrentMonth = endOfMonth(currentMonth).getDate();
+        const originalDay = getDate(originalEntryDate);
+        const dayForCurrentMonth = Math.min(originalDay, lastDayOfCurrentMonth);
+        const recurringDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), dayForCurrentMonth);
+        
+        return [{ ...e, date: format(recurringDate, 'yyyy-MM-dd') }];
+      } else {
+        const entryDate = parseDateInTimezone(e.date, timezone);
+        if (isSameMonth(entryDate, currentMonth)) {
+          return [e];
+        }
+        return [];
+      }
+    });
+
+    const monthlyBills = entriesForCurrentMonth.filter((e) => e.type === "bill").reduce((sum, e) => sum + e.amount, 0);
+    const currentMonthIncome = entriesForCurrentMonth.filter((e) => e.type === "income").reduce((sum, e) => sum + e.amount, 0);
+    
+    const monthlyNet = currentMonthIncome - monthlyBills;
+
+    const weeksInMonth = eachWeekOfInterval({
+        start: startOfMonth(currentMonth),
+        end: endOfMonth(currentMonth)
+    });
+
+    let remainingRollover = previousMonthLeftover;
+    
+    const weeksData = weeksInMonth.map(weekStart => {
+        const weekEnd = endOfWeek(weekStart);
+        const weekEntries = entriesForCurrentMonth.filter(e => {
+            const entryDate = parseDateInTimezone(e.date, timezone);
+            return entryDate >= weekStart && entryDate <= weekEnd;
+        });
+
+        const income = weekEntries.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
+        const bills = weekEntries.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
+        const net = income - bills;
+
+        let rolloverApplied = 0;
+        if (net < 0 && remainingRollover > 0) {
+            rolloverApplied = Math.min(Math.abs(net), remainingRollover);
+            remainingRollover -= rolloverApplied;
+        }
+
+        return { week: getWeek(weekStart), income, bills, net: net + rolloverApplied, rolloverApplied };
+    });
+
+    const selectedWeekData = weeksData.find(w => getWeek(selectedDate) === w.week) || {
+        week: getWeek(selectedDate), income: 0, bills: 0, net: 0, rolloverApplied: 0
+    };
+
+    return {
+      monthlyTotals: { bills: monthlyBills, income: currentMonthIncome, net: monthlyNet },
+      weeklyTotals: selectedWeekData,
+    };
+  }, [isMobile, selectedDate, entries, rollover, monthlyLeftovers, timezone]);
+
 
   if (!isClient) {
     return (
@@ -87,7 +177,7 @@ export default function FiscalFlowDashboard() {
                     ))}
                 </div>
              </main>
-             <aside className="w-[350px] border-l overflow-y-auto p-6 hidden md:block">
+             <aside className="w-[350px] border-l overflow-y-auto p-6 hidden lg:block">
                 <Skeleton className="h-8 w-32 mb-6" />
                 <Skeleton className="h-24 w-full mb-4" />
                 <Skeleton className="h-24 w-full" />
@@ -117,7 +207,14 @@ export default function FiscalFlowDashboard() {
                   <Button variant="ghost" size="icon"><Menu /></Button>
               </SheetTrigger>
               <SheetContent side="right" className="w-[300px] sm:w-[400px] p-0">
-                  {/* The content is rendered dynamically inside the sheet based on a dummy calendar instance */}
+                  {mobileSummaryData && (
+                    <SidebarContent
+                      weeklyTotals={mobileSummaryData.weeklyTotals}
+                      monthlyTotals={mobileSummaryData.monthlyTotals}
+                      isMobile={true}
+                      selectedDate={selectedDate}
+                    />
+                  )}
               </SheetContent>
             </Sheet>
           )}

@@ -1,7 +1,7 @@
 // src/components/fiscal-flow-calendar.tsx
 "use client";
 
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   addMonths,
   subMonths,
@@ -16,20 +16,19 @@ import {
   isSameDay,
   getWeek,
   getDate,
-  setMonth,
-  setYear,
   parseISO,
   isBefore,
   differenceInCalendarMonths,
   eachWeekOfInterval,
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
-import { ChevronLeft, ChevronRight, Plus, Menu, ArrowUp, ArrowDown, Repeat } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Repeat, Trash2, X } from "lucide-react";
 
 import useLocalStorage from "@/hooks/use-local-storage";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { Entry, RolloverPreference, MonthlyLeftovers, RecurrenceInterval } from "@/lib/types";
 
@@ -44,8 +43,6 @@ const recurrenceIntervalMonths: Record<RecurrenceInterval, number> = {
   '12months': 12,
 };
 
-// Helper to parse 'YYYY-MM-DD' string into a Date object within a specific timezone.
-// This prevents the date from shifting to the previous day.
 const parseDateInTimezone = (dateString: string, timeZone: string) => {
   const [year, month, day] = dateString.split('-').map(Number);
   return toZonedTime(new Date(year, month - 1, day), timeZone);
@@ -80,6 +77,9 @@ export function FiscalFlowCalendar({
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [monthlyLeftovers, setMonthlyLeftovers] = useLocalStorage<MonthlyLeftovers>("fiscalFlowLeftovers", {});
   const [draggingEntryId, setDraggingEntryId] = useState<string | null>(null);
+  
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
 
   const daysInMonth = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth));
@@ -88,12 +88,37 @@ export function FiscalFlowCalendar({
   }, [currentMonth]);
 
   const handleDayClick = (day: Date) => {
-      setSelectedDate(day);
-      setGlobalSelectedDate(day);
-      if (isMobile) {
-        openMobileSheet();
+      if (isSelectionMode) {
+          handleDaySelection(day);
+      } else {
+        setSelectedDate(day);
+        setGlobalSelectedDate(day);
+        if (isMobile) {
+            openMobileSheet();
+        }
       }
   }
+  
+  const handleDaySelection = (day: Date) => {
+    const dayKey = format(day, 'yyyy-MM-dd');
+    setSelectedDays(prevSelected => {
+        const newSelected = new Set(prevSelected);
+        if (newSelected.has(dayKey)) {
+            newSelected.delete(dayKey);
+        } else {
+            newSelected.add(dayKey);
+        }
+        return newSelected;
+    });
+  };
+
+  const handleDeleteSelected = () => {
+    setEntries(prevEntries => 
+        prevEntries.filter(entry => !selectedDays.has(entry.date))
+    );
+    setIsSelectionMode(false);
+    setSelectedDays(new Set());
+  };
 
   const openEditEntryDialog = (entry: Entry) => {
     setEditingEntry(entry);
@@ -165,7 +190,6 @@ export function FiscalFlowCalendar({
     const monthlyNet = currentMonthIncome - monthlyBills;
     const endOfMonthBalance = currentMonthIncome + previousMonthLeftover - monthlyBills;
     
-    // --- Weekly Calculations with Rollover Application ---
     const weeksInMonth = eachWeekOfInterval({
         start: startOfMonth(currentMonth),
         end: endOfMonth(currentMonth)
@@ -228,31 +252,14 @@ export function FiscalFlowCalendar({
     }
   }, [monthlyTotals.monthKey, monthlyTotals.endOfMonthBalance, setMonthlyLeftovers, monthlyLeftovers]);
 
-
-  const SidebarContent = () => (
-    <ScrollArea className="h-full">
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-          <h2 className="text-2xl font-bold">
-            {isMobile ? format(selectedDate, "MMM d, yyyy") : "Summary"}
-          </h2>
-          <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Week {weeklyTotals.week}</h3>
-              <SummaryCard title="Income" amount={weeklyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
-              <SummaryCard title="Bills Due" amount={weeklyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
-              {weeklyTotals.rolloverApplied > 0 && (
-                  <SummaryCard title="Rollover Applied" amount={weeklyTotals.rolloverApplied} icon={<Repeat />} />
-              )}
-              <SummaryCard title="Weekly Net" amount={weeklyTotals.net} variant={weeklyTotals.net >= 0 ? 'positive' : 'negative'} />
-          </div>
-          <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Month</h3>
-              <SummaryCard title="Total Income" amount={monthlyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
-              <SummaryCard title="Total Bills" amount={monthlyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
-              <SummaryCard title="Monthly Net" amount={monthlyTotals.net} variant={monthlyTotals.net >= 0 ? 'positive' : 'negative'} />
-          </div>
-      </div>
-    </ScrollArea>
-  );
+  const Sidebar = () => (
+    <SidebarContent 
+      weeklyTotals={weeklyTotals}
+      monthlyTotals={monthlyTotals}
+      isMobile={isMobile}
+      selectedDate={selectedDate}
+    />
+  )
 
   return (
     <div className="flex flex-1 overflow-hidden">
@@ -260,13 +267,27 @@ export function FiscalFlowCalendar({
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl sm:text-2xl font-bold">{format(currentMonth, "MMMM yyyy")}</h1>
             <div className="flex items-center gap-1 sm:gap-2">
-              <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" onClick={() => setCurrentMonth(new Date())} className="px-2 sm:px-4">Today</Button>
-              <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+              {!isSelectionMode ? (
+                <>
+                    <Button variant="outline" onClick={() => setIsSelectionMode(true)}>Select</Button>
+                    <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+                        <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" onClick={() => setCurrentMonth(new Date())} className="px-2 sm:px-4">Today</Button>
+                    <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+                        <ChevronRight className="h-4 w-4" />
+                    </Button>
+                </>
+              ) : (
+                <>
+                    <Button variant="destructive" size="sm" onClick={handleDeleteSelected} disabled={selectedDays.size === 0}>
+                        <Trash2 className="mr-2 h-4 w-4" /> Delete ({selectedDays.size})
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => { setIsSelectionMode(false); setSelectedDays(new Set()); }}>
+                        <X className="mr-2 h-4 w-4" /> Cancel
+                    </Button>
+                </>
+              )}
             </div>
           </div>
           <div className="grid grid-cols-7 gap-1 text-center font-semibold text-muted-foreground text-xs sm:text-sm">
@@ -274,6 +295,7 @@ export function FiscalFlowCalendar({
           </div>
           <div className="grid grid-cols-7 grid-rows-5 gap-1 mt-1">
             {daysInMonth.map((day) => {
+              const dayKey = format(day, 'yyyy-MM-dd');
               const dayEntries = entriesForCurrentMonth
                 .filter((e) => {
                     const entryDate = parseDateInTimezone(e.date, timezone);
@@ -289,10 +311,12 @@ export function FiscalFlowCalendar({
                 <div
                   key={day.toString()}
                   className={cn(
-                    "relative flex flex-col h-24 sm:h-32 rounded-lg p-1 sm:p-2 border transition-colors cursor-pointer",
-                    !isSameMonth(day, currentMonth) ? "bg-muted/50 text-muted-foreground" : "bg-card hover:bg-card/80",
+                    "relative flex flex-col h-24 sm:h-32 rounded-lg p-1 sm:p-2 border transition-colors",
+                    !isSelectionMode && "cursor-pointer",
+                    !isSameMonth(day, currentMonth) ? "bg-muted/50 text-muted-foreground" : "bg-card",
+                    !isSelectionMode && isSameMonth(day, currentMonth) && "hover:bg-card/80",
                     isToday(day) && "border-primary",
-                    isSameDay(day, selectedDate) && "ring-2 ring-primary"
+                    isSameDay(day, selectedDate) && !isSelectionMode && "ring-2 ring-primary"
                   )}
                   onClick={() => handleDayClick(day)}
                   onDragOver={handleDragOver}
@@ -300,22 +324,33 @@ export function FiscalFlowCalendar({
                 >
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-xs sm:text-base">{format(day, "d")}</span>
-                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); openNewEntryDialog(day); }}>
-                        <Plus className="h-4 w-4" />
-                    </Button>
+                    {!isSelectionMode && (
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); openNewEntryDialog(day); }}>
+                            <Plus className="h-4 w-4" />
+                        </Button>
+                    )}
+                    {isSelectionMode && dayEntries.length > 0 && (
+                        <Checkbox 
+                            checked={selectedDays.has(dayKey)}
+                            onCheckedChange={() => handleDaySelection(day)}
+                            className="h-5 w-5"
+                        />
+                    )}
                   </div>
                   <ScrollArea className="flex-1 mt-1">
                     <div className="space-y-1 text-[10px] sm:text-xs">
                       {dayEntries.map(entry => (
                           <div 
                               key={entry.id} 
-                              onClick={(e) => { e.stopPropagation(); openEditEntryDialog(entry); }}
+                              onClick={(e) => { if (!isSelectionMode) { e.stopPropagation(); openEditEntryDialog(entry); } }}
                               onDragStart={(e) => handleDragStart(e, entry.id)}
-                              draggable="true"
+                              draggable={!isSelectionMode}
                               className={cn(
-                                  "p-1 rounded-md truncate cursor-grab active:cursor-grabbing",
+                                  "p-1 rounded-md truncate",
+                                  !isSelectionMode && "cursor-grab active:cursor-grabbing",
                                   entry.type === 'bill' ? 'bg-destructive text-destructive-foreground' : 'bg-accent text-accent-foreground',
-                                  draggingEntryId === entry.id && 'opacity-50'
+                                  draggingEntryId === entry.id && 'opacity-50',
+                                  isSelectionMode && 'opacity-70'
                               )}
                           >
                               <span className="hidden sm:inline">{entry.name}: </span>{formatCurrency(entry.amount)}
@@ -364,7 +399,7 @@ export function FiscalFlowCalendar({
         </main>
         {!isMobile && (
           <aside className="w-[350px] border-l overflow-y-auto hidden lg:block">
-            <SidebarContent />
+            <Sidebar />
           </aside>
         )}
       </div>
@@ -387,12 +422,6 @@ function SummaryCard({ title, amount, icon, description, variant = 'default', cl
         </Card>
     );
 }
-
-export const MobileSidebar = ({ children }: { children: React.ReactNode }) => (
-  <div className="flex flex-col gap-6 p-4 h-full bg-card">
-    {children}
-  </div>
-);
 
 export const SidebarContent = ({
   weeklyTotals,

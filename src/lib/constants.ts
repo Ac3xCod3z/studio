@@ -1,0 +1,10 @@
+import { RecurrenceInterval } from './types';
+
+export const recurrenceIntervalMonths: Record<RecurrenceInterval, number> = {
+  none: 0,
+  monthly: 1,
+  bimonthly: 2,
+  '3months': 3,
+  '6months': 6,
+  '12months': 12,
+};
