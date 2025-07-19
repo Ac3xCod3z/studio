@@ -80,8 +80,10 @@ export default function FiscalFlowDashboard() {
 
   useEffect(() => {
     const { monthKey, net } = monthlyTotals;
-    setMonthlyLeftovers(prev => ({...prev, [monthKey]: net }));
-  }, [monthlyTotals, setMonthlyLeftovers]);
+    if (monthlyLeftovers[monthKey] !== net) {
+      setMonthlyLeftovers(prev => ({...prev, [monthKey]: net }));
+    }
+  }, [monthlyTotals, setMonthlyLeftovers, monthlyLeftovers]);
 
   const handleEntrySave = useCallback((entryData: Omit<Entry, "id"> & { id?: string }) => {
     setEntries((prev) => {
@@ -270,3 +272,5 @@ function SummaryCard({ title, amount, icon, description, variant = 'default' }: 
         </Card>
     );
 }
+
+    
