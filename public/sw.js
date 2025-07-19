@@ -1,29 +1,25 @@
-// This is the service worker file.
-// It's a simple cache-first service worker.
 
 const CACHE_NAME = 'fiscalflow-cache-v1';
 const urlsToCache = [
   '/',
   '/manifest.json',
-  // Add other critical assets here.
-  // Be careful not to cache too much, especially things that change often.
+  // Add other important assets here. Next.js automatically caches its own chunks.
 ];
 
-self.addEventListener('install', (event) => {
-  // Perform install steps
+self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => {
+      .then(cache => {
         console.log('Opened cache');
         return cache.addAll(urlsToCache);
       })
   );
 });
 
-self.addEventListener('fetch', (event) => {
+self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request)
-      .then((response) => {
+      .then(response => {
         // Cache hit - return response
         if (response) {
           return response;
@@ -36,9 +32,9 @@ self.addEventListener('fetch', (event) => {
         const fetchRequest = event.request.clone();
 
         return fetch(fetchRequest).then(
-          (response) => {
+          response => {
             // Check if we received a valid response
-            if (!response || response.status !== 200 || response.type !== 'basic') {
+            if(!response || response.status !== 200 || response.type !== 'basic') {
               return response;
             }
 
@@ -49,7 +45,7 @@ self.addEventListener('fetch', (event) => {
             const responseToCache = response.clone();
 
             caches.open(CACHE_NAME)
-              .then((cache) => {
+              .then(cache => {
                 cache.put(event.request, responseToCache);
               });
 
@@ -60,12 +56,12 @@ self.addEventListener('fetch', (event) => {
     );
 });
 
-self.addEventListener('activate', (event) => {
+self.addEventListener('activate', event => {
   const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
+    caches.keys().then(cacheNames => {
       return Promise.all(
-        cacheNames.map((cacheName) => {
+        cacheNames.map(cacheName => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
             return caches.delete(cacheName);
           }
