@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -46,6 +47,12 @@ type EntryFormProps = {
   selectedDate: Date;
 };
 
+// Helper function to parse YYYY-MM-DD string as local date
+const parseDateAsLocal = (dateString: string) => {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
 export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selectedDate }: EntryFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -53,9 +60,31 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
       type: entry?.type || "bill",
       name: entry?.name || "",
       amount: entry?.amount || 0,
-      date: entry ? new Date(entry.date) : selectedDate,
+      date: entry ? parseDateAsLocal(entry.date) : selectedDate,
     },
   });
+
+   // Add a useEffect to reset the form's date when selectedDate changes for a new entry
+   React.useEffect(() => {
+    if (isOpen) {
+      if (entry) {
+        form.reset({
+          type: entry.type,
+          name: entry.name,
+          amount: entry.amount,
+          date: parseDateAsLocal(entry.date)
+        });
+      } else {
+        form.reset({
+          type: "bill",
+          name: "",
+          amount: 0,
+          date: selectedDate,
+        });
+      }
+    }
+  }, [isOpen, selectedDate, entry, form]);
+
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     const dataToSave = {
