@@ -54,6 +54,7 @@ type FiscalFlowCalendarProps = {
 
 export function FiscalFlowCalendar({
     entries,
+    setEntries,
     rollover,
     timezone,
     openNewEntryDialog,
@@ -64,7 +65,8 @@ export function FiscalFlowCalendar({
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [monthlyLeftovers, setMonthlyLeftovers] = useLocalStorage<MonthlyLeftovers>("fiscalFlowLeftovers", {});
-  
+  const [draggingEntryId, setDraggingEntryId] = useState<string | null>(null);
+
   const isMobile = useMedia("(max-width: 768px)", false);
 
   const daysInMonth = useMemo(() => {
@@ -83,6 +85,29 @@ export function FiscalFlowCalendar({
     setGlobalSelectedDate(parseDateInTimezone(entry.date, timezone));
     setEntryDialogOpen(true);
   }
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, entryId: string) => {
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggingEntryId(entryId);
+  };
+  
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault(); 
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetDate: Date) => {
+    e.preventDefault();
+    if (draggingEntryId) {
+      setEntries(prevEntries => 
+        prevEntries.map(entry => 
+          entry.id === draggingEntryId 
+            ? { ...entry, date: format(targetDate, 'yyyy-MM-dd') }
+            : entry
+        )
+      );
+    }
+    setDraggingEntryId(null);
+  };
 
   const { monthlyTotals, weeklyTotals, entriesForCurrentMonth } = useMemo(() => {
     const monthKey = format(currentMonth, 'yyyy-MM');
@@ -195,10 +220,17 @@ export function FiscalFlowCalendar({
           </div>
           <div className="grid grid-cols-7 grid-rows-5 gap-1 mt-1">
             {daysInMonth.map((day) => {
-              const dayEntries = entriesForCurrentMonth.filter((e) => {
-                  const entryDate = parseDateInTimezone(e.date, timezone);
-                  return isSameDay(entryDate, day);
-              });
+              const dayEntries = entriesForCurrentMonth
+                .filter((e) => {
+                    const entryDate = parseDateInTimezone(e.date, timezone);
+                    return isSameDay(entryDate, day);
+                })
+                .sort((a, b) => {
+                    if (a.type === 'income' && b.type === 'bill') return -1;
+                    if (a.type === 'bill' && b.type === 'income') return 1;
+                    return 0;
+                });
+
               return (
                 <div
                   key={day.toString()}
@@ -209,6 +241,8 @@ export function FiscalFlowCalendar({
                     isSameDay(day, selectedDate) && "ring-2 ring-primary"
                   )}
                   onClick={() => handleDayClick(day)}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, day)}
                 >
                   <div className="flex justify-between items-center">
                     <span className="font-bold">{format(day, "d")}</span>
@@ -218,10 +252,15 @@ export function FiscalFlowCalendar({
                   </div>
                   <div className="flex-1 overflow-y-auto mt-1 space-y-1 text-xs">
                     {dayEntries.map(entry => (
-                        <div key={entry.id} onClick={(e) => { e.stopPropagation(); openEditEntryDialog(entry); }}
+                        <div 
+                            key={entry.id} 
+                            onClick={(e) => { e.stopPropagation(); openEditEntryDialog(entry); }}
+                            onDragStart={(e) => handleDragStart(e, entry.id)}
+                            draggable="true"
                             className={cn(
-                                "p-1 rounded-md truncate",
-                                entry.type === 'bill' ? 'bg-destructive text-destructive-foreground' : 'bg-accent text-accent-foreground'
+                                "p-1 rounded-md truncate cursor-grab active:cursor-grabbing",
+                                entry.type === 'bill' ? 'bg-destructive text-destructive-foreground' : 'bg-accent text-accent-foreground',
+                                draggingEntryId === entry.id && 'opacity-50'
                             )}
                         >
                             {entry.name}: {formatCurrency(entry.amount)}
