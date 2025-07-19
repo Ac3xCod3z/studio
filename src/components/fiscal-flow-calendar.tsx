@@ -20,6 +20,8 @@ import {
   isBefore,
   differenceInCalendarMonths,
   eachWeekOfInterval,
+  getDay,
+  setDate,
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Repeat, Trash2, X } from "lucide-react";
@@ -31,17 +33,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { Entry, RolloverPreference, MonthlyLeftovers, RecurrenceInterval } from "@/lib/types";
+import { recurrenceIntervalMonths } from "@/lib/constants";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-const recurrenceIntervalMonths: Record<RecurrenceInterval, number> = {
-  none: 0,
-  monthly: 1,
-  bimonthly: 2,
-  '3months': 3,
-  '6months': 6,
-  '12months': 12,
-};
 
 const parseDateInTimezone = (dateString: string, timeZone: string) => {
   const [year, month, day] = dateString.split('-').map(Number);
@@ -156,32 +150,47 @@ export function FiscalFlowCalendar({
     const previousMonthLeftover = (rollover === 'carryover' && monthlyLeftovers[prevMonthKey]) || 0;
 
     const entriesForCurrentMonth = entries.flatMap((e) => {
+      const originalEntryDate = parseISO(e.date);
+      if (isBefore(startOfMonth(currentMonth), startOfMonth(originalEntryDate))) {
+        return [];
+      }
+
+      if (e.recurrence === 'weekly') {
+        const originalDayOfWeek = getDay(originalEntryDate);
+        const daysInCurrentMonth = eachDayOfInterval({
+          start: startOfMonth(currentMonth),
+          end: endOfMonth(currentMonth),
+        });
+
+        return daysInCurrentMonth
+          .filter(day => getDay(day) === originalDayOfWeek)
+          .map(recurringDate => ({
+            ...e,
+            date: format(recurringDate, 'yyyy-MM-dd'),
+          }));
+      }
+
       const recurrenceInterval = e.recurrence ? recurrenceIntervalMonths[e.recurrence] : 0;
       if (e.recurrence && e.recurrence !== 'none' && recurrenceInterval > 0) {
-        const originalEntryDate = parseISO(e.date);
-        
-        if (isBefore(startOfMonth(currentMonth), startOfMonth(originalEntryDate))) {
-            return [];
-        }
-
         const monthDiff = differenceInCalendarMonths(currentMonth, originalEntryDate);
         if (monthDiff < 0 || monthDiff % recurrenceInterval !== 0) {
-            return [];
+          return [];
         }
         
         const lastDayOfCurrentMonth = endOfMonth(currentMonth).getDate();
         const originalDay = getDate(originalEntryDate);
         const dayForCurrentMonth = Math.min(originalDay, lastDayOfCurrentMonth);
-        const recurringDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), dayForCurrentMonth);
+        const recurringDate = setDate(currentMonth, dayForCurrentMonth);
         
         return [{ ...e, date: format(recurringDate, 'yyyy-MM-dd') }];
-      } else {
-        const entryDate = parseDateInTimezone(e.date, timezone);
-        if (isSameMonth(entryDate, currentMonth)) {
-          return [e];
-        }
-        return [];
       }
+
+      // Handle non-recurring entries
+      const entryDate = parseDateInTimezone(e.date, timezone);
+      if (isSameMonth(entryDate, currentMonth)) {
+        return [e];
+      }
+      return [];
     });
 
     const monthlyBills = entriesForCurrentMonth.filter((e) => e.type === "bill").reduce((sum, e) => sum + e.amount, 0);
@@ -341,7 +350,7 @@ export function FiscalFlowCalendar({
                     <div className="space-y-1 text-[10px] sm:text-xs">
                       {dayEntries.map(entry => (
                           <div 
-                              key={entry.id} 
+                              key={entry.id + entry.date} 
                               onClick={(e) => { if (!isSelectionMode) { e.stopPropagation(); openEditEntryDialog(entry); } }}
                               onDragStart={(e) => handleDragStart(e, entry.id)}
                               draggable={!isSelectionMode}

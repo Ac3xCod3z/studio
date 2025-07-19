@@ -2,6 +2,7 @@ export type EntryType = 'bill' | 'income';
 
 export type RecurrenceInterval =
   | 'none'
+  | 'weekly'
   | 'monthly'
   | 'bimonthly'
   | '3months'
