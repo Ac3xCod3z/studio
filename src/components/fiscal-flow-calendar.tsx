@@ -22,7 +22,7 @@ import {
   isBefore,
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
-import { ChevronLeft, ChevronRight, Plus, Menu, ArrowUp, ArrowDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Menu, ArrowUp, ArrowDown, Repeat } from "lucide-react";
 import { useMedia } from "react-use";
 
 import useLocalStorage from "@/hooks/use-local-storage";
@@ -84,7 +84,7 @@ export function FiscalFlowCalendar({
     setEntryDialogOpen(true);
   }
 
-  const { monthlyTotals, weeklyTotals, previousMonthLeftover, entriesForCurrentMonth } = useMemo(() => {
+  const { monthlyTotals, weeklyTotals, entriesForCurrentMonth } = useMemo(() => {
     const monthKey = format(currentMonth, 'yyyy-MM');
     const prevMonth = subMonths(currentMonth, 1);
     const prevMonthKey = format(prevMonth, 'yyyy-MM');
@@ -121,9 +121,8 @@ export function FiscalFlowCalendar({
     const monthlyBills = entriesForCurrentMonth.filter((e) => e.type === "bill").reduce((sum, e) => sum + e.amount, 0);
     const currentMonthIncome = entriesForCurrentMonth.filter((e) => e.type === "income").reduce((sum, e) => sum + e.amount, 0);
     
-    const totalIncome = currentMonthIncome + previousMonthLeftover;
     const monthlyNet = currentMonthIncome - monthlyBills;
-    const endOfMonthBalance = totalIncome - monthlyBills;
+    const endOfMonthBalance = currentMonthIncome + previousMonthLeftover - monthlyBills;
 
     const start = startOfWeek(selectedDate);
     const end = endOfWeek(selectedDate);
@@ -137,9 +136,15 @@ export function FiscalFlowCalendar({
     const weeklyNet = weeklyIncome - weeklyBills;
     
     return {
-      monthlyTotals: { bills: monthlyBills, income: totalIncome, net: monthlyNet, endOfMonthBalance: endOfMonthBalance, monthKey },
+      monthlyTotals: { 
+        bills: monthlyBills, 
+        income: currentMonthIncome, 
+        net: monthlyNet, 
+        endOfMonthBalance: endOfMonthBalance, 
+        rollover: previousMonthLeftover,
+        monthKey
+      },
       weeklyTotals: { bills: weeklyBills, income: weeklyIncome, net: weeklyNet, week: getWeek(selectedDate) },
-      previousMonthLeftover,
       entriesForCurrentMonth,
     };
   }, [entries, currentMonth, selectedDate, rollover, monthlyLeftovers, timezone]);
@@ -163,7 +168,7 @@ export function FiscalFlowCalendar({
         </div>
         <div className="space-y-4">
             <h3 className="font-semibold text-lg">Month</h3>
-            <SummaryCard title="Total Income" amount={monthlyTotals.income} icon={<ArrowUp className="text-emerald-500" />} description={previousMonthLeftover > 0 ? `${formatCurrency(previousMonthLeftover)} rolled over` : undefined} />
+            <SummaryCard title="Total Income" amount={monthlyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
             <SummaryCard title="Total Bills" amount={monthlyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
             <SummaryCard title="Monthly Net" amount={monthlyTotals.net} variant={monthlyTotals.net >= 0 ? 'positive' : 'negative'} />
         </div>
@@ -236,7 +241,6 @@ export function FiscalFlowCalendar({
                 title="Total Income"
                 amount={monthlyTotals.income}
                 icon={<ArrowUp className="text-emerald-500" />}
-                description={previousMonthLeftover > 0 ? `${formatCurrency(previousMonthLeftover)} rolled over` : undefined}
               />
               <SummaryCard
                 title="Total Bills"
@@ -249,9 +253,16 @@ export function FiscalFlowCalendar({
                 variant={monthlyTotals.net >= 0 ? 'positive' : 'negative'}
               />
               <SummaryCard
+                title="Rollover"
+                amount={monthlyTotals.rollover}
+                icon={<Repeat />}
+                description="From previous month"
+              />
+              <SummaryCard
                 title="End-of-Month Balance"
                 amount={monthlyTotals.endOfMonthBalance}
                 variant={monthlyTotals.endOfMonthBalance >= 0 ? 'positive' : 'negative'}
+                className="md:col-span-2 lg:col-span-4"
               />
             </div>
           </div>
@@ -276,10 +287,10 @@ export function FiscalFlowCalendar({
 }
 
 
-function SummaryCard({ title, amount, icon, description, variant = 'default' }: { title: string, amount: number, icon?: React.ReactNode, description?: string, variant?: 'default' | 'positive' | 'negative' }) {
+function SummaryCard({ title, amount, icon, description, variant = 'default', className }: { title: string, amount: number, icon?: React.ReactNode, description?: string, variant?: 'default' | 'positive' | 'negative', className?: string }) {
     const amountColor = variant === 'positive' ? 'text-emerald-600 dark:text-emerald-400' : variant === 'negative' ? 'text-destructive' : '';
     return (
-        <Card>
+        <Card className={cn(className)}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{title}</CardTitle>
                 {icon}
