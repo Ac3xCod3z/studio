@@ -21,6 +21,7 @@ import {
   parseISO,
   isBefore,
   differenceInCalendarMonths,
+  eachWeekOfInterval,
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { ChevronLeft, ChevronRight, Plus, Menu, ArrowUp, ArrowDown, Repeat } from "lucide-react";
@@ -159,18 +160,49 @@ export function FiscalFlowCalendar({
     
     const monthlyNet = currentMonthIncome - monthlyBills;
     const endOfMonthBalance = currentMonthIncome + previousMonthLeftover - monthlyBills;
-
-    const start = startOfWeek(selectedDate);
-    const end = endOfWeek(selectedDate);
-    const weekEntries = entriesForCurrentMonth.filter(e => {
-        const entryDate = parseDateInTimezone(e.date, timezone);
-        return entryDate >= start && entryDate <= end;
+    
+    // --- Weekly Calculations with Rollover Application ---
+    const weeksInMonth = eachWeekOfInterval({
+        start: startOfMonth(currentMonth),
+        end: endOfMonth(currentMonth)
     });
 
-    const weeklyBills = weekEntries.filter((e) => e.type === "bill").reduce((sum, e) => sum + e.amount, 0);
-    const weeklyIncome = weekEntries.filter((e) => e.type === "income").reduce((sum, e) => sum + e.amount, 0);
-    const weeklyNet = weeklyIncome - weeklyBills;
+    let remainingRollover = previousMonthLeftover;
     
+    const weeksData = weeksInMonth.map(weekStart => {
+        const weekEnd = endOfWeek(weekStart);
+        const weekEntries = entriesForCurrentMonth.filter(e => {
+            const entryDate = parseDateInTimezone(e.date, timezone);
+            return entryDate >= weekStart && entryDate <= weekEnd;
+        });
+
+        const income = weekEntries.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
+        const bills = weekEntries.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
+        const net = income - bills;
+
+        let rolloverApplied = 0;
+        if (net < 0 && remainingRollover > 0) {
+            rolloverApplied = Math.min(Math.abs(net), remainingRollover);
+            remainingRollover -= rolloverApplied;
+        }
+
+        return {
+            week: getWeek(weekStart),
+            income,
+            bills,
+            net: net + rolloverApplied,
+            rolloverApplied,
+        };
+    });
+
+    const selectedWeekData = weeksData.find(w => getWeek(selectedDate) === w.week) || {
+        week: getWeek(selectedDate),
+        income: 0,
+        bills: 0,
+        net: 0,
+        rolloverApplied: 0
+    };
+
     return {
       monthlyTotals: { 
         bills: monthlyBills, 
@@ -180,7 +212,7 @@ export function FiscalFlowCalendar({
         rollover: previousMonthLeftover,
         monthKey
       },
-      weeklyTotals: { bills: weeklyBills, income: weeklyIncome, net: weeklyNet, week: getWeek(selectedDate) },
+      weeklyTotals: selectedWeekData,
       entriesForCurrentMonth,
     };
   }, [entries, currentMonth, selectedDate, rollover, monthlyLeftovers, timezone]);
@@ -200,6 +232,9 @@ export function FiscalFlowCalendar({
             <h3 className="font-semibold text-lg">Week {weeklyTotals.week}</h3>
             <SummaryCard title="Income" amount={weeklyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
             <SummaryCard title="Bills Due" amount={weeklyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
+            {weeklyTotals.rolloverApplied > 0 && (
+                <SummaryCard title="Rollover Applied" amount={weeklyTotals.rolloverApplied} icon={<Repeat />} />
+            )}
             <SummaryCard title="Weekly Net" amount={weeklyTotals.net} variant={weeklyTotals.net >= 0 ? 'positive' : 'negative'} />
         </div>
         <div className="space-y-4">
