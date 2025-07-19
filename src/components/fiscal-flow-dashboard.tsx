@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import type { Entry, RolloverPreference } from "@/lib/types";
 import { FiscalFlowCalendar, SidebarContent } from "./fiscal-flow-calendar";
-import { format, subMonths, startOfMonth, endOfMonth, eachWeekOfInterval, getWeek, isSameMonth, parseISO, isBefore, differenceInCalendarMonths, getDate, endOfWeek } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, eachWeekOfInterval, getWeek, isSameMonth, parseISO, isBefore, differenceInCalendarMonths, getDate, endOfWeek, getDay } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { recurrenceIntervalMonths } from "@/lib/constants";
 
@@ -83,14 +83,29 @@ export default function FiscalFlowDashboard() {
     const previousMonthLeftover = (rollover === 'carryover' && monthlyLeftovers[prevMonthKey]) || 0;
 
     const entriesForCurrentMonth = entries.flatMap((e) => {
+      const originalEntryDate = parseISO(e.date);
+
+      if (isBefore(startOfMonth(currentMonth), startOfMonth(originalEntryDate))) {
+        return [];
+      }
+
+      if (e.recurrence === 'weekly') {
+        const originalDayOfWeek = getDay(originalEntryDate);
+        const daysInCurrentMonth = eachWeekOfInterval({
+          start: startOfMonth(currentMonth),
+          end: endOfMonth(currentMonth),
+        });
+
+        return daysInCurrentMonth
+          .filter(day => getDay(day) === originalDayOfWeek)
+          .map(recurringDate => ({
+            ...e,
+            date: format(recurringDate, 'yyyy-MM-dd'),
+          }));
+      }
+
       const recurrenceInterval = e.recurrence ? recurrenceIntervalMonths[e.recurrence] : 0;
       if (e.recurrence && e.recurrence !== 'none' && recurrenceInterval > 0) {
-        const originalEntryDate = parseISO(e.date);
-        
-        if (isBefore(startOfMonth(currentMonth), startOfMonth(originalEntryDate))) {
-            return [];
-        }
-
         const monthDiff = differenceInCalendarMonths(currentMonth, originalEntryDate);
         if (monthDiff < 0 || monthDiff % recurrenceInterval !== 0) {
             return [];
