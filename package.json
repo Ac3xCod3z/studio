@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack -p 9002",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
-    "build": "next build && copyfiles -u 1 public/sw.js public/manifest.json .next/standalone/public/",
+    "prebuild": "node scripts/generate-pwa-assets.js",
+    "build": "npm run prebuild && next build && copyfiles -u 1 public/sw.js public/manifest.json .next/standalone/public/",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
@@ -64,6 +65,8 @@
     "copyfiles": "^2.4.1",
     "genkit-cli": "^1.14.1",
     "postcss": "^8",
+    "sharp": "^0.33.4",
+    "svg-to-png": "^4.0.0",
     "tailwindcss": "^3.4.1",
     "typescript": "^5"
   }
