@@ -29,6 +29,9 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val
   };
 
   useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
     try {
         const item = window.localStorage.getItem(key);
         if (item) {
@@ -36,9 +39,8 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val
         }
     } catch (error) {
         console.log(error);
-        setStoredValue(initialValue);
     }
-  }, [key, initialValue]);
+  }, [key]);
 
   return [storedValue, setValue];
 }
