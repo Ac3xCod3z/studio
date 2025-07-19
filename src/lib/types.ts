@@ -6,6 +6,7 @@ export type Entry = {
   name: string;
   amount: number;
   type: EntryType;
+  recurring?: boolean;
 };
 
 export type RolloverPreference = 'carryover' | 'reset';

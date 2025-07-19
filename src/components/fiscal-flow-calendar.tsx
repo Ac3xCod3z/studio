@@ -15,6 +15,10 @@ import {
   isSameMonth,
   isSameDay,
   getWeek,
+  getDate,
+  setMonth,
+  setYear,
+  parseISO,
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { ChevronLeft, ChevronRight, Plus, Menu, ArrowUp, ArrowDown } from "lucide-react";
@@ -79,24 +83,45 @@ export function FiscalFlowCalendar({
     setEntryDialogOpen(true);
   }
 
-  const { monthlyTotals, weeklyTotals, previousMonthLeftover } = useMemo(() => {
+  const { monthlyTotals, weeklyTotals, previousMonthLeftover, entriesForCurrentMonth } = useMemo(() => {
     const monthKey = format(currentMonth, 'yyyy-MM');
     const prevMonth = subMonths(currentMonth, 1);
     const prevMonthKey = format(prevMonth, 'yyyy-MM');
     const previousMonthLeftover = (rollover === 'carryover' && monthlyLeftovers[prevMonthKey]) || 0;
 
-    const currentMonthEntries = entries.filter((e) => {
-      const entryDate = parseDateInTimezone(e.date, timezone);
-      return isSameMonth(entryDate, currentMonth);
+    const entriesForCurrentMonth = entries.flatMap((e) => {
+      const originalEntryDate = parseISO(e.date);
+      if (e.recurring) {
+        // Create a new date for the current month and year, but with the original day
+        let recurringDate = setYear(setMonth(new Date(0), currentMonth.getMonth()), currentMonth.getFullYear());
+        recurringDate = setMonth(recurringDate, currentMonth.getMonth());
+        recurringDate = setYear(recurringDate, currentMonth.getFullYear());
+
+        // Check if this new date is valid for the current month (e.g., handles Feb 30)
+        if (getDate(originalEntryDate) <= endOfMonth(currentMonth).getDate()) {
+            recurringDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), getDate(originalEntryDate));
+            if (isSameMonth(recurringDate, currentMonth)) {
+                return [{ ...e, date: format(recurringDate, 'yyyy-MM-dd') }];
+            }
+        }
+        return []; // Don't include if the day doesn't exist this month
+      } else {
+        // Non-recurring entries
+        const entryDate = parseDateInTimezone(e.date, timezone);
+        if (isSameMonth(entryDate, currentMonth)) {
+          return [e];
+        }
+        return [];
+      }
     });
 
-    const monthlyBills = currentMonthEntries.filter((e) => e.type === "bill").reduce((sum, e) => sum + e.amount, 0);
-    const monthlyIncome = currentMonthEntries.filter((e) => e.type === "income").reduce((sum, e) => sum + e.amount, 0) + previousMonthLeftover;
+    const monthlyBills = entriesForCurrentMonth.filter((e) => e.type === "bill").reduce((sum, e) => sum + e.amount, 0);
+    const monthlyIncome = entriesForCurrentMonth.filter((e) => e.type === "income").reduce((sum, e) => sum + e.amount, 0) + previousMonthLeftover;
     const monthlyNet = monthlyIncome - monthlyBills;
 
     const start = startOfWeek(selectedDate);
     const end = endOfWeek(selectedDate);
-    const weekEntries = entries.filter(e => {
+    const weekEntries = entriesForCurrentMonth.filter(e => {
         const entryDate = parseDateInTimezone(e.date, timezone);
         return entryDate >= start && entryDate <= end;
     });
@@ -108,7 +133,8 @@ export function FiscalFlowCalendar({
     return {
       monthlyTotals: { bills: monthlyBills, income: monthlyIncome, net: monthlyNet, monthKey },
       weeklyTotals: { bills: weeklyBills, income: weeklyIncome, net: weeklyNet, week: getWeek(selectedDate) },
-      previousMonthLeftover
+      previousMonthLeftover,
+      entriesForCurrentMonth,
     };
   }, [entries, currentMonth, selectedDate, rollover, monthlyLeftovers, timezone]);
 
@@ -157,7 +183,7 @@ export function FiscalFlowCalendar({
           </div>
           <div className="grid grid-cols-7 grid-rows-5 gap-1 mt-1">
             {daysInMonth.map((day) => {
-              const dayEntries = entries.filter((e) => {
+              const dayEntries = entriesForCurrentMonth.filter((e) => {
                   const entryDate = parseDateInTimezone(e.date, timezone);
                   return isSameDay(entryDate, day);
               });

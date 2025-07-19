@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { format } from "date-fns";
-import { toZonedTime, zonedTimeToUtc } from "date-fns-tz";
+import { toZonedTime } from "date-fns-tz";
 import { CalendarIcon, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import type { Entry } from "@/lib/types";
 
@@ -37,6 +38,7 @@ const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   amount: z.coerce.number().positive({ message: "Amount must be a positive number." }),
   date: z.date({ required_error: "A date is required." }),
+  recurring: z.boolean().default(false).optional(),
 });
 
 type EntryFormProps = {
@@ -76,6 +78,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
           name: entry.name,
           amount: entry.amount,
           date: entryDateInTimezone,
+          recurring: entry.recurring,
         });
       } else {
         // For new entries, use the selectedDate from the calendar directly.
@@ -85,6 +88,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
           name: "",
           amount: 0,
           date: selectedDate,
+          recurring: false,
         });
       }
     }
@@ -214,6 +218,26 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
                     </PopoverContent>
                   </Popover>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="recurring"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>
+                      Recurring Entry
+                    </FormLabel>
+                    <FormMessage />
+                  </div>
                 </FormItem>
               )}
             />
