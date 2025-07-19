@@ -10,7 +10,7 @@ import { Logo } from "./icons";
 import { Settings, Menu, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import type { Entry, RolloverPreference } from "@/lib/types";
 import { FiscalFlowCalendar, SidebarContent } from "./fiscal-flow-calendar";
 import { format, subMonths, startOfMonth, endOfMonth, eachWeekOfInterval, getWeek, isSameMonth, parseISO, isBefore, differenceInCalendarMonths, getDate, endOfWeek } from "date-fns";
@@ -207,6 +207,12 @@ export default function FiscalFlowDashboard() {
                   <Button variant="ghost" size="icon"><Menu /></Button>
               </SheetTrigger>
               <SheetContent side="right" className="w-[300px] sm:w-[400px] p-0">
+                 <SheetHeader className="p-4 md:p-6 border-b">
+                    <SheetTitle>Summary</SheetTitle>
+                    <SheetDescription>
+                        Weekly and monthly summary for {format(selectedDate, "MMM d, yyyy")}.
+                    </SheetDescription>
+                </SheetHeader>
                   {mobileSummaryData && (
                     <SidebarContent
                       weeklyTotals={mobileSummaryData.weeklyTotals}
