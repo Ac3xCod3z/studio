@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { format } from "date-fns";
+import { utcToZonedTime, zonedTimeToUtc } from "date-fns-tz";
 import { CalendarIcon, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -45,36 +46,41 @@ type EntryFormProps = {
   onDelete?: (id: string) => void;
   entry: Entry | null;
   selectedDate: Date;
+  timezone: string;
 };
 
-// Helper function to parse YYYY-MM-DD string as local date
-const parseDateAsLocal = (dateString: string) => {
-  const [year, month, day] = dateString.split('-').map(Number);
-  return new Date(year, month - 1, day);
+// Helper function to parse YYYY-MM-DD string as a date in the specified timezone
+const parseDateInTimezone = (dateString: string, timeZone: string) => {
+    // Treat the date string as being in the desired timezone right from the start
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    // This is a "local" date in the user's browser, but its components (Y,M,D) are what we want.
+    // To correctly convert it to a zoned time, we must treat it as UTC and then convert.
+    const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    return utcToZonedTime(utcDate, timeZone);
 };
 
-export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selectedDate }: EntryFormProps) {
+
+export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selectedDate, timezone }: EntryFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      type: entry?.type || "bill",
-      name: entry?.name || "",
-      amount: entry?.amount || 0,
-      date: entry ? parseDateAsLocal(entry.date) : selectedDate,
-    },
+    // Zod will handle validation, defaultValues can be initialized later in useEffect
   });
 
-   // Add a useEffect to reset the form's date when selectedDate changes for a new entry
    React.useEffect(() => {
     if (isOpen) {
       if (entry) {
+        // When editing, parse the stored date string in the context of the selected timezone
+        const entryDateInTimezone = parseDateInTimezone(entry.date, timezone);
         form.reset({
           type: entry.type,
           name: entry.name,
           amount: entry.amount,
-          date: parseDateAsLocal(entry.date)
+          date: entryDateInTimezone,
         });
       } else {
+        // For new entries, use the selectedDate from the calendar directly.
+        // It's already a Date object from the user's interaction.
         form.reset({
           type: "bill",
           name: "",
@@ -83,13 +89,17 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
         });
       }
     }
-  }, [isOpen, selectedDate, entry, form]);
+  }, [isOpen, selectedDate, entry, form, timezone]);
 
 
   function onSubmit(values: z.infer<typeof formSchema>) {
+    // Convert the form's date (which is in the user's local timezone) to the selected timezone before saving
+    const dateInSelectedTz = zonedTimeToUtc(values.date, timezone);
+
     const dataToSave = {
       ...values,
-      date: format(values.date, "yyyy-MM-dd"),
+      // Format as YYYY-MM-DD for storage
+      date: format(dateInSelectedTz, "yyyy-MM-dd"),
     };
     if (entry) {
       onSave({ ...dataToSave, id: entry.id });
@@ -126,7 +136,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
                   <FormControl>
                     <RadioGroup
                       onValueChange={field.onChange}
-                      defaultValue={field.value}
+                      value={field.value}
                       className="flex space-x-4"
                     >
                       <FormItem className="flex items-center space-x-2 space-y-0">

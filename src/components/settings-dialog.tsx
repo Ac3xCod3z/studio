@@ -4,7 +4,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Sparkles, Loader2, ChevronsUpDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +23,13 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,20 +39,30 @@ import { Separator } from "@/components/ui/separator";
 import type { RolloverPreference } from "@/lib/types";
 import { getRolloverRecommendation } from "@/ai/flows/rollover-optimization";
 import { useToast } from "@/hooks/use-toast";
+import { timezones } from "@/lib/timezones";
 
 const formSchema = z.object({
   incomeLevel: z.coerce.number().positive({ message: "Income must be a positive number." }),
   financialGoals: z.string().min(10, { message: "Please describe your financial goals in a bit more detail." }),
 });
 
-type RolloverDialogProps = {
+type SettingsDialogProps = {
   isOpen: boolean;
   onClose: () => void;
-  preference: RolloverPreference;
-  onPreferenceChange: (preference: RolloverPreference) => void;
+  rolloverPreference: RolloverPreference;
+  onRolloverPreferenceChange: (preference: RolloverPreference) => void;
+  timezone: string;
+  onTimezoneChange: (timezone: string) => void;
 };
 
-export function RolloverDialog({ isOpen, onClose, preference, onPreferenceChange }: RolloverDialogProps) {
+export function SettingsDialog({
+  isOpen,
+  onClose,
+  rolloverPreference,
+  onRolloverPreferenceChange,
+  timezone,
+  onTimezoneChange,
+}: SettingsDialogProps) {
   const [recommendation, setRecommendation] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -77,16 +94,39 @@ export function RolloverDialog({ isOpen, onClose, preference, onPreferenceChange
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Rollover Preference</DialogTitle>
+          <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
-            Choose how leftover funds are handled at the end of each month.
+            Manage your application preferences.
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-2">
+           <div className="space-y-2">
+            <Label htmlFor="timezone" className="font-semibold">Timezone</Label>
+             <p className="text-sm text-muted-foreground">Select your local timezone to ensure dates are handled correctly.</p>
+            <Select onValueChange={onTimezoneChange} defaultValue={timezone}>
+              <SelectTrigger id="timezone" className="w-full">
+                <SelectValue placeholder="Select a timezone" />
+              </SelectTrigger>
+              <SelectContent>
+                {timezones.map((tz) => (
+                  <SelectItem key={tz} value={tz}>
+                    {tz}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <Separator />
+        
+        <div className="space-y-4 py-2">
+            <h3 className="font-semibold">Rollover Preference</h3>
+            <p className="text-sm text-muted-foreground">Choose how leftover funds are handled at the end of each month.</p>
             <RadioGroup
-                value={preference}
-                onValueChange={(value) => onPreferenceChange(value as RolloverPreference)}
+                value={rolloverPreference}
+                onValueChange={(value) => onRolloverPreferenceChange(value as RolloverPreference)}
                 className="space-y-2"
             >
                 <div className="flex items-center space-x-2">
@@ -107,7 +147,7 @@ export function RolloverDialog({ isOpen, onClose, preference, onPreferenceChange
         
         <div className="space-y-4">
             <h3 className="font-semibold flex items-center gap-2"><Sparkles className="h-5 w-5 text-accent-foreground/80" /> AI Recommendation</h3>
-             <p className="text-sm text-muted-foreground">Not sure which to choose? Let our AI help you decide based on your goals.</p>
+             <p className="text-sm text-muted-foreground">Not sure which rollover option to choose? Let our AI help you decide based on your goals.</p>
             <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                  <FormField

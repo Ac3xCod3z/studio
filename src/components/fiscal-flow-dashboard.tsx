@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { EntryDialog } from "./entry-dialog";
-import { RolloverDialog } from "./rollover-dialog";
+import { SettingsDialog } from "./settings-dialog";
 import { Logo } from "./icons";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { Entry, RolloverPreference, MonthlyLeftovers } from "@/lib/types";
@@ -36,9 +36,10 @@ export default function FiscalFlowDashboard() {
   const [entries, setEntries] = useLocalStorage<Entry[]>("fiscalFlowEntries", []);
   const [rollover, setRollover] = useLocalStorage<RolloverPreference>("fiscalFlowRollover", "carryover");
   const [monthlyLeftovers, setMonthlyLeftovers] = useLocalStorage<MonthlyLeftovers>("fiscalFlowLeftovers", {});
-  
+  const [timezone, setTimezone] = useLocalStorage<string>('fiscalFlowTimezone', Intl.DateTimeFormat().resolvedOptions().timeZone);
+
   const [isEntryDialogOpen, setEntryDialogOpen] = useState(false);
-  const [isRolloverDialogOpen, setRolloverDialogOpen] = useState(false);
+  const [isSettingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
 
   const isMobile = useMedia("(max-width: 768px)", false);
@@ -138,7 +139,7 @@ export default function FiscalFlowDashboard() {
           <Button onClick={() => openNewEntryDialog(new Date())} size="sm" className="hidden md:flex">
             <Plus className="-ml-1 mr-2 h-4 w-4" /> Add Entry
           </Button>
-          <Button onClick={() => setRolloverDialogOpen(true)} variant="ghost" size="icon">
+          <Button onClick={() => setSettingsDialogOpen(true)} variant="ghost" size="icon">
             <Settings className="h-5 w-5" />
           </Button>
           {isMobile && (
@@ -245,13 +246,16 @@ export default function FiscalFlowDashboard() {
         onDelete={handleEntryDelete}
         entry={editingEntry}
         selectedDate={selectedDate}
+        timezone={timezone}
       />
       
-      <RolloverDialog 
-        isOpen={isRolloverDialogOpen}
-        onClose={() => setRolloverDialogOpen(false)}
-        preference={rollover}
-        onPreferenceChange={setRollover}
+      <SettingsDialog 
+        isOpen={isSettingsDialogOpen}
+        onClose={() => setSettingsDialogOpen(false)}
+        rolloverPreference={rollover}
+        onRolloverPreferenceChange={setRollover}
+        timezone={timezone}
+        onTimezoneChange={setTimezone}
       />
     </div>
   );
@@ -272,5 +276,3 @@ function SummaryCard({ title, amount, icon, description, variant = 'default' }: 
         </Card>
     );
 }
-
-    
