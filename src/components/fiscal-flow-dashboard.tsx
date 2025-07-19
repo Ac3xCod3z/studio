@@ -16,6 +16,7 @@ import { FiscalFlowCalendar, SidebarContent } from "./fiscal-flow-calendar";
 import { format, subMonths, startOfMonth, endOfMonth, eachWeekOfInterval, getWeek, isSameMonth, parseISO, isBefore, differenceInCalendarMonths, getDate, endOfWeek, getDay, eachDayOfInterval, setDate } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { recurrenceIntervalMonths } from "@/lib/constants";
+import { ScrollArea } from "./ui/scroll-area";
 
 
 export default function FiscalFlowDashboard() {
@@ -101,6 +102,7 @@ export default function FiscalFlowDashboard() {
           .map(recurringDate => ({
             ...e,
             date: format(recurringDate, 'yyyy-MM-dd'),
+            id: `${e.id}-${format(recurringDate, 'yyyy-MM-dd')}`
           }));
       }
 
@@ -221,20 +223,22 @@ export default function FiscalFlowDashboard() {
               <SheetTrigger asChild>
                   <Button variant="ghost" size="icon"><Menu /></Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[300px] sm:w-[400px] p-0">
-                 <SheetHeader className="p-4 md:p-6 border-b">
+              <SheetContent side="right" className="w-[300px] sm:w-[400px] p-0 flex flex-col">
+                 <SheetHeader className="p-4 md:p-6 border-b shrink-0">
                     <SheetTitle>Summary</SheetTitle>
                     <SheetDescription>
                         Weekly and monthly summary for {format(selectedDate, "MMM d, yyyy")}.
                     </SheetDescription>
                 </SheetHeader>
                   {mobileSummaryData && (
-                    <SidebarContent
-                      weeklyTotals={mobileSummaryData.weeklyTotals}
-                      monthlyTotals={mobileSummaryData.monthlyTotals}
-                      isMobile={true}
-                      selectedDate={selectedDate}
-                    />
+                    <ScrollArea>
+                      <SidebarContent
+                        weeklyTotals={mobileSummaryData.weeklyTotals}
+                        monthlyTotals={mobileSummaryData.monthlyTotals}
+                        isMobile={true}
+                        selectedDate={selectedDate}
+                      />
+                    </ScrollArea>
                   )}
               </SheetContent>
             </Sheet>

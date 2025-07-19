@@ -183,7 +183,7 @@ export function FiscalFlowCalendar({
         const dayForCurrentMonth = Math.min(originalDay, lastDayOfCurrentMonth);
         const recurringDate = setDate(currentMonth, dayForCurrentMonth);
         
-        return [{ ...e, date: format(recurringDate, 'yyyy-MM-dd') }];
+        return [{ ...e, date: format(recurringDate, 'yyyy-MM-dd'), id: `${e.id}-${format(recurringDate, 'yyyy-MM-dd')}` }];
       }
 
       // Handle non-recurring entries
@@ -263,7 +263,7 @@ export function FiscalFlowCalendar({
         }
         return prev;
     });
-  }, [monthlyTotals.monthKey, monthlyTotals.endOfMonthBalance, setMonthlyLeftovers]);
+  }, [monthlyTotals, setMonthlyLeftovers]);
 
   const Sidebar = () => (
     <SidebarContent 
@@ -449,26 +449,22 @@ export const SidebarContent = ({
   isMobile: boolean,
   selectedDate: Date,
 }) => (
-  <ScrollArea className="h-full">
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-        <h2 className="text-2xl font-bold">
-          {isMobile ? format(selectedDate, "MMM d, yyyy") : "Summary"}
-        </h2>
-        <div className="space-y-4">
-            <h3 className="font-semibold text-lg">Week {weeklyTotals.week}</h3>
-            <SummaryCard title="Income" amount={weeklyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
-            <SummaryCard title="Bills Due" amount={weeklyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
-            {weeklyTotals.rolloverApplied > 0 && (
-                <SummaryCard title="Rollover Applied" amount={weeklyTotals.rolloverApplied} icon={<Repeat />} />
-            )}
-            <SummaryCard title="Weekly Net" amount={weeklyTotals.net} variant={weeklyTotals.net >= 0 ? 'positive' : 'negative'} />
-        </div>
-        <div className="space-y-4">
-            <h3 className="font-semibold text-lg">Month</h3>
-            <SummaryCard title="Total Income" amount={monthlyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
-            <SummaryCard title="Total Bills" amount={monthlyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
-            <SummaryCard title="Monthly Net" amount={monthlyTotals.net} variant={monthlyTotals.net >= 0 ? 'positive' : 'negative'} />
-        </div>
-    </div>
-  </ScrollArea>
+  <div className="flex flex-col gap-6 p-4 md:p-6">
+      {!isMobile && <h2 className="text-2xl font-bold">Summary</h2>}
+      <div className="space-y-4">
+          <h3 className="font-semibold text-lg">Week of {format(startOfWeek(selectedDate), "MMM d")}</h3>
+          <SummaryCard title="Income" amount={weeklyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
+          <SummaryCard title="Bills Due" amount={weeklyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
+          {weeklyTotals.rolloverApplied > 0 && (
+              <SummaryCard title="Rollover Applied" amount={weeklyTotals.rolloverApplied} icon={<Repeat />} />
+          )}
+          <SummaryCard title="Weekly Net" amount={weeklyTotals.net} variant={weeklyTotals.net >= 0 ? 'positive' : 'negative'} />
+      </div>
+      <div className="space-y-4">
+          <h3 className="font-semibold text-lg">Month of {format(selectedDate, 'MMMM')}</h3>
+          <SummaryCard title="Total Income" amount={monthlyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
+          <SummaryCard title="Total Bills" amount={monthlyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
+          <SummaryCard title="Monthly Net" amount={monthlyTotals.net} variant={monthlyTotals.net >= 0 ? 'positive' : 'negative'} />
+      </div>
+  </div>
 );
