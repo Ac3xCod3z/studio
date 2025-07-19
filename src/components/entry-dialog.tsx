@@ -29,16 +29,16 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import type { Entry } from "@/lib/types";
+import type { Entry, RecurrenceInterval } from "@/lib/types";
 
 const formSchema = z.object({
   type: z.enum(["bill", "income"], { required_error: "You need to select an entry type." }),
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   amount: z.coerce.number().positive({ message: "Amount must be a positive number." }),
   date: z.date({ required_error: "A date is required." }),
-  recurring: z.boolean().default(false).optional(),
+  recurrence: z.enum(["none", "monthly", "bimonthly", "3months", "6months", "12months"]).default("none"),
 });
 
 type EntryFormProps = {
@@ -78,7 +78,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
           name: entry.name,
           amount: entry.amount,
           date: entryDateInTimezone,
-          recurring: entry.recurring,
+          recurrence: entry.recurrence || 'none',
         });
       } else {
         // For new entries, use the selectedDate from the calendar directly.
@@ -88,7 +88,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
           name: "",
           amount: 0,
           date: selectedDate,
-          recurring: false,
+          recurrence: 'none',
         });
       }
     }
@@ -223,21 +223,26 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
             />
             <FormField
               control={form.control}
-              name="recurring"
+              name="recurrence"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>
-                      Recurring Entry
-                    </FormLabel>
-                    <FormMessage />
-                  </div>
+                <FormItem>
+                   <FormLabel>Recurrence</FormLabel>
+                   <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a recurrence interval" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">Does not repeat</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="bimonthly">Every 2 months</SelectItem>
+                      <SelectItem value="3months">Every 3 months</SelectItem>
+                      <SelectItem value="6months">Every 6 months</SelectItem>
+                      <SelectItem value="12months">Annually (12 months)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
                 </FormItem>
               )}
             />

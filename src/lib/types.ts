@@ -1,12 +1,20 @@
 export type EntryType = 'bill' | 'income';
 
+export type RecurrenceInterval =
+  | 'none'
+  | 'monthly'
+  | 'bimonthly'
+  | '3months'
+  | '6months'
+  | '12months';
+
 export type Entry = {
   id: string;
   date: string; // YYYY-MM-DD
   name: string;
   amount: number;
   type: EntryType;
-  recurring?: boolean;
+  recurrence?: RecurrenceInterval;
 };
 
 export type RolloverPreference = 'carryover' | 'reset';

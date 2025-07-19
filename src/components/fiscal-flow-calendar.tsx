@@ -20,6 +20,7 @@ import {
   setYear,
   parseISO,
   isBefore,
+  differenceInCalendarMonths,
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { ChevronLeft, ChevronRight, Plus, Menu, ArrowUp, ArrowDown, Repeat } from "lucide-react";
@@ -30,9 +31,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn, formatCurrency } from "@/lib/utils";
-import type { Entry, RolloverPreference, MonthlyLeftovers } from "@/lib/types";
+import type { Entry, RolloverPreference, MonthlyLeftovers, RecurrenceInterval } from "@/lib/types";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const recurrenceIntervalMonths: Record<RecurrenceInterval, number> = {
+  none: 0,
+  monthly: 1,
+  bimonthly: 2,
+  '3months': 3,
+  '6months': 6,
+  '12months': 12,
+};
 
 // Helper to parse 'YYYY-MM-DD' string into a Date object within a specific timezone.
 // This prevents the date from shifting to the previous day.
@@ -116,24 +126,25 @@ export function FiscalFlowCalendar({
     const previousMonthLeftover = (rollover === 'carryover' && monthlyLeftovers[prevMonthKey]) || 0;
 
     const entriesForCurrentMonth = entries.flatMap((e) => {
-      if (e.recurring) {
+      const recurrenceInterval = e.recurrence ? recurrenceIntervalMonths[e.recurrence] : 0;
+      if (e.recurrence && e.recurrence !== 'none' && recurrenceInterval > 0) {
         const originalEntryDate = parseISO(e.date);
         
         if (isBefore(startOfMonth(currentMonth), startOfMonth(originalEntryDate))) {
             return [];
         }
 
+        const monthDiff = differenceInCalendarMonths(currentMonth, originalEntryDate);
+        if (monthDiff < 0 || monthDiff % recurrenceInterval !== 0) {
+            return [];
+        }
+        
         const lastDayOfCurrentMonth = endOfMonth(currentMonth).getDate();
         const originalDay = getDate(originalEntryDate);
-        
         const dayForCurrentMonth = Math.min(originalDay, lastDayOfCurrentMonth);
-
         const recurringDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), dayForCurrentMonth);
-
-        if (isSameMonth(recurringDate, currentMonth)) {
-            return [{ ...e, date: format(recurringDate, 'yyyy-MM-dd') }];
-        }
-        return [];
+        
+        return [{ ...e, date: format(recurringDate, 'yyyy-MM-dd') }];
       } else {
         const entryDate = parseDateInTimezone(e.date, timezone);
         if (isSameMonth(entryDate, currentMonth)) {
