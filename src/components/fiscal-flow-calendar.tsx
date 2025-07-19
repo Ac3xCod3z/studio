@@ -92,19 +92,18 @@ export function FiscalFlowCalendar({
     const entriesForCurrentMonth = entries.flatMap((e) => {
       const originalEntryDate = parseISO(e.date);
       if (e.recurring) {
-        // Create a new date for the current month and year, but with the original day
-        let recurringDate = setYear(setMonth(new Date(0), currentMonth.getMonth()), currentMonth.getFullYear());
-        recurringDate = setMonth(recurringDate, currentMonth.getMonth());
-        recurringDate = setYear(recurringDate, currentMonth.getFullYear());
+        const lastDayOfCurrentMonth = endOfMonth(currentMonth).getDate();
+        const originalDay = getDate(originalEntryDate);
+        
+        // If original day is greater than the last day of current month, use the last day.
+        const dayForCurrentMonth = Math.min(originalDay, lastDayOfCurrentMonth);
 
-        // Check if this new date is valid for the current month (e.g., handles Feb 30)
-        if (getDate(originalEntryDate) <= endOfMonth(currentMonth).getDate()) {
-            recurringDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), getDate(originalEntryDate));
-            if (isSameMonth(recurringDate, currentMonth)) {
-                return [{ ...e, date: format(recurringDate, 'yyyy-MM-dd') }];
-            }
+        const recurringDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), dayForCurrentMonth);
+
+        if (isSameMonth(recurringDate, currentMonth)) {
+            return [{ ...e, date: format(recurringDate, 'yyyy-MM-dd') }];
         }
-        return []; // Don't include if the day doesn't exist this month
+        return [];
       } else {
         // Non-recurring entries
         const entryDate = parseDateInTimezone(e.date, timezone);
