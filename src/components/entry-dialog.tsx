@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { format } from "date-fns";
-import { utcToZonedTime, zonedTimeToUtc } from "date-fns-tz";
+import { toZonedTime, zonedTimeToUtc } from "date-fns-tz";
 import { CalendarIcon, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -53,11 +53,10 @@ type EntryFormProps = {
 const parseDateInTimezone = (dateString: string, timeZone: string) => {
     // Treat the date string as being in the desired timezone right from the start
     const [year, month, day] = dateString.split('-').map(Number);
-    const date = new Date(year, month - 1, day);
     // This is a "local" date in the user's browser, but its components (Y,M,D) are what we want.
     // To correctly convert it to a zoned time, we must treat it as UTC and then convert.
-    const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-    return utcToZonedTime(utcDate, timeZone);
+    const utcDate = new Date(Date.UTC(year, month - 1, day));
+    return toZonedTime(utcDate, timeZone);
 };
 
 
@@ -94,7 +93,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     // Convert the form's date (which is in the user's local timezone) to the selected timezone before saving
-    const dateInSelectedTz = zonedTimeToUtc(values.date, timezone);
+    const dateInSelectedTz = toZonedTime(values.date, timezone);
 
     const dataToSave = {
       ...values,
