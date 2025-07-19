@@ -51,12 +51,12 @@ type EntryFormProps = {
 
 // Helper function to parse YYYY-MM-DD string as a date in the specified timezone
 const parseDateInTimezone = (dateString: string, timeZone: string) => {
-    // Treat the date string as being in the desired timezone right from the start
+    // Splits the date string 'YYYY-MM-DD' into parts.
     const [year, month, day] = dateString.split('-').map(Number);
-    // This is a "local" date in the user's browser, but its components (Y,M,D) are what we want.
-    // To correctly convert it to a zoned time, we must treat it as UTC and then convert.
-    const utcDate = new Date(Date.UTC(year, month - 1, day));
-    return toZonedTime(utcDate, timeZone);
+    // Creates a new Date object using the provided timezone.
+    // This correctly interprets the date parts in the context of the given timezone,
+    // avoiding shifts that happen when the browser's local timezone is different.
+    return toZonedTime(new Date(year, month - 1, day), timeZone);
 };
 
 
@@ -92,13 +92,10 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
 
 
   function onSubmit(values: z.infer<typeof formSchema>) {
-    // Convert the form's date (which is in the user's local timezone) to the selected timezone before saving
-    const dateInSelectedTz = toZonedTime(values.date, timezone);
-
     const dataToSave = {
       ...values,
-      // Format as YYYY-MM-DD for storage
-      date: format(dateInSelectedTz, "yyyy-MM-dd"),
+      // Format as YYYY-MM-DD for storage. The `values.date` is already correct.
+      date: format(values.date, "yyyy-MM-dd"),
     };
     if (entry) {
       onSave({ ...dataToSave, id: entry.id });

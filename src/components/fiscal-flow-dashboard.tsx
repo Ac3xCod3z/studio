@@ -15,6 +15,7 @@ import {
   isSameDay,
   getWeek,
 } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 import { ChevronLeft, ChevronRight, Plus, Settings, Menu, ArrowUp, ArrowDown } from "lucide-react";
 import { useMedia } from "react-use";
 
@@ -29,6 +30,14 @@ import { cn, formatCurrency } from "@/lib/utils";
 import type { Entry, RolloverPreference, MonthlyLeftovers } from "@/lib/types";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// Helper to parse 'YYYY-MM-DD' string into a Date object within a specific timezone.
+// This prevents the date from shifting to the previous day.
+const parseDateInTimezone = (dateString: string, timeZone: string) => {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return toZonedTime(new Date(year, month - 1, day), timeZone);
+};
+
 
 export default function FiscalFlowDashboard() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -56,7 +65,11 @@ export default function FiscalFlowDashboard() {
     const prevMonthKey = format(prevMonth, 'yyyy-MM');
     const previousMonthLeftover = (rollover === 'carryover' && monthlyLeftovers[prevMonthKey]) || 0;
 
-    const currentMonthEntries = entries.filter((e) => isSameMonth(new Date(e.date), currentMonth));
+    const currentMonthEntries = entries.filter((e) => {
+      const entryDate = parseDateInTimezone(e.date, timezone);
+      return isSameMonth(entryDate, currentMonth);
+    });
+
     const monthlyBills = currentMonthEntries.filter((e) => e.type === "bill").reduce((sum, e) => sum + e.amount, 0);
     const monthlyIncome = currentMonthEntries.filter((e) => e.type === "income").reduce((sum, e) => sum + e.amount, 0) + previousMonthLeftover;
     const monthlyNet = monthlyIncome - monthlyBills;
@@ -64,7 +77,7 @@ export default function FiscalFlowDashboard() {
     const start = startOfWeek(selectedDate);
     const end = endOfWeek(selectedDate);
     const weekEntries = entries.filter(e => {
-        const entryDate = new Date(e.date);
+        const entryDate = parseDateInTimezone(e.date, timezone);
         return entryDate >= start && entryDate <= end;
     });
 
@@ -77,21 +90,21 @@ export default function FiscalFlowDashboard() {
       weeklyTotals: { bills: weeklyBills, income: weeklyIncome, net: weeklyNet, week: getWeek(selectedDate) },
       previousMonthLeftover
     };
-  }, [entries, currentMonth, selectedDate, rollover, monthlyLeftovers]);
+  }, [entries, currentMonth, selectedDate, rollover, monthlyLeftovers, timezone]);
 
   useEffect(() => {
     const { monthKey, net } = monthlyTotals;
     if (monthlyLeftovers[monthKey] !== net) {
       setMonthlyLeftovers(prev => ({...prev, [monthKey]: net }));
     }
-  }, [monthlyTotals, setMonthlyLeftovers, monthlyLeftovers]);
+  }, [monthlyTotals.monthKey, monthlyTotals.net, setMonthlyLeftovers, monthlyLeftovers]);
 
   const handleEntrySave = useCallback((entryData: Omit<Entry, "id"> & { id?: string }) => {
     setEntries((prev) => {
       if (entryData.id) {
-        return prev.map((e) => (e.id === entryData.id ? { ...e, ...entryData } : e));
+        return prev.map((e) => (e.id === entryData.id ? { ...e, ...entryData } as Entry : e));
       }
-      return [...prev, { ...entryData, id: crypto.randomUUID() }];
+      return [...prev, { ...entryData, id: crypto.randomUUID() } as Entry];
     });
   }, [setEntries]);
 
@@ -107,6 +120,7 @@ export default function FiscalFlowDashboard() {
   
   const openEditEntryDialog = (entry: Entry) => {
     setEditingEntry(entry);
+    setSelectedDate(parseDateInTimezone(entry.date, timezone));
     setEntryDialogOpen(true);
   }
 
@@ -174,7 +188,10 @@ export default function FiscalFlowDashboard() {
           </div>
           <div className="grid grid-cols-7 grid-rows-5 gap-1 mt-1">
             {daysInMonth.map((day) => {
-              const dayEntries = entries.filter((e) => isSameDay(new Date(e.date), day));
+              const dayEntries = entries.filter((e) => {
+                  const entryDate = parseDateInTimezone(e.date, timezone);
+                  return isSameDay(entryDate, day);
+              });
               return (
                 <div
                   key={day.toString()}
