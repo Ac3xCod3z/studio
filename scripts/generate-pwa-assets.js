@@ -51,6 +51,9 @@ function createAssetLinks() {
 }
 
 async function main() {
+    if (!fs.existsSync(publicDir)) {
+        fs.mkdirSync(publicDir, { recursive: true });
+    }
     await generateIcons();
     createAssetLinks();
 }

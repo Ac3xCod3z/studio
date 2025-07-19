@@ -35,7 +35,7 @@ export default function FiscalFlowDashboard() {
   const isMobile = useMedia("(max-width: 1024px)", false);
 
   useEffect(() => {
-    setIsClient(true);
+    // This now correctly runs only on the client
     if (!localStorage.getItem('fiscalFlowTimezone')) {
         setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
     }
@@ -48,6 +48,8 @@ export default function FiscalFlowDashboard() {
         });
       });
     }
+    // Set isClient to true after the first client-side render
+    setIsClient(true);
   }, [setTimezone]);
 
   const handleEntrySave = (entryData: Omit<Entry, "id"> & { id?: string }) => {
@@ -85,6 +87,7 @@ export default function FiscalFlowDashboard() {
 
     const entriesForCurrentMonth = entries.flatMap((e) => {
       const originalEntryDate = parseISO(e.date);
+      const recurrenceInterval = e.recurrence ? recurrenceIntervalMonths[e.recurrence] : 0;
 
       if (isBefore(startOfMonth(currentMonth), startOfMonth(originalEntryDate))) {
         return [];
@@ -106,7 +109,7 @@ export default function FiscalFlowDashboard() {
           }));
       }
 
-      const recurrenceInterval = e.recurrence ? recurrenceIntervalMonths[e.recurrence] : 0;
+      
       if (e.recurrence && e.recurrence !== 'none' && recurrenceInterval > 0) {
         const monthDiff = differenceInCalendarMonths(currentMonth, originalEntryDate);
         if (monthDiff < 0 || monthDiff % recurrenceInterval !== 0) {
@@ -118,14 +121,14 @@ export default function FiscalFlowDashboard() {
         const dayForCurrentMonth = Math.min(originalDay, lastDayOfCurrentMonth);
         const recurringDate = setDate(currentMonth, dayForCurrentMonth);
         
-        return [{ ...e, date: format(recurringDate, 'yyyy-MM-dd') }];
-      } else {
-        const entryDate = parseDateInTimezone(e.date, timezone);
-        if (isSameMonth(entryDate, currentMonth)) {
-          return [e];
-        }
-        return [];
+        return [{ ...e, date: format(recurringDate, 'yyyy-MM-dd'), id: `${e.id}-${format(recurringDate, 'yyyy-MM-dd')}` }];
       }
+      
+      const entryDate = parseDateInTimezone(e.date, timezone);
+      if (isSameMonth(entryDate, currentMonth)) {
+        return [e];
+      }
+      return [];
     });
 
     const monthlyBills = entriesForCurrentMonth.filter((e) => e.type === "bill").reduce((sum, e) => sum + e.amount, 0);
@@ -165,7 +168,7 @@ export default function FiscalFlowDashboard() {
     };
 
     return {
-      monthlyTotals: { bills: monthlyBills, income: currentMonthIncome, net: monthlyNet },
+      monthlyTotals: { bills: monthlyBills, income: currentMonthIncome, net: monthlyNet, rollover: previousMonthLeftover, endOfMonthBalance: currentMonthIncome + previousMonthLeftover - monthlyBills, monthKey },
       weeklyTotals: selectedWeekData,
     };
   }, [isMobile, selectedDate, entries, rollover, monthlyLeftovers, timezone]);
@@ -231,7 +234,7 @@ export default function FiscalFlowDashboard() {
                     </SheetDescription>
                 </SheetHeader>
                   {mobileSummaryData && (
-                    <ScrollArea>
+                    <ScrollArea className="flex-1">
                       <SidebarContent
                         weeklyTotals={mobileSummaryData.weeklyTotals}
                         monthlyTotals={mobileSummaryData.monthlyTotals}
