@@ -96,10 +96,6 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
       date: format(values.date, "yyyy-MM-dd"),
     };
 
-    if (values.type !== 'bill') {
-        delete dataToSave.category;
-    }
-
     if (entry) {
       onSave({ ...dataToSave, id: entry.id });
     } else {
