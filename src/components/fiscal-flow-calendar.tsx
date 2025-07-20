@@ -55,6 +55,8 @@ type FiscalFlowCalendarProps = {
     setEntryDialogOpen: (isOpen: boolean) => void;
     isMobile: boolean;
     openMobileSheet: () => void;
+    isReadOnly?: boolean;
+    setMonthlyLeftovers: (value: any | ((val: any) => any)) => void;
 }
 
 export function FiscalFlowCalendar({
@@ -68,10 +70,16 @@ export function FiscalFlowCalendar({
     setEntryDialogOpen,
     isMobile,
     openMobileSheet,
+    isReadOnly = false,
+    setMonthlyLeftovers,
 }: FiscalFlowCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [monthlyLeftovers, setMonthlyLeftovers] = useLocalStorage<MonthlyLeftovers>("fiscalFlowLeftovers", {});
+  // This hook is not used in read-only mode, but we need the setter for the main component.
+  const [localMonthlyLeftovers, setLocalMonthlyLeftovers] = useLocalStorage<MonthlyLeftovers>("fiscalFlowLeftovers", {});
+  const monthlyLeftovers = isReadOnly ? {} : localMonthlyLeftovers;
+  const finalSetMonthlyLeftovers = isReadOnly ? setMonthlyLeftovers : setLocalMonthlyLeftovers;
+
   const [draggingEntryId, setDraggingEntryId] = useState<string | null>(null);
   
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -85,6 +93,7 @@ export function FiscalFlowCalendar({
   }, [currentMonth]);
 
   const handleDayClick = (day: Date) => {
+      if (isReadOnly) return;
       if (isSelectionMode) {
           handleDaySelection(day);
       } else {
@@ -110,6 +119,7 @@ export function FiscalFlowCalendar({
   };
 
   const handleDeleteSelected = () => {
+    if (isReadOnly) return;
     setEntries(prevEntries => 
         prevEntries.filter(entry => !selectedDays.has(entry.date))
     );
@@ -118,21 +128,25 @@ export function FiscalFlowCalendar({
   };
 
   const openEditEntryDialog = (entry: Entry) => {
+    if (isReadOnly) return;
     setEditingEntry(entry);
     setGlobalSelectedDate(parseDateInTimezone(entry.date, timezone));
     setEntryDialogOpen(true);
   }
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, entryId: string) => {
+    if (isReadOnly) return;
     e.dataTransfer.effectAllowed = 'move';
     setDraggingEntryId(entryId);
   };
   
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (isReadOnly) return;
     e.preventDefault(); 
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetDate: Date) => {
+    if (isReadOnly) return;
     e.preventDefault();
     if (draggingEntryId) {
       setEntries(prevEntries => 
@@ -154,7 +168,7 @@ export function FiscalFlowCalendar({
 
     const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry[] => {
         const instances: Entry[] = [];
-        const originalEntryDate = parseISO(entry.date);
+        const originalEntryDate = new Date(entry.date + 'T00:00:00');
         
         if (isBefore(end, originalEntryDate)) return [];
 
@@ -265,14 +279,15 @@ export function FiscalFlowCalendar({
   }, [entries, currentMonth, selectedDate, rollover, monthlyLeftovers, timezone, calendarInterval]);
 
   useEffect(() => {
+    if (isReadOnly) return;
     const { monthKey, endOfMonthBalance } = monthlyTotals;
-    setMonthlyLeftovers(prev => {
+    finalSetMonthlyLeftovers(prev => {
         if (prev[monthKey] !== endOfMonthBalance) {
             return {...prev, [monthKey]: endOfMonthBalance };
         }
         return prev;
     });
-  }, [monthlyTotals, setMonthlyLeftovers]);
+  }, [monthlyTotals, finalSetMonthlyLeftovers, isReadOnly]);
 
   const Sidebar = () => (
     <SidebarContent 
@@ -287,7 +302,7 @@ export function FiscalFlowCalendar({
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl sm:text-2xl font-bold">{format(currentMonth, "MMMM yyyy")}</h1>
             <div className="flex items-center gap-1 sm:gap-2">
-              {!isSelectionMode ? (
+              {!isSelectionMode && !isReadOnly ? (
                 <>
                     <Button variant="outline" onClick={() => setIsSelectionMode(true)}>Select</Button>
                     <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
@@ -298,13 +313,25 @@ export function FiscalFlowCalendar({
                         <ChevronRight className="h-4 w-4" />
                     </Button>
                 </>
-              ) : (
+              ) : null}
+               {isSelectionMode && !isReadOnly ? (
                 <>
                     <Button variant="destructive" size="sm" onClick={handleDeleteSelected} disabled={selectedDays.size === 0}>
                         <Trash2 className="mr-2 h-4 w-4" /> Delete ({selectedDays.size})
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => { setIsSelectionMode(false); setSelectedDays(new Set()); }}>
                         <X className="mr-2 h-4 w-4" /> Cancel
+                    </Button>
+                </>
+              ) : null}
+              {isReadOnly && (
+                 <>
+                    <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+                        <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" onClick={() => setCurrentMonth(new Date())} className="px-2 sm:px-4">Today</Button>
+                    <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+                        <ChevronRight className="h-4 w-4" />
                     </Button>
                 </>
               )}
@@ -332,9 +359,9 @@ export function FiscalFlowCalendar({
                   key={dayKey}
                   className={cn(
                     "relative flex flex-col h-24 sm:h-32 rounded-lg p-1 sm:p-2 border transition-colors",
-                    !isSelectionMode && "cursor-pointer",
+                    !isReadOnly && !isSelectionMode && "cursor-pointer",
                     !isSameMonth(day, currentMonth) ? "bg-muted/50 text-muted-foreground" : "bg-card",
-                    !isSelectionMode && isSameMonth(day, currentMonth) && "hover:bg-card/80",
+                    !isReadOnly && !isSelectionMode && isSameMonth(day, currentMonth) && "hover:bg-card/80",
                     isToday(day) && "border-primary",
                     isSameDay(day, selectedDate) && !isSelectionMode && "ring-2 ring-primary"
                   )}
@@ -344,12 +371,12 @@ export function FiscalFlowCalendar({
                 >
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-xs sm:text-base">{format(day, "d")}</span>
-                    {!isSelectionMode && (
+                    {!isSelectionMode && !isReadOnly && (
                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); openNewEntryDialog(day); }}>
                             <Plus className="h-4 w-4" />
                         </Button>
                     )}
-                    {isSelectionMode && dayEntries.length > 0 && (
+                    {isSelectionMode && dayEntries.length > 0 && !isReadOnly && (
                         <Checkbox 
                             checked={selectedDays.has(dayKey)}
                             onCheckedChange={() => handleDaySelection(day)}
@@ -364,10 +391,10 @@ export function FiscalFlowCalendar({
                               key={entry.id}
                               onClick={(e) => { if (!isSelectionMode) { e.stopPropagation(); openEditEntryDialog(entry); } }}
                               onDragStart={(e) => handleDragStart(e, entry.id)}
-                              draggable={!isSelectionMode && !entry.id.includes('-')}
+                              draggable={!isReadOnly && !isSelectionMode && !entry.id.includes('-')}
                               className={cn(
                                   "p-1 rounded-md truncate",
-                                  !isSelectionMode && !entry.id.includes('-') && "cursor-grab active:cursor-grabbing",
+                                  !isReadOnly && !isSelectionMode && !entry.id.includes('-') && "cursor-grab active:cursor-grabbing",
                                   entry.type === 'bill' ? 'bg-destructive text-destructive-foreground' : 'bg-accent text-accent-foreground',
                                   draggingEntryId === entry.id && 'opacity-50',
                                   isSelectionMode && 'opacity-70'

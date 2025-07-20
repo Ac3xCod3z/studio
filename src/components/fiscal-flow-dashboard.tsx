@@ -117,7 +117,7 @@ export default function FiscalFlowDashboard() {
     
     const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry[] => {
         const instances: Entry[] = [];
-        const originalEntryDate = parseISO(entry.date);
+        const originalEntryDate = new Date(entry.date + 'T00:00:00');
         
         if (isBefore(end, originalEntryDate)) return [];
 
@@ -295,6 +295,7 @@ export default function FiscalFlowDashboard() {
         setEntryDialogOpen={setEntryDialogOpen}
         isMobile={isMobile}
         openMobileSheet={() => setMobileSheetOpen(true)}
+        setMonthlyLeftovers={setMonthlyLeftovers}
       />
       
       <EntryDialog 

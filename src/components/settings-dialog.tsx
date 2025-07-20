@@ -1,10 +1,11 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { Sparkles, Loader2, Bell, BellOff } from "lucide-react";
+import { Sparkles, Loader2, Bell, BellOff, Share2, Check, Copy } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -36,7 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
-import type { RolloverPreference } from "@/lib/types";
+import type { Entry, RolloverPreference } from "@/lib/types";
 import { getRolloverRecommendation } from "@/ai/flows/rollover-optimization";
 import { useToast } from "@/hooks/use-toast";
 import { timezones } from "@/lib/timezones";
@@ -72,12 +73,17 @@ export function SettingsDialog({
   const { toast } = useToast();
   const [notificationStatus, setNotificationStatus] = useState("default");
   const [notificationsEnabled, setNotificationsEnabled] = useLocalStorage('fiscalFlowNotificationsEnabled', false);
-
+  const [entries] = useLocalStorage<Entry[]>("fiscalFlowEntries", []);
+  const [shareLink, setShareLink] = useState('');
+  const [hasCopied, setHasCopied] = useState(false);
 
   useEffect(() => {
     if ("Notification" in window) {
       setNotificationStatus(Notification.permission);
     }
+    // Reset share link state when dialog opens
+    setShareLink('');
+    setHasCopied(false);
   }, [isOpen]);
 
   const handleNotificationToggle = async () => {
@@ -126,6 +132,30 @@ export function SettingsDialog({
     }
   }
 
+  const handleGenerateShareLink = () => {
+    const dataToShare = {
+        entries,
+        rollover: rolloverPreference,
+        timezone
+    };
+    const jsonString = JSON.stringify(dataToShare);
+    const encodedData = encodeURIComponent(btoa(jsonString));
+    const url = `${window.location.origin}/view?data=${encodedData}`;
+    setShareLink(url);
+    setHasCopied(false);
+  };
+
+  const handleCopyToClipboard = () => {
+    navigator.clipboard.writeText(shareLink).then(() => {
+        setHasCopied(true);
+        toast({ title: "Copied to Clipboard!", description: "The shareable link has been copied." });
+        setTimeout(() => setHasCopied(false), 2000); // Reset icon after 2s
+    }, (err) => {
+        console.error('Could not copy text: ', err);
+        toast({ title: "Copy Failed", description: "Could not copy the link to your clipboard.", variant: "destructive" });
+    });
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md grid-rows-[auto_minmax(0,1fr)_auto] p-0 max-h-[90vh]">
@@ -138,6 +168,25 @@ export function SettingsDialog({
         
         <ScrollArea className="px-6">
           <div className="space-y-4 py-4">
+             <div className="space-y-2">
+                <h3 className="font-semibold">Share Calendar</h3>
+                <p className="text-sm text-muted-foreground">Generate a read-only link to share your calendar with others.</p>
+                <Button onClick={handleGenerateShareLink} className="w-full">
+                    <Share2 className="mr-2 h-4 w-4" /> Generate Share Link
+                </Button>
+                {shareLink && (
+                    <div className="p-2 border rounded-md bg-muted">
+                        <p className="text-sm text-muted-foreground break-all mb-2">{shareLink}</p>
+                        <Button onClick={handleCopyToClipboard} size="sm" className="w-full">
+                            {hasCopied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+                            {hasCopied ? 'Copied!' : 'Copy Link'}
+                        </Button>
+                    </div>
+                )}
+            </div>
+
+            <Separator />
+            
              <div className="space-y-2">
                 <h3 className="font-semibold">Notifications</h3>
                 <p className="text-sm text-muted-foreground">Get reminders for your upcoming bills, delivered right to your device.</p>
