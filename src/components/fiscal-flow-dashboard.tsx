@@ -173,11 +173,10 @@ export default function FiscalFlowDashboard() {
     if (!isMobile) return null;
 
     const currentMonth = selectedDate; 
-    const prevMonth = subMonths(currentMonth, 1);
-    const prevMonthKey = format(prevMonth, 'yyyy-MM');
-
+    const monthKey = format(currentMonth, 'yyyy-MM');
     const weekStart = startOfWeek(selectedDate);
     const weekEnd = endOfWeek(selectedDate);
+
     const weekEntries = generatedEntries.filter(e => {
         const entryDate = parseDateInTimezone(e.date, timezone);
         return entryDate >= weekStart && entryDate <= weekEnd;
@@ -185,24 +184,28 @@ export default function FiscalFlowDashboard() {
 
     const weeklyIncome = weekEntries.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
     const weeklyBills = weekEntries.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
-    const weeklyNet = weeklyIncome - weeklyBills;
+    const initialWeeklyNet = weeklyIncome - weeklyBills;
     
-    const isFirstWeekOfMonth = isBefore(weekStart, startOfMonth(currentMonth));
-    const weeklyRolloverSourceKey = isFirstWeekOfMonth ? format(subMonths(currentMonth,1), 'yyyy-MM') : prevMonthKey;
-    const weeklyPreviousLeftover = (rollover === 'carryover' && monthlyLeftovers[weeklyRolloverSourceKey]) || 0;
+    const weeklyRolloverSourceKey = isBefore(weekStart, startOfMonth(currentMonth)) 
+        ? format(subMonths(weekStart, 1), 'yyyy-MM') 
+        : monthKey;
+
+    const startOfWeekLeftover = (rollover === 'carryover' && monthlyLeftovers[weeklyRolloverSourceKey]) || 0;
 
     let rolloverApplied = 0;
-    if (weeklyNet < 0 && weeklyPreviousLeftover > 0) {
-        rolloverApplied = Math.min(Math.abs(weeklyNet), weeklyPreviousLeftover);
+    if (initialWeeklyNet < 0 && startOfWeekLeftover > 0) {
+        rolloverApplied = Math.min(Math.abs(initialWeeklyNet), startOfWeekLeftover);
     }
     
+    const finalWeeklyNet = initialWeeklyNet + rolloverApplied;
+
     const dayEntries = generatedEntries.filter((e) => isSameDay(parseDateInTimezone(e.date, timezone), selectedDate));
 
     return {
       weeklyTotals: {
           income: weeklyIncome,
           bills: weeklyBills,
-          net: weeklyNet + rolloverApplied,
+          net: finalWeeklyNet,
           rolloverApplied,
       },
       dayEntries,
@@ -336,3 +339,5 @@ export default function FiscalFlowDashboard() {
     </div>
   );
 }
+
+    

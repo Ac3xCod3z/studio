@@ -253,17 +253,21 @@ export function FiscalFlowCalendar({
 
     const weeklyIncome = weekEntries.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
     const weeklyBills = weekEntries.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
-    const weeklyNet = weeklyIncome - weeklyBills;
+    const initialWeeklyNet = weeklyIncome - weeklyBills;
     
     // Find previous leftover for weekly rollover calculation
-    const isFirstWeekOfMonth = isBefore(weekStart, startOfMonth(currentMonth));
-    const weeklyRolloverSourceKey = isFirstWeekOfMonth ? format(subMonths(currentMonth,1), 'yyyy-MM') : prevMonthKey;
-    const weeklyPreviousLeftover = (rollover === 'carryover' && monthlyLeftovers[weeklyRolloverSourceKey]) || 0;
-
+    const weeklyRolloverSourceKey = isBefore(weekStart, startOfMonth(currentMonth)) 
+      ? format(subMonths(weekStart, 1), 'yyyy-MM') 
+      : monthKey;
+      
+    const startOfWeekLeftover = (rollover === 'carryover' && monthlyLeftovers[weeklyRolloverSourceKey]) || 0;
+    
     let rolloverApplied = 0;
-    if (weeklyNet < 0 && weeklyPreviousLeftover > 0) {
-        rolloverApplied = Math.min(Math.abs(weeklyNet), weeklyPreviousLeftover);
+    if (initialWeeklyNet < 0 && startOfWeekLeftover > 0) {
+        rolloverApplied = Math.min(Math.abs(initialWeeklyNet), startOfWeekLeftover);
     }
+    
+    const finalWeeklyNet = initialWeeklyNet + rolloverApplied;
 
     return {
       monthlyTotals: { 
@@ -277,7 +281,7 @@ export function FiscalFlowCalendar({
       weeklyTotals: {
           income: weeklyIncome,
           bills: weeklyBills,
-          net: weeklyNet + rolloverApplied,
+          net: finalWeeklyNet,
           rolloverApplied,
       },
     };
@@ -496,3 +500,5 @@ export const SidebarContent = ({
       </div>
   </div>
 );
+
+    
