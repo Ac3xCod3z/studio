@@ -1,7 +1,7 @@
 import { toZonedTime } from 'date-fns-tz';
 import { Entry } from './types';
 import { formatCurrency } from './utils';
-import { add, getDay, isAfter, isBefore, nextSunday, set } from 'date-fns';
+import { add, getDay, isAfter, isBefore, set } from 'date-fns';
 import { recurrenceIntervalMonths } from './constants';
 
 const NOTIFICATION_TAG_PREFIX = 'fiscalflow-bill-';
@@ -40,18 +40,16 @@ function getNextBillOccurrences(entry: Entry, timezone: string): Date[] {
   const [year, month, day] = entry.date.split('-').map(Number);
   const baseDate = toZonedTime(new Date(year, month - 1, day), timezone);
 
+  // Set the notification time to 8 AM for all occurrences
+  const notificationTime = { hours: 8, minutes: 0, seconds: 0, milliseconds: 0 };
+
   if (entry.recurrence === 'none') {
-    if (isAfter(baseDate, now) && isBefore(baseDate, scheduleUntil)) {
-      occurrences.push(baseDate);
+    const occurrence = set(baseDate, notificationTime);
+    if (isAfter(occurrence, now) && isBefore(occurrence, scheduleUntil)) {
+      occurrences.push(occurrence);
     }
   } else if (entry.recurrence === 'weekly') {
-    const dayOfWeek = getDay(baseDate);
-    let nextOccurrence = set(baseDate, {
-      hours: 9,
-      minutes: 0,
-      seconds: 0,
-      milliseconds: 0,
-    });
+    let nextOccurrence = set(baseDate, notificationTime);
     
     while(isBefore(nextOccurrence, now)){
       nextOccurrence = add(nextOccurrence, { weeks: 1 });
@@ -63,12 +61,7 @@ function getNextBillOccurrences(entry: Entry, timezone: string): Date[] {
     }
   } else {
     const interval = recurrenceIntervalMonths[entry.recurrence as keyof typeof recurrenceIntervalMonths];
-    let nextOccurrence = set(baseDate, {
-      hours: 9,
-      minutes: 0,
-      seconds: 0,
-      milliseconds: 0,
-    });
+    let nextOccurrence = set(baseDate, notificationTime);
 
     while(isBefore(nextOccurrence, now)){
       nextOccurrence = add(nextOccurrence, { months: interval });
