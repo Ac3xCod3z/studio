@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from "react";
@@ -88,11 +89,16 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
 
 
   function onSubmit(values: z.infer<typeof formSchema>) {
-    const dataToSave = {
+    const dataToSave: Omit<Entry, 'id'> & {id?: string} = {
       ...values,
       // Format as YYYY-MM-DD for storage. The `values.date` is already correct.
       date: format(values.date, "yyyy-MM-dd"),
     };
+
+    if (values.type !== 'bill') {
+        delete dataToSave.category;
+    }
+
     if (entry) {
       onSave({ ...dataToSave, id: entry.id });
     } else {
@@ -252,29 +258,29 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="none">Does not repeat</SelectItem>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="bimonthly">Every 2 months</SelectItem>
-                      <SelectItem value="3months">Every 3 months</SelectItem>
-                      <SelectItem value="6months">Every 6 months</SelectItem>
-                      <SelectItem value="12months">Annually (12 months)</SelectItem>
+                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="bimonthly">Every 2 months</SelectItem>
+                        <SelectItem value="3months">Every 3 months</SelectItem>
+                        <SelectItem value="6months">Every 6 months</SelectItem>
+                        <SelectItem value="12months">Every 12 months</SelectItem>
                     </SelectContent>
-                  </Select>
+                   </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <DialogFooter className="sm:justify-between pt-4">
-                {entry && (
-                     <Button type="button" variant="destructive" onClick={handleDelete} className="mr-auto">
-                        <Trash2 className="mr-2 h-4 w-4" /> Delete
-                    </Button>
-                )}
-               <div className="flex gap-2">
-                 <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-                 <Button type="submit">Save</Button>
-               </div>
+            <DialogFooter className="pt-4">
+              {entry && onDelete && (
+                 <Button type="button" variant="destructive" onClick={handleDelete} className="mr-auto">
+                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                </Button>
+              )}
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="submit">Save</Button>
             </DialogFooter>
           </form>
         </Form>
