@@ -268,7 +268,6 @@ export function FiscalFlowCalendar({
   const Sidebar = () => (
     <SidebarContent 
       weeklyTotals={weeklyTotals}
-      monthlyTotals={monthlyTotals}
       isMobile={isMobile}
       selectedDate={selectedDate}
     />
@@ -440,12 +439,10 @@ function SummaryCard({ title, amount, icon, description, variant = 'default', cl
 
 export const SidebarContent = ({
   weeklyTotals,
-  monthlyTotals,
   isMobile,
   selectedDate,
 }: {
   weeklyTotals: any,
-  monthlyTotals: any,
   isMobile: boolean,
   selectedDate: Date,
 }) => (
