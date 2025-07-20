@@ -72,7 +72,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
   });
 
   const entryType = form.watch("type");
-  const hasCategory = form.watch("category");
+  const hasCategory = !!form.watch("category");
 
    React.useEffect(() => {
     if (isOpen) {
@@ -191,7 +191,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Category</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a category" />
