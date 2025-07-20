@@ -460,11 +460,5 @@ export const SidebarContent = ({
           )}
           <SummaryCard title="Weekly Net" amount={weeklyTotals.net} variant={weeklyTotals.net >= 0 ? 'positive' : 'negative'} />
       </div>
-      <div className="space-y-4">
-          <h3 className="font-semibold text-lg">Month of {format(selectedDate, 'MMMM')}</h3>
-          <SummaryCard title="Total Income" amount={monthlyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
-          <SummaryCard title="Total Bills" amount={monthlyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
-          <SummaryCard title="Monthly Net" amount={monthlyTotals.net} variant={monthlyTotals.net >= 0 ? 'positive' : 'negative'} />
-      </div>
   </div>
 );
