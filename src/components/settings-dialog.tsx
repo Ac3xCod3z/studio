@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { Sparkles, Loader2, ChevronsUpDown } from "lucide-react";
+import { Sparkles, Loader2, Bell, BellOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -41,6 +41,7 @@ import { getRolloverRecommendation } from "@/ai/flows/rollover-optimization";
 import { useToast } from "@/hooks/use-toast";
 import { timezones } from "@/lib/timezones";
 import { ScrollArea } from "./ui/scroll-area";
+import useLocalStorage from "@/hooks/use-local-storage";
 
 const formSchema = z.object({
   incomeLevel: z.coerce.number().positive({ message: "Income must be a positive number." }),
@@ -54,6 +55,7 @@ type SettingsDialogProps = {
   onRolloverPreferenceChange: (preference: RolloverPreference) => void;
   timezone: string;
   onTimezoneChange: (timezone: string) => void;
+  onNotificationsToggle: (enabled: boolean) => void;
 };
 
 export function SettingsDialog({
@@ -63,10 +65,43 @@ export function SettingsDialog({
   onRolloverPreferenceChange,
   timezone,
   onTimezoneChange,
+  onNotificationsToggle,
 }: SettingsDialogProps) {
   const [recommendation, setRecommendation] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const [notificationStatus, setNotificationStatus] = useState("default");
+  const [notificationsEnabled, setNotificationsEnabled] = useLocalStorage('fiscalFlowNotificationsEnabled', false);
+
+
+  useEffect(() => {
+    if ("Notification" in window) {
+      setNotificationStatus(Notification.permission);
+    }
+  }, [isOpen]);
+
+  const handleNotificationToggle = async () => {
+    if (!("Notification" in window) || !("serviceWorker" in navigator)) {
+        toast({ title: "Notifications not supported", description: "Your browser does not support notifications.", variant: "destructive" });
+        return;
+    }
+
+    if (notificationStatus === 'granted') {
+        setNotificationsEnabled(false);
+        onNotificationsToggle(false);
+        toast({ title: "Notifications Disabled", description: "You will no longer receive bill reminders." });
+    } else {
+        const permission = await Notification.requestPermission();
+        setNotificationStatus(permission);
+        if (permission === 'granted') {
+            setNotificationsEnabled(true);
+            onNotificationsToggle(true);
+            toast({ title: "Notifications Enabled!", description: "You'll receive reminders for upcoming bills." });
+        } else {
+            toast({ title: "Notifications Blocked", description: "You need to enable notifications in your browser settings.", variant: "destructive" });
+        }
+    }
+  };
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -103,6 +138,25 @@ export function SettingsDialog({
         
         <ScrollArea className="px-6">
           <div className="space-y-4 py-4">
+             <div className="space-y-2">
+                <h3 className="font-semibold">Notifications</h3>
+                <p className="text-sm text-muted-foreground">Get reminders for your upcoming bills, delivered right to your device.</p>
+                <Button 
+                    onClick={handleNotificationToggle} 
+                    className="w-full"
+                    variant={notificationsEnabled && notificationStatus === 'granted' ? 'secondary' : 'default'}
+                    disabled={notificationStatus === 'denied'}
+                >
+                    {notificationsEnabled && notificationStatus === 'granted' ? <BellOff className="mr-2 h-4 w-4" /> : <Bell className="mr-2 h-4 w-4" />}
+                    {notificationsEnabled && notificationStatus === 'granted' ? 'Disable Notifications' : 'Enable Notifications'}
+                </Button>
+                 {notificationStatus === 'denied' && (
+                    <p className="text-xs text-destructive text-center">You have blocked notifications. Please enable them in your browser settings.</p>
+                )}
+            </div>
+
+            <Separator />
+
             <div className="space-y-2">
               <Label htmlFor="timezone" className="font-semibold">Timezone</Label>
               <p className="text-sm text-muted-foreground">Select your local timezone to ensure dates are handled correctly.</p>

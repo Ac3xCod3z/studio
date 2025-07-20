@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import useLocalStorage from "@/hooks/use-local-storage";
 import { useMedia } from "react-use";
 
@@ -17,7 +17,8 @@ import { format, subMonths, startOfMonth, endOfMonth, eachWeekOfInterval, getWee
 import { toZonedTime } from "date-fns-tz";
 import { recurrenceIntervalMonths } from "@/lib/constants";
 import { ScrollArea } from "./ui/scroll-area";
-
+import { scheduleNotifications, cancelAllNotifications } from "@/lib/notification-manager";
+import { useToast } from "@/hooks/use-toast";
 
 export default function FiscalFlowDashboard() {
   const [isClient, setIsClient] = useState(false);
@@ -25,6 +26,7 @@ export default function FiscalFlowDashboard() {
   const [rollover, setRollover] = useLocalStorage<RolloverPreference>("fiscalFlowRollover", "carryover");
   const [timezone, setTimezone] = useLocalStorage<string>('fiscalFlowTimezone', 'UTC');
   const [monthlyLeftovers, setMonthlyLeftovers] = useLocalStorage<any>("fiscalFlowLeftovers", {});
+  const [notificationsEnabled, setNotificationsEnabled] = useLocalStorage('fiscalFlowNotificationsEnabled', false);
 
   const [isEntryDialogOpen, setEntryDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setSettingsDialogOpen] = useState(false);
@@ -33,6 +35,24 @@ export default function FiscalFlowDashboard() {
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   const isMobile = useMedia("(max-width: 1024px)", false);
+  const { toast } = useToast();
+
+  const handleNotificationsToggle = useCallback((enabled: boolean) => {
+    setNotificationsEnabled(enabled);
+  }, [setNotificationsEnabled]);
+
+  useEffect(() => {
+    if (isClient && notificationsEnabled) {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        scheduleNotifications(entries, timezone, toast);
+      } else {
+        setNotificationsEnabled(false);
+      }
+    } else if (isClient && !notificationsEnabled) {
+      cancelAllNotifications(toast);
+    }
+  }, [isClient, entries, timezone, notificationsEnabled, setNotificationsEnabled, toast]);
+
 
   useEffect(() => {
     setIsClient(true);
@@ -40,8 +60,9 @@ export default function FiscalFlowDashboard() {
 
   useEffect(() => {
     if (isClient) {
-        if (!localStorage.getItem('fiscalFlowTimezone')) {
-            setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+      const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (!localStorage.getItem('fiscalFlowTimezone') && detectedTimezone) {
+            setTimezone(detectedTimezone);
         }
         if ('serviceWorker' in navigator) {
           window.addEventListener('load', () => {
@@ -54,6 +75,7 @@ export default function FiscalFlowDashboard() {
         }
     }
   }, [isClient, setTimezone]);
+
 
   const handleEntrySave = (entryData: Omit<Entry, "id"> & { id?: string }) => {
     setEntries((prev) => {
@@ -274,6 +296,7 @@ export default function FiscalFlowDashboard() {
         onRolloverPreferenceChange={setRollover}
         timezone={timezone}
         onTimezoneChange={setTimezone}
+        onNotificationsToggle={handleNotificationsToggle}
       />
     </div>
   );
