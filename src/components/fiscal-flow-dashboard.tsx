@@ -35,22 +35,25 @@ export default function FiscalFlowDashboard() {
   const isMobile = useMedia("(max-width: 1024px)", false);
 
   useEffect(() => {
-    // This now correctly runs only on the client
-    if (!localStorage.getItem('fiscalFlowTimezone')) {
-        setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
-    }
-     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').then(registration => {
-          console.log('SW registered: ', registration);
-        }).catch(registrationError => {
-          console.log('SW registration failed: ', registrationError);
-        });
-      });
-    }
-    // Set isClient to true after the first client-side render
     setIsClient(true);
-  }, [setTimezone]);
+  }, []);
+
+  useEffect(() => {
+    if (isClient) {
+        if (!localStorage.getItem('fiscalFlowTimezone')) {
+            setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+        }
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').then(registration => {
+              console.log('SW registered: ', registration);
+            }).catch(registrationError => {
+              console.log('SW registration failed: ', registrationError);
+            });
+          });
+        }
+    }
+  }, [isClient, setTimezone]);
 
   const handleEntrySave = (entryData: Omit<Entry, "id"> & { id?: string }) => {
     setEntries((prev) => {
@@ -87,12 +90,11 @@ export default function FiscalFlowDashboard() {
 
     const entriesForCurrentMonth = entries.flatMap((e) => {
       const originalEntryDate = parseISO(e.date);
-      const recurrenceInterval = e.recurrence ? recurrenceIntervalMonths[e.recurrence] : 0;
 
       if (isBefore(startOfMonth(currentMonth), startOfMonth(originalEntryDate))) {
         return [];
       }
-
+      
       if (e.recurrence === 'weekly') {
         const originalDayOfWeek = getDay(originalEntryDate);
         const daysInCurrentMonth = eachDayOfInterval({
@@ -109,7 +111,7 @@ export default function FiscalFlowDashboard() {
           }));
       }
 
-      
+      const recurrenceInterval = e.recurrence ? recurrenceIntervalMonths[e.recurrence] : 0;
       if (e.recurrence && e.recurrence !== 'none' && recurrenceInterval > 0) {
         const monthDiff = differenceInCalendarMonths(currentMonth, originalEntryDate);
         if (monthDiff < 0 || monthDiff % recurrenceInterval !== 0) {
@@ -130,12 +132,7 @@ export default function FiscalFlowDashboard() {
       }
       return [];
     });
-
-    const monthlyBills = entriesForCurrentMonth.filter((e) => e.type === "bill").reduce((sum, e) => sum + e.amount, 0);
-    const currentMonthIncome = entriesForCurrentMonth.filter((e) => e.type === "income").reduce((sum, e) => sum + e.amount, 0);
     
-    const monthlyNet = currentMonthIncome - monthlyBills;
-
     const weeksInMonth = eachWeekOfInterval({
         start: startOfMonth(currentMonth),
         end: endOfMonth(currentMonth)
@@ -168,7 +165,6 @@ export default function FiscalFlowDashboard() {
     };
 
     return {
-      monthlyTotals: { bills: monthlyBills, income: currentMonthIncome, net: monthlyNet, rollover: previousMonthLeftover, endOfMonthBalance: currentMonthIncome + previousMonthLeftover - monthlyBills, monthKey },
       weeklyTotals: selectedWeekData,
     };
   }, [isMobile, selectedDate, entries, rollover, monthlyLeftovers, timezone]);
@@ -230,14 +226,13 @@ export default function FiscalFlowDashboard() {
                  <SheetHeader className="p-4 md:p-6 border-b shrink-0">
                     <SheetTitle>Summary</SheetTitle>
                     <SheetDescription>
-                        Weekly and monthly summary for {format(selectedDate, "MMM d, yyyy")}.
+                        Weekly summary for {format(selectedDate, "MMM d, yyyy")}.
                     </SheetDescription>
                 </SheetHeader>
                   {mobileSummaryData && (
                     <ScrollArea className="flex-1">
                       <SidebarContent
                         weeklyTotals={mobileSummaryData.weeklyTotals}
-                        monthlyTotals={mobileSummaryData.monthlyTotals}
                         isMobile={true}
                         selectedDate={selectedDate}
                       />
