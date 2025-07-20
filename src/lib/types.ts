@@ -1,5 +1,19 @@
 export type EntryType = 'bill' | 'income';
 
+export const BillCategories = [
+  "rent",
+  "vehicles",
+  "utilities",
+  "groceries",
+  "credit cards",
+  "subscriptions",
+  "loans",
+  "necessities",
+  "other",
+] as const;
+
+export type BillCategory = (typeof BillCategories)[number];
+
 export type RecurrenceInterval =
   | 'none'
   | 'weekly'
@@ -16,6 +30,7 @@ export type Entry = {
   amount: number;
   type: EntryType;
   recurrence?: RecurrenceInterval;
+  category?: BillCategory;
 };
 
 export type RolloverPreference = 'carryover' | 'reset';

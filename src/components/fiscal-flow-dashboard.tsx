@@ -8,6 +8,7 @@ import { useMedia } from "react-use";
 import { EntryDialog } from "./entry-dialog";
 import { SettingsDialog } from "./settings-dialog";
 import { DayEntriesDialog } from "./day-entries-dialog";
+import { MonthlyBreakdownDialog } from "./monthly-breakdown-dialog";
 import { Logo } from "./icons";
 import { Settings, Menu, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ export default function FiscalFlowDashboard() {
   const [isSettingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [isMobileSheetOpen, setMobileSheetOpen] = useState(false);
   const [isDayEntriesDialogOpen, setDayEntriesDialogOpen] = useState(false);
+  const [isBreakdownDialogOpen, setBreakdownDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -298,6 +300,7 @@ export default function FiscalFlowDashboard() {
         isMobile={isMobile}
         openDayEntriesDialog={() => setDayEntriesDialogOpen(true)}
         setMonthlyLeftovers={setMonthlyLeftovers}
+        onOpenBreakdown={() => setBreakdownDialogOpen(true)}
       />
       
       <EntryDialog 
@@ -327,6 +330,14 @@ export default function FiscalFlowDashboard() {
         }}
       />
 
+       <MonthlyBreakdownDialog
+        isOpen={isBreakdownDialogOpen}
+        onClose={() => setBreakdownDialogOpen(false)}
+        entries={entries}
+        currentMonth={selectedDate}
+        timezone={timezone}
+      />
+
       <SettingsDialog 
         isOpen={isSettingsDialogOpen}
         onClose={() => setSettingsDialogOpen(false)}
@@ -339,5 +350,3 @@ export default function FiscalFlowDashboard() {
     </div>
   );
 }
-
-    

@@ -32,6 +32,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { Entry } from "@/lib/types";
+import { BillCategories } from "@/lib/types";
 
 const formSchema = z.object({
   type: z.enum(["bill", "income"], { required_error: "You need to select an entry type." }),
@@ -39,6 +40,7 @@ const formSchema = z.object({
   amount: z.coerce.number().positive({ message: "Amount must be a positive number." }),
   date: z.date({ required_error: "A date is required." }),
   recurrence: z.enum(["none", "weekly", "monthly", "bimonthly", "3months", "6months", "12months"]).default("none"),
+  category: z.enum(BillCategories).optional(),
 });
 
 type EntryFormProps = {
@@ -68,6 +70,8 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
     // Zod will handle validation, defaultValues can be initialized later in useEffect
   });
 
+  const entryType = form.watch("type");
+
    React.useEffect(() => {
     if (isOpen) {
       const resetDate = entry ? parseDateInTimezone(entry.date, timezone) : selectedDate;
@@ -77,6 +81,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
         amount: entry?.amount || 0,
         date: resetDate,
         recurrence: entry?.recurrence || 'none',
+        category: entry?.category,
       });
     }
   }, [isOpen, selectedDate, entry, form, timezone]);
@@ -113,7 +118,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
               name="type"
@@ -170,6 +175,32 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
                 </FormItem>
               )}
             />
+
+            {entryType === 'bill' && (
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {BillCategories.map(cat => (
+                           <SelectItem key={cat} value={cat} className="capitalize">{cat}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             <FormField
               control={form.control}
               name="date"
@@ -234,7 +265,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
                 </FormItem>
               )}
             />
-            <DialogFooter className="sm:justify-between">
+            <DialogFooter className="sm:justify-between pt-4">
                 {entry && (
                      <Button type="button" variant="destructive" onClick={handleDelete} className="mr-auto">
                         <Trash2 className="mr-2 h-4 w-4" /> Delete

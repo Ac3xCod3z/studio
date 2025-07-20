@@ -26,7 +26,7 @@ import {
   add,
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
-import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Repeat, Trash2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Repeat, Trash2, X, PieChart } from "lucide-react";
 
 import useLocalStorage from "@/hooks/use-local-storage";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,7 @@ type FiscalFlowCalendarProps = {
     openDayEntriesDialog: () => void;
     isReadOnly?: boolean;
     setMonthlyLeftovers: (value: any | ((val: any) => any)) => void;
+    onOpenBreakdown: () => void;
 }
 
 export function FiscalFlowCalendar({
@@ -72,6 +73,7 @@ export function FiscalFlowCalendar({
     openDayEntriesDialog,
     isReadOnly = false,
     setMonthlyLeftovers,
+    onOpenBreakdown,
 }: FiscalFlowCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -419,9 +421,14 @@ export function FiscalFlowCalendar({
             })}
           </div>
           <div className="mt-6 border-t pt-6">
-            <h2 className="text-xl font-bold mb-4 text-center md:text-left">
-              {format(currentMonth, "MMMM")} Summary
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-center md:text-left">
+                {format(currentMonth, "MMMM")} Summary
+              </h2>
+              <Button onClick={onOpenBreakdown} variant="outline" size="sm">
+                <PieChart className="mr-2 h-4 w-4" /> View Breakdown
+              </Button>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <SummaryCard
                 title="Total Income"
@@ -500,5 +507,3 @@ export const SidebarContent = ({
       </div>
   </div>
 );
-
-    
