@@ -27,7 +27,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { add, endOfMonth, format, getDay, isBefore, isSameMonth, setDate, startOfMonth, getDate } from 'date-fns';
+import { add, endOfMonth, format, getDay, isBefore, isSameMonth, setDate, startOfMonth, getDate, differenceInCalendarMonths, parseISO } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { type Entry, type BillCategory, BillCategories } from '@/lib/types';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -92,19 +92,22 @@ export function MonthlyBreakdownDialog({
         if (entry.recurrence && entry.recurrence !== 'none' && recurrenceInterval > 0) {
             let recurringDate = originalEntryDate;
             
-            // Move to first relevant recurring date for the current view
             while(isBefore(recurringDate, start) && differenceInCalendarMonths(start, recurringDate) > recurrenceInterval){
                 recurringDate = add(recurringDate, { months: recurrenceInterval * Math.floor(differenceInCalendarMonths(start, recurringDate) / recurrenceInterval) });
             }
 
-            while(isBefore(recurringDate, end)) {
-                const lastDayOfMonth = endOfMonth(recurringDate).getDate();
-                const originalDay = getDate(originalEntryDate);
-                const dayForMonth = Math.min(originalDay, lastDayOfMonth);
-                const finalDate = setDate(recurringDate, dayForMonth);
+            while(isBefore(recurringDate, end) || isSameMonth(recurringDate, end)) {
+                if(isBefore(recurringDate, add(end, {days: 1})) && isSameMonth(recurringDate, currentMonth)) {
+                    const lastDayOfMonth = endOfMonth(recurringDate).getDate();
+                    const originalDay = getDate(originalEntryDate);
+                    const dayForMonth = Math.min(originalDay, lastDayOfMonth);
+                    const finalDate = setDate(recurringDate, dayForMonth);
 
-                if (isSameMonth(finalDate, currentMonth) && finalDate >= originalEntryDate) {
-                    instances.push({ ...entry, date: format(finalDate, 'yyyy-MM-dd') });
+                    if ((isSameMonth(finalDate, currentMonth) || isBefore(finalDate, currentMonth)) && finalDate >= originalEntryDate) {
+                        if (isSameMonth(finalDate, currentMonth)) {
+                           instances.push({ ...entry, date: format(finalDate, 'yyyy-MM-dd') });
+                        }
+                    }
                 }
                 recurringDate = add(recurringDate, { months: recurrenceInterval });
             }
