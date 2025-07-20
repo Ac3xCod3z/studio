@@ -54,7 +54,7 @@ type FiscalFlowCalendarProps = {
     setSelectedDate: (date: Date) => void;
     setEntryDialogOpen: (isOpen: boolean) => void;
     isMobile: boolean;
-    openMobileSheet: () => void;
+    openDayEntriesDialog: () => void;
     isReadOnly?: boolean;
     setMonthlyLeftovers: (value: any | ((val: any) => any)) => void;
 }
@@ -69,7 +69,7 @@ export function FiscalFlowCalendar({
     setSelectedDate: setGlobalSelectedDate,
     setEntryDialogOpen,
     isMobile,
-    openMobileSheet,
+    openDayEntriesDialog,
     isReadOnly = false,
     setMonthlyLeftovers,
 }: FiscalFlowCalendarProps) {
@@ -85,22 +85,91 @@ export function FiscalFlowCalendar({
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
 
-  const { daysInMonth, calendarInterval } = useMemo(() => {
+  const { daysInMonth, calendarInterval, entriesForGrid } = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth));
     const end = endOfWeek(endOfMonth(currentMonth));
     const days = eachDayOfInterval({ start, end });
-    return { daysInMonth: days, calendarInterval: { start, end }};
-  }, [currentMonth]);
+    
+    const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry[] => {
+        const instances: Entry[] = [];
+        const originalEntryDate = new Date(entry.date + 'T00:00:00');
+        
+        if (isBefore(end, originalEntryDate)) return [];
+
+        if (entry.recurrence === 'weekly') {
+            const originalDayOfWeek = getDay(originalEntryDate);
+            let currentDate = startOfWeek(start);
+            while (isBefore(currentDate, end)) {
+                if (getDay(currentDate) === originalDayOfWeek && (currentDate >= originalEntryDate)) {
+                    instances.push({
+                        ...entry,
+                        date: format(currentDate, 'yyyy-MM-dd'),
+                        id: `${entry.id}-${format(currentDate, 'yyyy-MM-dd')}`
+                    });
+                }
+                currentDate = add(currentDate, { days: 1 });
+            }
+            return instances;
+        }
+        
+        const recurrenceInterval = entry.recurrence ? recurrenceIntervalMonths[entry.recurrence as keyof typeof recurrenceIntervalMonths] : 0;
+        if (entry.recurrence && entry.recurrence !== 'none' && recurrenceInterval > 0) {
+            let recurringDate = originalEntryDate;
+            while(isBefore(recurringDate, end)) {
+                 if (recurringDate >= start) {
+                    const lastDayOfMonth = endOfMonth(recurringDate).getDate();
+                    const originalDay = getDate(originalEntryDate);
+                    const dayForMonth = Math.min(originalDay, lastDayOfMonth);
+                    const finalDate = setDate(recurringDate, dayForMonth);
+
+                    instances.push({ 
+                        ...entry, 
+                        date: format(finalDate, 'yyyy-MM-dd'), 
+                        id: `${entry.id}-${format(finalDate, 'yyyy-MM-dd')}` 
+                    });
+                 }
+                 recurringDate = add(recurringDate, { months: recurrenceInterval });
+            }
+            return instances;
+        }
+
+        return [];
+    };
+
+    const entriesForGrid = entries.flatMap((e) => {
+        const instances: Entry[] = [];
+
+        // Handle non-recurring
+        if (e.recurrence === 'none') {
+            const entryDate = parseDateInTimezone(e.date, timezone);
+            if (entryDate >= start && entryDate <= end) {
+                instances.push(e);
+            }
+        } else {
+            // Handle recurring
+            instances.push(...generateRecurringInstances(e, start, end));
+        }
+
+        return instances;
+    });
+
+    return { daysInMonth: days, calendarInterval: { start, end }, entriesForGrid };
+  }, [currentMonth, entries, timezone]);
 
   const handleDayClick = (day: Date) => {
       if (isReadOnly) return;
       if (isSelectionMode) {
           handleDaySelection(day);
-      } else {
-        setSelectedDate(day);
-        setGlobalSelectedDate(day);
-        if (isMobile) {
-            openMobileSheet();
+          return;
+      }
+      
+      setSelectedDate(day);
+      setGlobalSelectedDate(day);
+
+      if (isMobile) {
+        const dayHasEntries = entriesForGrid.some(e => e.date === format(day, 'yyyy-MM-dd'));
+        if (dayHasEntries) {
+            openDayEntriesDialog();
         }
       }
   }
@@ -160,74 +229,11 @@ export function FiscalFlowCalendar({
     setDraggingEntryId(null);
   };
 
-    const { monthlyTotals, weeklyTotals, entriesForGrid } = useMemo(() => {
+    const { monthlyTotals, weeklyTotals } = useMemo(() => {
     const monthKey = format(currentMonth, 'yyyy-MM');
     const prevMonth = subMonths(currentMonth, 1);
     const prevMonthKey = format(prevMonth, 'yyyy-MM');
     const previousMonthLeftover = (rollover === 'carryover' && monthlyLeftovers[prevMonthKey]) || 0;
-
-    const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry[] => {
-        const instances: Entry[] = [];
-        const originalEntryDate = new Date(entry.date + 'T00:00:00');
-        
-        if (isBefore(end, originalEntryDate)) return [];
-
-        if (entry.recurrence === 'weekly') {
-            const originalDayOfWeek = getDay(originalEntryDate);
-            let currentDate = startOfWeek(start);
-            while (isBefore(currentDate, end)) {
-                if (getDay(currentDate) === originalDayOfWeek && (currentDate >= originalEntryDate)) {
-                    instances.push({
-                        ...entry,
-                        date: format(currentDate, 'yyyy-MM-dd'),
-                        id: `${entry.id}-${format(currentDate, 'yyyy-MM-dd')}`
-                    });
-                }
-                currentDate = add(currentDate, { days: 1 });
-            }
-            return instances;
-        }
-        
-        const recurrenceInterval = entry.recurrence ? recurrenceIntervalMonths[entry.recurrence as keyof typeof recurrenceIntervalMonths] : 0;
-        if (entry.recurrence && entry.recurrence !== 'none' && recurrenceInterval > 0) {
-            let recurringDate = originalEntryDate;
-            while(isBefore(recurringDate, end)) {
-                 if (recurringDate >= start) {
-                    const lastDayOfMonth = endOfMonth(recurringDate).getDate();
-                    const originalDay = getDate(originalEntryDate);
-                    const dayForMonth = Math.min(originalDay, lastDayOfMonth);
-                    const finalDate = setDate(recurringDate, dayForMonth);
-
-                    instances.push({ 
-                        ...entry, 
-                        date: format(finalDate, 'yyyy-MM-dd'), 
-                        id: `${entry.id}-${format(finalDate, 'yyyy-MM-dd')}` 
-                    });
-                 }
-                 recurringDate = add(recurringDate, { months: recurrenceInterval });
-            }
-            return instances;
-        }
-
-        return [];
-    };
-
-    const entriesForGrid = entries.flatMap((e) => {
-        const entryDate = parseDateInTimezone(e.date, timezone);
-        const instances: Entry[] = [];
-
-        // Handle non-recurring
-        if (e.recurrence === 'none') {
-            if (entryDate >= calendarInterval.start && entryDate <= calendarInterval.end) {
-                instances.push(e);
-            }
-        } else {
-            // Handle recurring
-            instances.push(...generateRecurringInstances(e, calendarInterval.start, calendarInterval.end));
-        }
-
-        return instances;
-    });
     
     // Monthly calculation still focuses on the current month's view
     const entriesForCurrentMonth = entriesForGrid.filter(e => isSameMonth(parseDateInTimezone(e.date, timezone), currentMonth));
@@ -274,9 +280,8 @@ export function FiscalFlowCalendar({
           net: weeklyNet + rolloverApplied,
           rolloverApplied,
       },
-      entriesForGrid,
     };
-  }, [entries, currentMonth, selectedDate, rollover, monthlyLeftovers, timezone, calendarInterval]);
+  }, [entriesForGrid, currentMonth, selectedDate, rollover, monthlyLeftovers, timezone]);
 
   useEffect(() => {
     if (isReadOnly) return;

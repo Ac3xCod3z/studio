@@ -7,6 +7,7 @@ import { useMedia } from "react-use";
 
 import { EntryDialog } from "./entry-dialog";
 import { SettingsDialog } from "./settings-dialog";
+import { DayEntriesDialog } from "./day-entries-dialog";
 import { Logo } from "./icons";
 import { Settings, Menu, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import type { Entry, RolloverPreference } from "@/lib/types";
 import { FiscalFlowCalendar, SidebarContent } from "./fiscal-flow-calendar";
-import { format, subMonths, startOfMonth, endOfMonth, eachWeekOfInterval, getWeek, isSameMonth, parseISO, isBefore, differenceInCalendarMonths, getDate, endOfWeek, getDay, eachDayOfInterval, setDate, startOfWeek, add } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, eachWeekOfInterval, getWeek, isSameMonth, parseISO, isBefore, differenceInCalendarMonths, getDate, endOfWeek, getDay, eachDayOfInterval, setDate, startOfWeek, add, isSameDay } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { recurrenceIntervalMonths } from "@/lib/constants";
 import { ScrollArea } from "./ui/scroll-area";
@@ -32,6 +33,7 @@ export default function FiscalFlowDashboard() {
   const [isEntryDialogOpen, setEntryDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [isMobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const [isDayEntriesDialogOpen, setDayEntriesDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -102,86 +104,81 @@ export default function FiscalFlowDashboard() {
     return toZonedTime(new Date(year, month - 1, day), timeZone);
   };
 
+  const generatedEntries = useMemo(() => {
+      const start = startOfWeek(startOfMonth(selectedDate));
+      const end = endOfWeek(endOfMonth(selectedDate));
+      
+      const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry[] => {
+          const instances: Entry[] = [];
+          const originalEntryDate = new Date(entry.date + 'T00:00:00');
+          
+          if (isBefore(end, originalEntryDate)) return [];
+
+          if (entry.recurrence === 'weekly') {
+              const originalDayOfWeek = getDay(originalEntryDate);
+              let currentDate = startOfWeek(start);
+              while (isBefore(currentDate, end)) {
+                  if (getDay(currentDate) === originalDayOfWeek && (currentDate >= originalEntryDate)) {
+                      instances.push({
+                          ...entry,
+                          date: format(currentDate, 'yyyy-MM-dd'),
+                          id: `${entry.id}-${format(currentDate, 'yyyy-MM-dd')}`
+                      });
+                  }
+                  currentDate = add(currentDate, { days: 1 });
+              }
+              return instances;
+          }
+          
+          const recurrenceInterval = entry.recurrence ? recurrenceIntervalMonths[entry.recurrence as keyof typeof recurrenceIntervalMonths] : 0;
+          if (entry.recurrence && entry.recurrence !== 'none' && recurrenceInterval > 0) {
+              let recurringDate = originalEntryDate;
+              while(isBefore(recurringDate, end)) {
+                   if (recurringDate >= start) {
+                      const lastDayOfMonth = endOfMonth(recurringDate).getDate();
+                      const originalDay = getDate(originalEntryDate);
+                      const dayForMonth = Math.min(originalDay, lastDayOfMonth);
+                      const finalDate = setDate(recurringDate, dayForMonth);
+
+                      instances.push({ 
+                          ...entry, 
+                          date: format(finalDate, 'yyyy-MM-dd'), 
+                          id: `${entry.id}-${format(finalDate, 'yyyy-MM-dd')}` 
+                      });
+                   }
+                   recurringDate = add(recurringDate, { months: recurrenceInterval });
+              }
+              return instances;
+          }
+
+          return [];
+      };
+
+      return entries.flatMap((e) => {
+          const instances: Entry[] = [];
+          if (e.recurrence === 'none') {
+              const entryDate = parseDateInTimezone(e.date, timezone);
+              if (entryDate >= start && entryDate <= end) {
+                  instances.push(e);
+              }
+          } else {
+              instances.push(...generateRecurringInstances(e, start, end));
+          }
+          return instances;
+      });
+  }, [entries, selectedDate, timezone]);
+
+
   const mobileSummaryData = useMemo(() => {
     if (!isMobile) return null;
 
-    const currentMonth = selectedDate; // Use selected date for context
-    const monthKey = format(currentMonth, 'yyyy-MM');
+    const currentMonth = selectedDate; 
     const prevMonth = subMonths(currentMonth, 1);
     const prevMonthKey = format(prevMonth, 'yyyy-MM');
 
-    const calendarInterval = {
-        start: startOfWeek(startOfMonth(currentMonth)),
-        end: endOfWeek(endOfMonth(currentMonth))
-    }
-    
-    const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry[] => {
-        const instances: Entry[] = [];
-        const originalEntryDate = new Date(entry.date + 'T00:00:00');
-        
-        if (isBefore(end, originalEntryDate)) return [];
-
-        if (entry.recurrence === 'weekly') {
-            const originalDayOfWeek = getDay(originalEntryDate);
-            let currentDate = startOfWeek(start);
-            while (isBefore(currentDate, end)) {
-                if (getDay(currentDate) === originalDayOfWeek && (currentDate >= originalEntryDate)) {
-                    instances.push({
-                        ...entry,
-                        date: format(currentDate, 'yyyy-MM-dd'),
-                        id: `${entry.id}-${format(currentDate, 'yyyy-MM-dd')}`
-                    });
-                }
-                currentDate = add(currentDate, { days: 1 });
-            }
-            return instances;
-        }
-        
-        const recurrenceInterval = entry.recurrence ? recurrenceIntervalMonths[entry.recurrence as keyof typeof recurrenceIntervalMonths] : 0;
-        if (entry.recurrence && entry.recurrence !== 'none' && recurrenceInterval > 0) {
-            let recurringDate = originalEntryDate;
-            while(isBefore(recurringDate, end)) {
-                 if (recurringDate >= start) {
-                    const lastDayOfMonth = endOfMonth(recurringDate).getDate();
-                    const originalDay = getDate(originalEntryDate);
-                    const dayForMonth = Math.min(originalDay, lastDayOfMonth);
-                    const finalDate = setDate(recurringDate, dayForMonth);
-
-                    instances.push({ 
-                        ...entry, 
-                        date: format(finalDate, 'yyyy-MM-dd'), 
-                        id: `${entry.id}-${format(finalDate, 'yyyy-MM-dd')}` 
-                    });
-                 }
-                 recurringDate = add(recurringDate, { months: recurrenceInterval });
-            }
-            return instances;
-        }
-
-        return [];
-    };
-
-    const entriesForGrid = entries.flatMap((e) => {
-        const entryDate = parseDateInTimezone(e.date, timezone);
-        const instances: Entry[] = [];
-
-        // Handle non-recurring
-        if (e.recurrence === 'none') {
-            if (entryDate >= calendarInterval.start && entryDate <= calendarInterval.end) {
-                instances.push(e);
-            }
-        } else {
-            // Handle recurring
-            instances.push(...generateRecurringInstances(e, calendarInterval.start, calendarInterval.end));
-        }
-
-        return instances;
-    });
-
-    // Weekly calculation uses the full grid range
     const weekStart = startOfWeek(selectedDate);
     const weekEnd = endOfWeek(selectedDate);
-    const weekEntries = entriesForGrid.filter(e => {
+    const weekEntries = generatedEntries.filter(e => {
         const entryDate = parseDateInTimezone(e.date, timezone);
         return entryDate >= weekStart && entryDate <= weekEnd;
     });
@@ -190,7 +187,6 @@ export default function FiscalFlowDashboard() {
     const weeklyBills = weekEntries.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
     const weeklyNet = weeklyIncome - weeklyBills;
     
-    // Find previous leftover for weekly rollover calculation
     const isFirstWeekOfMonth = isBefore(weekStart, startOfMonth(currentMonth));
     const weeklyRolloverSourceKey = isFirstWeekOfMonth ? format(subMonths(currentMonth,1), 'yyyy-MM') : prevMonthKey;
     const weeklyPreviousLeftover = (rollover === 'carryover' && monthlyLeftovers[weeklyRolloverSourceKey]) || 0;
@@ -200,15 +196,18 @@ export default function FiscalFlowDashboard() {
         rolloverApplied = Math.min(Math.abs(weeklyNet), weeklyPreviousLeftover);
     }
     
+    const dayEntries = generatedEntries.filter((e) => isSameDay(parseDateInTimezone(e.date, timezone), selectedDate));
+
     return {
       weeklyTotals: {
           income: weeklyIncome,
           bills: weeklyBills,
           net: weeklyNet + rolloverApplied,
           rolloverApplied,
-      }
+      },
+      dayEntries,
     };
-  }, [isMobile, selectedDate, entries, rollover, monthlyLeftovers, timezone]);
+  }, [isMobile, selectedDate, generatedEntries, rollover, monthlyLeftovers, timezone]);
 
 
   if (!isClient) {
@@ -294,7 +293,7 @@ export default function FiscalFlowDashboard() {
         setSelectedDate={setSelectedDate}
         setEntryDialogOpen={setEntryDialogOpen}
         isMobile={isMobile}
-        openMobileSheet={() => setMobileSheetOpen(true)}
+        openDayEntriesDialog={() => setDayEntriesDialogOpen(true)}
         setMonthlyLeftovers={setMonthlyLeftovers}
       />
       
@@ -308,6 +307,23 @@ export default function FiscalFlowDashboard() {
         timezone={timezone}
       />
       
+      <DayEntriesDialog
+        isOpen={isDayEntriesDialogOpen}
+        onClose={() => setDayEntriesDialogOpen(false)}
+        date={selectedDate}
+        entries={mobileSummaryData?.dayEntries || []}
+        onAddEntry={() => {
+            setDayEntriesDialogOpen(false);
+            openNewEntryDialog(selectedDate);
+        }}
+        onEditEntry={(entry) => {
+            setDayEntriesDialogOpen(false);
+            const originalEntry = entries.find(e => e.id === entry.id.split('-')[0]) || entry;
+            setEditingEntry(originalEntry);
+            setEntryDialogOpen(true);
+        }}
+      />
+
       <SettingsDialog 
         isOpen={isSettingsDialogOpen}
         onClose={() => setSettingsDialogOpen(false)}
