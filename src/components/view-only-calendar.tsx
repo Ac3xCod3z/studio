@@ -8,11 +8,10 @@ import { useMedia } from "react-use";
 import { Logo } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Entry, RolloverPreference } from "@/lib/types";
-import { FiscalFlowCalendar } from "@/components/fiscal-flow-calendar";
+import { FiscalFlowCalendar, SidebarContent } from "@/components/fiscal-flow-calendar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
-import { SidebarContent } from "@/components/fiscal-flow-calendar";
 import { format, subMonths, startOfMonth, endOfMonth, isBefore, getDay, add, setDate, getDate, startOfWeek, endOfWeek } from "date-fns";
 import { toZonedTime } from 'date-fns-tz';
 import { recurrenceIntervalMonths } from "@/lib/constants";
@@ -227,7 +226,7 @@ export default function ViewOnlyCalendar() {
         setSelectedDate={setSelectedDate}
         setEntryDialogOpen={() => {}} // No-op
         isMobile={isMobile}
-        openMobileSheet={() => setMobileSheetOpen(true)}
+        openDayEntriesDialog={() => {}} // No-op for read-only view
         isReadOnly={true}
         setMonthlyLeftovers={setMonthlyLeftovers}
       />

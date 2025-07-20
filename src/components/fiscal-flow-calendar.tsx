@@ -485,7 +485,6 @@ export const SidebarContent = ({
   selectedDate: Date;
 }) => (
   <div className="flex flex-col gap-6 p-4 md:p-6">
-      <h2 className="text-2xl font-bold">Summary</h2>
       <div className="space-y-4">
           <h3 className="font-semibold text-lg">Week of {format(startOfWeek(selectedDate), "MMM d")}</h3>
           <SummaryCard title="Income" amount={weeklyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
