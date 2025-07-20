@@ -21,10 +21,16 @@ import {
   TableRow,
   TableFooter,
 } from '@/components/ui/table';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { add, endOfMonth, format, getDay, isBefore, isSameMonth, setDate, startOfMonth, getDate } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { type Entry, type BillCategory, BillCategories } from '@/lib/types';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import {
   ChartContainer,
   ChartTooltip,
@@ -85,17 +91,22 @@ export function MonthlyBreakdownDialog({
         const recurrenceInterval = entry.recurrence ? recurrenceIntervalMonths[entry.recurrence as keyof typeof recurrenceIntervalMonths] : 0;
         if (entry.recurrence && entry.recurrence !== 'none' && recurrenceInterval > 0) {
             let recurringDate = originalEntryDate;
-            while(isBefore(recurringDate, start) || isSameMonth(recurringDate, start)) {
+            
+            // Move to first relevant recurring date for the current view
+            while(isBefore(recurringDate, start) && differenceInCalendarMonths(start, recurringDate) > recurrenceInterval){
+                recurringDate = add(recurringDate, { months: recurrenceInterval * Math.floor(differenceInCalendarMonths(start, recurringDate) / recurrenceInterval) });
+            }
+
+            while(isBefore(recurringDate, end)) {
                 const lastDayOfMonth = endOfMonth(recurringDate).getDate();
                 const originalDay = getDate(originalEntryDate);
                 const dayForMonth = Math.min(originalDay, lastDayOfMonth);
                 const finalDate = setDate(recurringDate, dayForMonth);
 
-                if (isSameMonth(finalDate, currentMonth)) {
+                if (isSameMonth(finalDate, currentMonth) && finalDate >= originalEntryDate) {
                     instances.push({ ...entry, date: format(finalDate, 'yyyy-MM-dd') });
                 }
                 recurringDate = add(recurringDate, { months: recurrenceInterval });
-                 if(recurringDate > end) break;
             }
             return instances;
         }
@@ -106,35 +117,37 @@ export function MonthlyBreakdownDialog({
         .filter(entry => entry.type === 'bill')
         .flatMap(entry => {
             if (entry.recurrence === 'none') {
-                const entryDate = toZonedTime(entry.date, timezone);
+                const entryDate = toZonedTime(parseISO(entry.date), timezone);
                 return isSameMonth(entryDate, currentMonth) ? [entry] : [];
             }
             return generateRecurringInstances(entry);
         });
 
-    const breakdown: Record<BillCategory, number> = Object.fromEntries(
-        BillCategories.map(cat => [cat, 0])
-    ) as Record<BillCategory, number>;
+    const breakdown: Record<BillCategory, { total: number, entries: Entry[] }> = Object.fromEntries(
+        BillCategories.map(cat => [cat, { total: 0, entries: [] }])
+    ) as Record<BillCategory, { total: number, entries: Entry[] }>;
     
     let total = 0;
 
     for (const bill of monthlyBills) {
       const category = bill.category || 'other';
-      breakdown[category] += bill.amount;
+      breakdown[category].total += bill.amount;
+      breakdown[category].entries.push(bill);
       total += bill.amount;
     }
     
     const sortedBreakdown = Object.entries(breakdown)
-        .filter(([, amount]) => amount > 0)
-        .sort(([, a], [, b]) => b - a) as [BillCategory, number][];
+        .map(([category, data]) => ({ category: category as BillCategory, ...data}))
+        .filter((item) => item.total > 0)
+        .sort((a, b) => b.total - a.total);
 
     return { breakdown: sortedBreakdown, total };
   }, [entries, currentMonth, timezone]);
 
   const chartData = useMemo(() => {
-    return breakdownData.breakdown.map(([name, value]) => ({
-      name,
-      value,
+    return breakdownData.breakdown.map(({ category, total }) => ({
+      name: category,
+      value: total,
     }));
   }, [breakdownData]);
 
@@ -146,7 +159,7 @@ export function MonthlyBreakdownDialog({
             Monthly Bill Breakdown for {format(currentMonth, 'MMMM yyyy')}
           </DialogTitle>
           <DialogDescription>
-            A summary of your expenses by category for the selected month.
+            A summary of your expenses by category. Click a category to see details.
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[60vh] pr-4">
@@ -181,40 +194,40 @@ export function MonthlyBreakdownDialog({
                 </div>
             )}
             
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <Accordion type="single" collapsible className="w-full">
                 {breakdownData.breakdown.length > 0 ? (
-                  breakdownData.breakdown.map(([category, amount]) => (
-                    <TableRow key={category}>
-                      <TableCell className="font-medium capitalize">{category}</TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(amount)}
-                      </TableCell>
-                    </TableRow>
+                  breakdownData.breakdown.map(({ category, total, entries }) => (
+                    <AccordionItem value={category} key={category}>
+                       <AccordionTrigger className="hover:no-underline">
+                           <div className="flex justify-between w-full pr-4">
+                                <span className="font-medium capitalize">{category}</span>
+                                <span>{formatCurrency(total)}</span>
+                           </div>
+                       </AccordionTrigger>
+                       <AccordionContent>
+                           <Table>
+                               <TableBody>
+                                   {entries.sort((a,b) => a.name.localeCompare(b.name)).map((entry, idx) => (
+                                       <TableRow key={`${entry.id}-${idx}`}>
+                                           <TableCell>{entry.name}</TableCell>
+                                           <TableCell className="text-right">{formatCurrency(entry.amount)}</TableCell>
+                                       </TableRow>
+                                   ))}
+                               </TableBody>
+                           </Table>
+                       </AccordionContent>
+                    </AccordionItem>
                   ))
                 ) : (
-                  <TableRow>
-                    <TableCell colSpan={2} className="text-center text-muted-foreground">
+                    <div className="text-center text-muted-foreground py-8">
                       No bills with categories found for this month.
-                    </TableCell>
-                  </TableRow>
+                    </div>
                 )}
-              </TableBody>
-              <TableFooter>
-                <TableRow>
-                  <TableHead>Total</TableHead>
-                  <TableHead className="text-right text-lg font-bold">
-                    {formatCurrency(breakdownData.total)}
-                  </TableHead>
-                </TableRow>
-              </TableFooter>
-            </Table>
+            </Accordion>
+             <div className="border-t mt-4 pt-4 flex justify-between items-center text-lg font-bold">
+                <span>Total</span>
+                <span>{formatCurrency(breakdownData.total)}</span>
+             </div>
           </div>
         </ScrollArea>
         <DialogFooter className="sm:justify-end">
