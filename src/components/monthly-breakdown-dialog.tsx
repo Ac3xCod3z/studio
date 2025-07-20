@@ -68,12 +68,12 @@ export function MonthlyBreakdownDialog({
         const instances: Entry[] = [];
         const originalEntryDate = new Date(entry.date + 'T00:00:00');
         
-        if (isBefore(end, originalEntryDate)) return [];
+        if (isBefore(end, originalEntryDate) && entry.recurrence !== 'none') return [];
 
         if (entry.recurrence === 'weekly') {
             const originalDayOfWeek = getDay(originalEntryDate);
             let currentDate = start;
-            while (isBefore(currentDate, end)) {
+            while (isBefore(currentDate, end) || isSameMonth(currentDate, end)) {
                 if (getDay(currentDate) === originalDayOfWeek && (currentDate >= originalEntryDate)) {
                     instances.push({ ...entry, date: format(currentDate, 'yyyy-MM-dd') });
                 }
@@ -85,18 +85,17 @@ export function MonthlyBreakdownDialog({
         const recurrenceInterval = entry.recurrence ? recurrenceIntervalMonths[entry.recurrence as keyof typeof recurrenceIntervalMonths] : 0;
         if (entry.recurrence && entry.recurrence !== 'none' && recurrenceInterval > 0) {
             let recurringDate = originalEntryDate;
-            while(isBefore(recurringDate, end)) {
-                 if (recurringDate >= start) {
-                    const lastDayOfMonth = endOfMonth(recurringDate).getDate();
-                    const originalDay = getDate(originalEntryDate);
-                    const dayForMonth = Math.min(originalDay, lastDayOfMonth);
-                    const finalDate = setDate(recurringDate, dayForMonth);
+            while(isBefore(recurringDate, start) || isSameMonth(recurringDate, start)) {
+                const lastDayOfMonth = endOfMonth(recurringDate).getDate();
+                const originalDay = getDate(originalEntryDate);
+                const dayForMonth = Math.min(originalDay, lastDayOfMonth);
+                const finalDate = setDate(recurringDate, dayForMonth);
 
-                    if (isSameMonth(finalDate, currentMonth)) {
-                        instances.push({ ...entry, date: format(finalDate, 'yyyy-MM-dd') });
-                    }
-                 }
-                 recurringDate = add(recurringDate, { months: recurrenceInterval });
+                if (isSameMonth(finalDate, currentMonth)) {
+                    instances.push({ ...entry, date: format(finalDate, 'yyyy-MM-dd') });
+                }
+                recurringDate = add(recurringDate, { months: recurrenceInterval });
+                 if(recurringDate > end) break;
             }
             return instances;
         }
@@ -120,11 +119,8 @@ export function MonthlyBreakdownDialog({
     let total = 0;
 
     for (const bill of monthlyBills) {
-      if (bill.category) {
-        breakdown[bill.category] += bill.amount;
-      } else {
-        breakdown['other'] += bill.amount; // Default to 'other' if no category
-      }
+      const category = bill.category || 'other';
+      breakdown[category] += bill.amount;
       total += bill.amount;
     }
     

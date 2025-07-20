@@ -95,6 +95,11 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
       // Format as YYYY-MM-DD for storage. The `values.date` is already correct.
       date: format(values.date, "yyyy-MM-dd"),
     };
+    
+    // Ensure category is undefined if it's not a bill, otherwise keep it.
+    if (values.type !== 'bill') {
+      dataToSave.category = undefined;
+    }
 
     if (entry) {
       onSave({ ...dataToSave, id: entry.id });
