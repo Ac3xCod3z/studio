@@ -23,6 +23,7 @@ import {
   eachWeekOfInterval,
   getDay,
   setDate,
+  add,
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Repeat, Trash2, X } from "lucide-react";
@@ -76,10 +77,11 @@ export function FiscalFlowCalendar({
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
 
-  const daysInMonth = useMemo(() => {
+  const { daysInMonth, calendarInterval } = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth));
     const end = endOfWeek(endOfMonth(currentMonth));
-    return eachDayOfInterval({ start, end });
+    const days = eachDayOfInterval({ start, end });
+    return { daysInMonth: days, calendarInterval: { start, end }};
   }, [currentMonth]);
 
   const handleDayClick = (day: Date) => {
@@ -144,103 +146,104 @@ export function FiscalFlowCalendar({
     setDraggingEntryId(null);
   };
 
-  const { monthlyTotals, weeklyTotals, entriesForCurrentMonth } = useMemo(() => {
+    const { monthlyTotals, weeklyTotals, entriesForGrid } = useMemo(() => {
     const monthKey = format(currentMonth, 'yyyy-MM');
     const prevMonth = subMonths(currentMonth, 1);
     const prevMonthKey = format(prevMonth, 'yyyy-MM');
     const previousMonthLeftover = (rollover === 'carryover' && monthlyLeftovers[prevMonthKey]) || 0;
 
-    const entriesForCurrentMonth = entries.flatMap((e) => {
-      const originalEntryDate = parseISO(e.date);
-      if (isBefore(startOfMonth(currentMonth), startOfMonth(originalEntryDate))) {
-        return [];
-      }
+    const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry[] => {
+        const instances: Entry[] = [];
+        const originalEntryDate = parseISO(entry.date);
+        
+        if (isBefore(end, originalEntryDate)) return [];
 
-      if (e.recurrence === 'weekly') {
-        const originalDayOfWeek = getDay(originalEntryDate);
-        const daysInCurrentMonth = eachDayOfInterval({
-          start: startOfMonth(currentMonth),
-          end: endOfMonth(currentMonth),
-        });
-
-        return daysInCurrentMonth
-          .filter(day => getDay(day) === originalDayOfWeek)
-          .map(recurringDate => ({
-            ...e,
-            date: format(recurringDate, 'yyyy-MM-dd'),
-            id: `${e.id}-${format(recurringDate, 'yyyy-MM-dd')}` // Unique ID for recurring instance
-          }));
-      }
-
-      const recurrenceInterval = e.recurrence ? recurrenceIntervalMonths[e.recurrence] : 0;
-      if (e.recurrence && e.recurrence !== 'none' && recurrenceInterval > 0) {
-        const monthDiff = differenceInCalendarMonths(currentMonth, originalEntryDate);
-        if (monthDiff < 0 || monthDiff % recurrenceInterval !== 0) {
-          return [];
+        if (entry.recurrence === 'weekly') {
+            const originalDayOfWeek = getDay(originalEntryDate);
+            let currentDate = startOfWeek(start);
+            while (isBefore(currentDate, end)) {
+                if (getDay(currentDate) === originalDayOfWeek && (currentDate >= originalEntryDate)) {
+                    instances.push({
+                        ...entry,
+                        date: format(currentDate, 'yyyy-MM-dd'),
+                        id: `${entry.id}-${format(currentDate, 'yyyy-MM-dd')}`
+                    });
+                }
+                currentDate = add(currentDate, { days: 1 });
+            }
+            return instances;
         }
         
-        const lastDayOfCurrentMonth = endOfMonth(currentMonth).getDate();
-        const originalDay = getDate(originalEntryDate);
-        const dayForCurrentMonth = Math.min(originalDay, lastDayOfCurrentMonth);
-        const recurringDate = setDate(currentMonth, dayForCurrentMonth);
-        
-        return [{ ...e, date: format(recurringDate, 'yyyy-MM-dd'), id: `${e.id}-${format(recurringDate, 'yyyy-MM-dd')}` }];
-      }
+        const recurrenceInterval = entry.recurrence ? recurrenceIntervalMonths[entry.recurrence as keyof typeof recurrenceIntervalMonths] : 0;
+        if (entry.recurrence && entry.recurrence !== 'none' && recurrenceInterval > 0) {
+            let recurringDate = originalEntryDate;
+            while(isBefore(recurringDate, end)) {
+                 if (recurringDate >= start) {
+                    const lastDayOfMonth = endOfMonth(recurringDate).getDate();
+                    const originalDay = getDate(originalEntryDate);
+                    const dayForMonth = Math.min(originalDay, lastDayOfMonth);
+                    const finalDate = setDate(recurringDate, dayForMonth);
 
-      // Handle non-recurring entries
-      const entryDate = parseDateInTimezone(e.date, timezone);
-      if (isSameMonth(entryDate, currentMonth)) {
-        return [e];
-      }
-      return [];
+                    instances.push({ 
+                        ...entry, 
+                        date: format(finalDate, 'yyyy-MM-dd'), 
+                        id: `${entry.id}-${format(finalDate, 'yyyy-MM-dd')}` 
+                    });
+                 }
+                 recurringDate = add(recurringDate, { months: recurrenceInterval });
+            }
+            return instances;
+        }
+
+        return [];
+    };
+
+    const entriesForGrid = entries.flatMap((e) => {
+        const entryDate = parseDateInTimezone(e.date, timezone);
+        const instances: Entry[] = [];
+
+        // Handle non-recurring
+        if (e.recurrence === 'none') {
+            if (entryDate >= calendarInterval.start && entryDate <= calendarInterval.end) {
+                instances.push(e);
+            }
+        } else {
+            // Handle recurring
+            instances.push(...generateRecurringInstances(e, calendarInterval.start, calendarInterval.end));
+        }
+
+        return instances;
     });
-
+    
+    // Monthly calculation still focuses on the current month's view
+    const entriesForCurrentMonth = entriesForGrid.filter(e => isSameMonth(parseDateInTimezone(e.date, timezone), currentMonth));
     const monthlyBills = entriesForCurrentMonth.filter((e) => e.type === "bill").reduce((sum, e) => sum + e.amount, 0);
     const currentMonthIncome = entriesForCurrentMonth.filter((e) => e.type === "income").reduce((sum, e) => sum + e.amount, 0);
     
     const monthlyNet = currentMonthIncome - monthlyBills;
     const endOfMonthBalance = currentMonthIncome + previousMonthLeftover - monthlyBills;
     
-    const weeksInMonth = eachWeekOfInterval({
-        start: startOfMonth(currentMonth),
-        end: endOfMonth(currentMonth)
+    // Weekly calculation uses the full grid range
+    const weekStart = startOfWeek(selectedDate);
+    const weekEnd = endOfWeek(selectedDate);
+    const weekEntries = entriesForGrid.filter(e => {
+        const entryDate = parseDateInTimezone(e.date, timezone);
+        return entryDate >= weekStart && entryDate <= weekEnd;
     });
 
-    let remainingRollover = previousMonthLeftover;
+    const weeklyIncome = weekEntries.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
+    const weeklyBills = weekEntries.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
+    const weeklyNet = weeklyIncome - weeklyBills;
     
-    const weeksData = weeksInMonth.map(weekStart => {
-        const weekEnd = endOfWeek(weekStart);
-        const weekEntries = entriesForCurrentMonth.filter(e => {
-            const entryDate = parseDateInTimezone(e.date, timezone);
-            return entryDate >= weekStart && entryDate <= weekEnd;
-        });
+    // Find previous leftover for weekly rollover calculation
+    const isFirstWeekOfMonth = isBefore(weekStart, startOfMonth(currentMonth));
+    const weeklyRolloverSourceKey = isFirstWeekOfMonth ? format(subMonths(currentMonth,1), 'yyyy-MM') : prevMonthKey;
+    const weeklyPreviousLeftover = (rollover === 'carryover' && monthlyLeftovers[weeklyRolloverSourceKey]) || 0;
 
-        const income = weekEntries.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
-        const bills = weekEntries.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
-        const net = income - bills;
-
-        let rolloverApplied = 0;
-        if (net < 0 && remainingRollover > 0) {
-            rolloverApplied = Math.min(Math.abs(net), remainingRollover);
-            remainingRollover -= rolloverApplied;
-        }
-
-        return {
-            week: getWeek(weekStart),
-            income,
-            bills,
-            net: net + rolloverApplied,
-            rolloverApplied,
-        };
-    });
-
-    const selectedWeekData = weeksData.find(w => getWeek(selectedDate) === w.week) || {
-        week: getWeek(selectedDate),
-        income: 0,
-        bills: 0,
-        net: 0,
-        rolloverApplied: 0
-    };
+    let rolloverApplied = 0;
+    if (weeklyNet < 0 && weeklyPreviousLeftover > 0) {
+        rolloverApplied = Math.min(Math.abs(weeklyNet), weeklyPreviousLeftover);
+    }
 
     return {
       monthlyTotals: { 
@@ -251,10 +254,15 @@ export function FiscalFlowCalendar({
         rollover: previousMonthLeftover,
         monthKey
       },
-      weeklyTotals: selectedWeekData,
-      entriesForCurrentMonth,
+      weeklyTotals: {
+          income: weeklyIncome,
+          bills: weeklyBills,
+          net: weeklyNet + rolloverApplied,
+          rolloverApplied,
+      },
+      entriesForGrid,
     };
-  }, [entries, currentMonth, selectedDate, rollover, monthlyLeftovers, timezone]);
+  }, [entries, currentMonth, selectedDate, rollover, monthlyLeftovers, timezone, calendarInterval]);
 
   useEffect(() => {
     const { monthKey, endOfMonthBalance } = monthlyTotals;
@@ -269,7 +277,6 @@ export function FiscalFlowCalendar({
   const Sidebar = () => (
     <SidebarContent 
       weeklyTotals={weeklyTotals}
-      isMobile={isMobile}
       selectedDate={selectedDate}
     />
   )
@@ -309,7 +316,7 @@ export function FiscalFlowCalendar({
           <div className="grid grid-cols-7 grid-rows-5 gap-1 mt-1">
             {daysInMonth.map((day) => {
               const dayKey = format(day, 'yyyy-MM-dd');
-              const dayEntries = entriesForCurrentMonth
+              const dayEntries = entriesForGrid
                 .filter((e) => {
                     const entryDate = parseDateInTimezone(e.date, timezone);
                     return isSameDay(entryDate, day);
@@ -357,10 +364,10 @@ export function FiscalFlowCalendar({
                               key={entry.id}
                               onClick={(e) => { if (!isSelectionMode) { e.stopPropagation(); openEditEntryDialog(entry); } }}
                               onDragStart={(e) => handleDragStart(e, entry.id)}
-                              draggable={!isSelectionMode && !entry.recurrence?.includes('weekly')}
+                              draggable={!isSelectionMode && !entry.id.includes('-')}
                               className={cn(
                                   "p-1 rounded-md truncate",
-                                  !isSelectionMode && !entry.recurrence?.includes('weekly') && "cursor-grab active:cursor-grabbing",
+                                  !isSelectionMode && !entry.id.includes('-') && "cursor-grab active:cursor-grabbing",
                                   entry.type === 'bill' ? 'bg-destructive text-destructive-foreground' : 'bg-accent text-accent-foreground',
                                   draggingEntryId === entry.id && 'opacity-50',
                                   isSelectionMode && 'opacity-70'
@@ -440,15 +447,13 @@ function SummaryCard({ title, amount, icon, description, variant = 'default', cl
 
 export const SidebarContent = ({
   weeklyTotals,
-  isMobile,
   selectedDate,
 }: {
   weeklyTotals: any;
-  isMobile: boolean;
   selectedDate: Date;
 }) => (
   <div className="flex flex-col gap-6 p-4 md:p-6">
-      {!isMobile && <h2 className="text-2xl font-bold">Summary</h2>}
+      <h2 className="text-2xl font-bold">Summary</h2>
       <div className="space-y-4">
           <h3 className="font-semibold text-lg">Week of {format(startOfWeek(selectedDate), "MMM d")}</h3>
           <SummaryCard title="Income" amount={weeklyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
