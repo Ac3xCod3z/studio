@@ -72,6 +72,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
   });
 
   const entryType = form.watch("type");
+  const hasCategory = form.watch("category");
 
    React.useEffect(() => {
     if (isOpen) {
@@ -182,7 +183,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
               )}
             />
 
-            {entryType === 'bill' && (
+            {(entryType === 'bill' || hasCategory) && (
               <FormField
                 control={form.control}
                 name="category"
