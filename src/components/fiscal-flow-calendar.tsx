@@ -47,7 +47,6 @@ type FiscalFlowCalendarProps = {
     openDayEntriesDialog: () => void;
     isReadOnly?: boolean;
     monthlyLeftovers: MonthlyLeftovers;
-    setMonthlyLeftovers: (value: MonthlyLeftovers | ((val: MonthlyLeftovers) => MonthlyLeftovers)) => void;
     weeklyTotals: any;
     onOpenBreakdown: () => void;
 }
@@ -66,7 +65,6 @@ export function FiscalFlowCalendar({
     openDayEntriesDialog,
     isReadOnly = false,
     monthlyLeftovers,
-    setMonthlyLeftovers,
     weeklyTotals,
     onOpenBreakdown,
 }: FiscalFlowCalendarProps) {
@@ -82,38 +80,6 @@ export function FiscalFlowCalendar({
     return { daysInMonth: days };
   }, [currentMonth]);
   
-  useEffect(() => {
-    const oldestEntry = entries.reduce((oldest, entry) => {
-        const entryDate = new Date(entry.date);
-        return entryDate < oldest ? entryDate : oldest;
-    }, new Date());
-
-    const start = startOfMonth(oldestEntry);
-    const end = new Date(); 
-    
-    const newLeftovers: MonthlyLeftovers = {};
-    let current = start;
-    let lastMonthLeftover = 0;
-
-    while(isBefore(current, end)) {
-        const monthKey = format(current, 'yyyy-MM');
-        
-        const entriesForMonth = generatedEntries.filter(e => isSameMonth(parseDateInTimezone(e.date, timezone), current));
-        const income = entriesForMonth.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
-        const bills = entriesForMonth.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
-        
-        const endOfMonthBalance = income + (rollover === 'carryover' ? lastMonthLeftover : 0) - bills;
-
-        newLeftovers[monthKey] = endOfMonthBalance;
-        lastMonthLeftover = endOfMonthBalance;
-        
-        current = addMonths(current, 1);
-    }
-    
-    if (JSON.stringify(newLeftovers) !== JSON.stringify(monthlyLeftovers)) {
-        setMonthlyLeftovers(newLeftovers);
-    }
-  }, [entries, rollover, timezone, generatedEntries, monthlyLeftovers, setMonthlyLeftovers]);
 
   const handleDayClick = (day: Date) => {
       if (isReadOnly) return;

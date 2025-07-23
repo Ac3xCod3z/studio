@@ -221,17 +221,15 @@ export default function FiscalFlowDashboard() {
         current = addMonths(current, 1);
     }
     
-    // Check if an update is actually needed to prevent infinite loops
     if (JSON.stringify(newLeftovers) !== JSON.stringify(monthlyLeftovers)) {
         setMonthlyLeftovers(newLeftovers);
     }
-  }, [allGeneratedEntries, rollover, timezone]);
+  }, [allGeneratedEntries, rollover, timezone, setMonthlyLeftovers, monthlyLeftovers]);
 
 
-  const { entriesForCurrentMonthView, dayEntries, weeklyTotals} = useMemo(() => {
+  const { dayEntries, weeklyTotals} = useMemo(() => {
       if (!allGeneratedEntries.length) {
         return {
-          entriesForCurrentMonthView: [],
           dayEntries: [],
           weeklyTotals: { income: 0, bills: 0, net: 0, rolloverApplied: 0 }
         };
@@ -269,7 +267,6 @@ export default function FiscalFlowDashboard() {
       const finalWeeklyNet = initialWeeklyNet + rolloverApplied;
 
       return {
-        entriesForCurrentMonthView,
         dayEntries,
         weeklyTotals: {
             income: weeklyIncome,
@@ -365,7 +362,6 @@ export default function FiscalFlowDashboard() {
         openDayEntriesDialog={() => setDayEntriesDialogOpen(true)}
         onOpenBreakdown={() => setBreakdownDialogOpen(true)}
         monthlyLeftovers={monthlyLeftovers}
-        setMonthlyLeftovers={setMonthlyLeftovers}
         weeklyTotals={weeklyTotals}
       />
       
@@ -390,7 +386,7 @@ export default function FiscalFlowDashboard() {
         }}
         onEditEntry={(entry) => {
             setDayEntriesDialogOpen(false);
-            const originalEntry = entries.find(e => e.id === entry.id.split('-')[0]) || entry;
+            const originalEntry = entries.find(e => e.id.startsWith(entry.id.split('-')[0])) || entry;
             setEditingEntry(originalEntry);
             setEntryDialogOpen(true);
         }}
