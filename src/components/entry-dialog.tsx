@@ -72,7 +72,6 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
   });
 
   const entryType = form.watch("type");
-  const hasCategory = !!form.watch("category");
 
    React.useEffect(() => {
     if (isOpen) {
@@ -83,7 +82,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
         amount: entry?.amount || 0,
         date: resetDate,
         recurrence: entry?.recurrence || 'none',
-        category: entry?.category,
+        category: entry?.category || undefined,
       });
     }
   }, [isOpen, selectedDate, entry, form, timezone]);
@@ -92,11 +91,9 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
   function onSubmit(values: z.infer<typeof formSchema>) {
     const dataToSave: Omit<Entry, 'id'> & {id?: string} = {
       ...values,
-      // Format as YYYY-MM-DD for storage. The `values.date` is already correct.
       date: format(values.date, "yyyy-MM-dd"),
     };
     
-    // Ensure category is undefined if it's not a bill, otherwise keep it.
     if (values.type !== 'bill') {
       dataToSave.category = undefined;
     }
@@ -184,7 +181,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
               )}
             />
 
-            {(entryType === 'bill' || hasCategory) && (
+            {entryType === 'bill' && (
               <FormField
                 control={form.control}
                 name="category"
