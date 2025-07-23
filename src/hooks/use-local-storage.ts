@@ -38,6 +38,7 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val
         return;
       }
       try {
+        // Same as useState's setter function, allows reading previous value
         const newValue = value instanceof Function ? value(readValue()) : value;
         window.localStorage.setItem(key, JSON.stringify(newValue));
         setStoredValue(newValue);
