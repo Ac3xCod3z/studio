@@ -27,7 +27,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { add, endOfMonth, format, getDay, isBefore, isSameMonth, setDate, startOfMonth, getDate, differenceInCalendarMonths, parseISO } from 'date-fns';
+import { add, endOfMonth, format, getDay, isBefore, isSameMonth, setDate, startOfMonth, getDate, differenceInCalendarMonths, parseISO, isAfter } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { type Entry, type BillCategory, BillCategories } from '@/lib/types';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -72,45 +72,50 @@ export function MonthlyBreakdownDialog({
 
     const generateRecurringInstances = (entry: Entry): Entry[] => {
         const instances: Entry[] = [];
-        const originalEntryDate = new Date(entry.date + 'T00:00:00');
-        
-        if (isBefore(end, originalEntryDate) && entry.recurrence !== 'none') return [];
+        const originalEntryDate = toZonedTime(parseISO(entry.date), timezone);
 
         if (entry.recurrence === 'weekly') {
-            const originalDayOfWeek = getDay(originalEntryDate);
-            let currentDate = start;
+            let currentDate = originalEntryDate;
+            // Move to the first occurrence that is on or after the start of the breakdown month
+            while (isBefore(currentDate, start)) {
+                currentDate = add(currentDate, { weeks: 1 });
+            }
+            // Add all occurrences within the breakdown month
             while (isBefore(currentDate, end) || isSameMonth(currentDate, end)) {
-                if (getDay(currentDate) === originalDayOfWeek && (currentDate >= originalEntryDate)) {
-                    instances.push({ ...entry, date: format(currentDate, 'yyyy-MM-dd') });
-                }
-                currentDate = add(currentDate, { days: 1 });
+                instances.push({ ...entry, date: format(currentDate, 'yyyy-MM-dd') });
+                currentDate = add(currentDate, { weeks: 1 });
             }
             return instances;
         }
-        
+
         const recurrenceInterval = entry.recurrence ? recurrenceIntervalMonths[entry.recurrence as keyof typeof recurrenceIntervalMonths] : 0;
         if (entry.recurrence && entry.recurrence !== 'none' && recurrenceInterval > 0) {
-            let recurringDate = originalEntryDate;
+            let currentDate = originalEntryDate;
             
-            while(isBefore(recurringDate, start) && differenceInCalendarMonths(start, recurringDate) > recurrenceInterval){
-                recurringDate = add(recurringDate, { months: recurrenceInterval * Math.floor(differenceInCalendarMonths(start, recurringDate) / recurrenceInterval) });
+            // Fast-forward to the current month's potential start
+            if (isBefore(currentDate, start)) {
+                const monthsDiff = differenceInCalendarMonths(start, currentDate);
+                if (monthsDiff > 0) {
+                    const monthsToAdd = Math.floor(monthsDiff / recurrenceInterval) * recurrenceInterval;
+                    currentDate = add(currentDate, { months: monthsToAdd });
+                }
             }
 
-            while(isBefore(recurringDate, end) || isSameMonth(recurringDate, end)) {
-                if(isBefore(recurringDate, add(end, {days: 1})) && isSameMonth(recurringDate, currentMonth)) {
-                    const lastDayOfMonth = endOfMonth(recurringDate).getDate();
-                    const originalDay = getDate(originalEntryDate);
-                    const dayForMonth = Math.min(originalDay, lastDayOfMonth);
-                    const finalDate = setDate(recurringDate, dayForMonth);
-
-                    if ((isSameMonth(finalDate, currentMonth) || isBefore(finalDate, currentMonth)) && finalDate >= originalEntryDate) {
-                        if (isSameMonth(finalDate, currentMonth)) {
-                           instances.push({ ...entry, date: format(finalDate, 'yyyy-MM-dd') });
-                        }
+            // Iterate through potential dates and add valid ones
+            while (isBefore(currentDate, end) || isSameMonth(currentDate, end)) {
+                if (isAfter(currentDate, originalEntryDate) || isSameMonth(currentDate, originalEntryDate)) {
+                    // Make sure we haven't overshot the month
+                    if (isSameMonth(currentDate, currentMonth)) {
+                        const lastDayOfMonth = endOfMonth(currentDate).getDate();
+                        const originalDay = getDate(originalEntryDate);
+                        const dayForMonth = Math.min(originalDay, lastDayOfMonth);
+                        const finalDate = setDate(currentDate, dayForMonth);
+                        instances.push({ ...entry, date: format(finalDate, 'yyyy-MM-dd') });
                     }
                 }
-                recurringDate = add(recurringDate, { months: recurrenceInterval });
+                currentDate = add(currentDate, { months: recurrenceInterval });
             }
+
             return instances;
         }
         return [];
@@ -134,6 +139,9 @@ export function MonthlyBreakdownDialog({
 
     for (const bill of monthlyBills) {
       const category = bill.category || 'other';
+      if (!breakdown[category]) {
+        breakdown[category] = { total: 0, entries: [] };
+      }
       breakdown[category].total += bill.amount;
       breakdown[category].entries.push(bill);
       total += bill.amount;
