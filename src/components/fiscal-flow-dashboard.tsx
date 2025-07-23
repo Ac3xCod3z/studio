@@ -158,6 +158,8 @@ export default function FiscalFlowDashboard() {
 
   const handleEntryDelete = (id: string) => {
     setEntries((prev) => prev.filter((e) => e.id !== id));
+    setEntryDialogOpen(false);
+    setEditingEntry(null);
   };
 
   const openNewEntryDialog = (date: Date) => {
@@ -167,6 +169,8 @@ export default function FiscalFlowDashboard() {
   };
   
   const allGeneratedEntries = useMemo(() => {
+    if (entries.length === 0) return [];
+    
     const oldestEntry = entries.reduce((oldest, entry) => {
       const entryDate = new Date(entry.date);
       return entryDate < oldest ? entryDate : oldest;
@@ -185,7 +189,53 @@ export default function FiscalFlowDashboard() {
     });
   }, [entries]);
 
+  useEffect(() => {
+    if (allGeneratedEntries.length === 0) {
+        setMonthlyLeftovers({});
+        return;
+    }
+    const oldestEntry = allGeneratedEntries.reduce((oldest, entry) => {
+        const entryDate = new Date(entry.date);
+        return entryDate < oldest ? entryDate : oldest;
+    }, new Date());
+
+    const start = startOfMonth(oldestEntry);
+    const end = new Date(); 
+    
+    const newLeftovers: MonthlyLeftovers = {};
+    let current = start;
+    let lastMonthLeftover = 0;
+
+    while(isBefore(current, end)) {
+        const monthKey = format(current, 'yyyy-MM');
+        
+        const entriesForMonth = allGeneratedEntries.filter(e => isSameMonth(parseDateInTimezone(e.date, timezone), current));
+        const income = entriesForMonth.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
+        const bills = entriesForMonth.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
+        
+        const endOfMonthBalance = income + (rollover === 'carryover' ? lastMonthLeftover : 0) - bills;
+
+        newLeftovers[monthKey] = endOfMonthBalance;
+        lastMonthLeftover = endOfMonthBalance;
+        
+        current = addMonths(current, 1);
+    }
+    
+    // Check if an update is actually needed to prevent infinite loops
+    if (JSON.stringify(newLeftovers) !== JSON.stringify(monthlyLeftovers)) {
+        setMonthlyLeftovers(newLeftovers);
+    }
+  }, [allGeneratedEntries, rollover, timezone, setMonthlyLeftovers]); // Removed monthlyLeftovers
+
+
   const { entriesForCurrentMonthView, dayEntries, weeklyTotals} = useMemo(() => {
+      if (!allGeneratedEntries.length) {
+        return {
+          entriesForCurrentMonthView: [],
+          dayEntries: [],
+          weeklyTotals: { income: 0, bills: 0, net: 0, rolloverApplied: 0 }
+        };
+      }
       const currentMonth = selectedDate;
       const calendarStart = startOfWeek(startOfMonth(currentMonth));
       const calendarEnd = endOfWeek(endOfMonth(currentMonth));
