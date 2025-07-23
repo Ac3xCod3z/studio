@@ -15,6 +15,7 @@ import {
   isToday,
   isSameMonth,
   isSameDay,
+  isBefore,
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Repeat, PieChart } from "lucide-react";
