@@ -228,7 +228,7 @@ export default function FiscalFlowDashboard() {
     if (JSON.stringify(newLeftovers) !== JSON.stringify(monthlyLeftovers)) {
         setMonthlyLeftovers(newLeftovers);
     }
-  }, [isClient, allGeneratedEntries, rollover, timezone, setMonthlyLeftovers]);
+  }, [isClient, allGeneratedEntries, rollover, timezone, monthlyLeftovers]);
 
 
   const { dayEntries, weeklyTotals} = useMemo(() => {
@@ -416,3 +416,5 @@ export default function FiscalFlowDashboard() {
     </div>
   );
 }
+
+    
