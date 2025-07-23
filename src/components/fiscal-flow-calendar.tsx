@@ -85,7 +85,7 @@ export function FiscalFlowCalendar({
   const [draggingEntryId, setDraggingEntryId] = useState<string | null>(null);
   
   const [isSelectionMode, setIsSelectionMode] = useState(false);
-  const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
+  const [selectedEntryInstances, setSelectedEntryInstances] = useState<Set<string>>(new Set());
 
   const { daysInMonth, calendarInterval, entriesForGrid } = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth));
@@ -94,22 +94,26 @@ export function FiscalFlowCalendar({
     
     const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry[] => {
         const instances: Entry[] = [];
+        if (!entry.date) return [];
         const originalEntryDate = new Date(entry.date + 'T00:00:00');
         
         if (isBefore(end, originalEntryDate)) return [];
 
         if (entry.recurrence === 'weekly') {
-            const originalDayOfWeek = getDay(originalEntryDate);
-            let currentDate = startOfWeek(start);
+            let currentDate = startOfWeek(originalEntryDate);
+             while (isBefore(currentDate, start)) {
+                currentDate = add(currentDate, { weeks: 1 });
+            }
+
             while (isBefore(currentDate, end)) {
-                if (getDay(currentDate) === originalDayOfWeek && (currentDate >= originalEntryDate)) {
-                    instances.push({
+                if (currentDate >= start) {
+                     instances.push({
                         ...entry,
                         date: format(currentDate, 'yyyy-MM-dd'),
-                        id: `${entry.id}-${format(currentDate, 'yyyy-MM-dd')}`
+                        id: `${entry.id}-${format(currentDate, 'yyyy-MM-dd')}` // Instance ID
                     });
                 }
-                currentDate = add(currentDate, { days: 1 });
+                currentDate = add(currentDate, { weeks: 1 });
             }
             return instances;
         }
@@ -161,7 +165,7 @@ export function FiscalFlowCalendar({
   const handleDayClick = (day: Date) => {
       if (isReadOnly) return;
       if (isSelectionMode) {
-          handleDaySelection(day);
+          // In selection mode, clicking the day does nothing to avoid confusion.
           return;
       }
       
@@ -176,37 +180,52 @@ export function FiscalFlowCalendar({
       }
   }
   
-  const handleDaySelection = (day: Date) => {
-    const dayKey = format(day, 'yyyy-MM-dd');
-    setSelectedDays(prevSelected => {
+  const handleEntrySelection = (instanceId: string) => {
+    setSelectedEntryInstances(prevSelected => {
         const newSelected = new Set(prevSelected);
-        if (newSelected.has(dayKey)) {
-            newSelected.delete(dayKey);
+        if (newSelected.has(instanceId)) {
+            newSelected.delete(instanceId);
         } else {
-            newSelected.add(dayKey);
+            newSelected.add(instanceId);
         }
         return newSelected;
     });
   };
 
   const handleDeleteSelected = () => {
-    if (isReadOnly) return;
-    setEntries(prevEntries => 
-        prevEntries.filter(entry => !selectedDays.has(entry.date))
+    if (isReadOnly || selectedEntryInstances.size === 0) return;
+    
+    // Get the base IDs of the entries to delete.
+    const baseIdsToDelete = new Set(
+        Array.from(selectedEntryInstances).map(instanceId => instanceId.split('-')[0])
     );
+
+    setEntries(prevEntries => 
+        prevEntries.filter(entry => !baseIdsToDelete.has(entry.id))
+    );
+    
     setIsSelectionMode(false);
-    setSelectedDays(new Set());
+    setSelectedEntryInstances(new Set());
   };
 
   const openEditEntryDialog = (entry: Entry) => {
     if (isReadOnly) return;
-    setEditingEntry(entry);
-    setGlobalSelectedDate(parseDateInTimezone(entry.date, timezone));
+    // For recurring entries, we need to find the original entry to edit.
+    const originalEntryId = entry.id.split('-')[0];
+    const originalEntry = entries.find(e => e.id === originalEntryId) || entry;
+
+    setEditingEntry(originalEntry);
+    setGlobalSelectedDate(parseDateInTimezone(originalEntry.date, timezone));
     setEntryDialogOpen(true);
   }
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, entryId: string) => {
     if (isReadOnly) return;
+    // Drag and drop only works for non-recurring entries.
+     if (entryId.includes('-')) {
+        e.preventDefault();
+        return;
+    }
     e.dataTransfer.effectAllowed = 'move';
     setDraggingEntryId(entryId);
   };
@@ -223,7 +242,7 @@ export function FiscalFlowCalendar({
       setEntries(prevEntries => 
         prevEntries.map(entry => 
           entry.id === draggingEntryId 
-            ? { ...entry, date: format(targetDate, 'yyyy-MM-dd') }
+            ? { ...entry, date: format(targetDate, 'yyyy-MM-dd'), recurrence: 'none' } // Dropping makes it non-recurring
             : entry
         )
       );
@@ -327,10 +346,10 @@ export function FiscalFlowCalendar({
               ) : null}
                {isSelectionMode && !isReadOnly ? (
                 <>
-                    <Button variant="destructive" size="sm" onClick={handleDeleteSelected} disabled={selectedDays.size === 0}>
-                        <Trash2 className="mr-2 h-4 w-4" /> Delete ({selectedDays.size})
+                    <Button variant="destructive" size="sm" onClick={handleDeleteSelected} disabled={selectedEntryInstances.size === 0}>
+                        <Trash2 className="mr-2 h-4 w-4" /> Delete ({selectedEntryInstances.size})
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => { setIsSelectionMode(false); setSelectedDays(new Set()); }}>
+                    <Button variant="ghost" size="sm" onClick={() => { setIsSelectionMode(false); setSelectedEntryInstances(new Set()); }}>
                         <X className="mr-2 h-4 w-4" /> Cancel
                     </Button>
                 </>
@@ -353,7 +372,6 @@ export function FiscalFlowCalendar({
           </div>
           <div className="grid grid-cols-7 grid-rows-5 gap-1 mt-1">
             {daysInMonth.map((day) => {
-              const dayKey = format(day, 'yyyy-MM-dd');
               const dayEntries = entriesForGrid
                 .filter((e) => {
                     const entryDate = parseDateInTimezone(e.date, timezone);
@@ -367,7 +385,7 @@ export function FiscalFlowCalendar({
 
               return (
                 <div
-                  key={dayKey}
+                  key={format(day, 'yyyy-MM-dd')}
                   className={cn(
                     "relative flex flex-col h-24 sm:h-32 rounded-lg p-1 sm:p-2 border transition-colors",
                     !isReadOnly && !isSelectionMode && "cursor-pointer",
@@ -387,31 +405,33 @@ export function FiscalFlowCalendar({
                             <Plus className="h-4 w-4" />
                         </Button>
                     )}
-                    {isSelectionMode && dayEntries.length > 0 && !isReadOnly && (
-                        <Checkbox 
-                            checked={selectedDays.has(dayKey)}
-                            onCheckedChange={() => handleDaySelection(day)}
-                            className="h-5 w-5"
-                        />
-                    )}
                   </div>
                   <ScrollArea className="flex-1 mt-1">
                     <div className="space-y-1 text-[10px] sm:text-xs">
                       {dayEntries.map(entry => (
                           <div 
                               key={entry.id}
-                              onClick={(e) => { if (!isSelectionMode) { e.stopPropagation(); openEditEntryDialog(entry); } }}
+                              onClick={(e) => { e.stopPropagation(); isSelectionMode ? handleEntrySelection(entry.id) : openEditEntryDialog(entry); }}
                               onDragStart={(e) => handleDragStart(e, entry.id)}
-                              draggable={!isReadOnly && !isSelectionMode && !entry.id.includes('-')}
+                              draggable={!isReadOnly && !entry.id.includes('-')}
                               className={cn(
-                                  "p-1 rounded-md truncate",
-                                  !isReadOnly && !isSelectionMode && !entry.id.includes('-') && "cursor-grab active:cursor-grabbing",
+                                  "p-1 rounded-md truncate flex items-center gap-2",
+                                  isSelectionMode && "cursor-pointer",
+                                  !isSelectionMode && !entry.id.includes('-') && !isReadOnly && "cursor-grab active:cursor-grabbing",
                                   entry.type === 'bill' ? 'bg-destructive text-destructive-foreground' : 'bg-accent text-accent-foreground',
                                   draggingEntryId === entry.id && 'opacity-50',
-                                  isSelectionMode && 'opacity-70'
+                                  selectedEntryInstances.has(entry.id) && 'ring-2 ring-offset-2 ring-offset-background ring-primary'
                               )}
                           >
-                              <span className="hidden sm:inline">{entry.name}: </span>{formatCurrency(entry.amount)}
+                            {isSelectionMode && !isReadOnly && (
+                                <Checkbox 
+                                    checked={selectedEntryInstances.has(entry.id)}
+                                    onCheckedChange={() => handleEntrySelection(entry.id)}
+                                    className="h-4 w-4 border-primary-foreground data-[state=checked]:bg-primary-foreground data-[state=checked]:text-primary"
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                            )}
+                              <span className="flex-1 truncate"><span className="hidden sm:inline">{entry.name}: </span>{formatCurrency(entry.amount)}</span>
                           </div>
                       ))}
                     </div>
