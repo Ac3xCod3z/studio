@@ -1,86 +1,67 @@
-// sw.js
+// A unique name for the cache, updated on each build
+const CACHE_NAME = `fiscalflow-v${new Date().getTime()}`;
 
-const CACHE_NAME = 'fiscalflow-cache-v1';
-const urlsToCache = [
-  '/',
-  '/manifest.json',
-  '/icon-192x192.png',
-  '/icon-512x512.png'
-  // Note: Next.js assets are dynamically hashed and cached by the service worker at runtime.
-];
-
+// This event listener is fired when the service worker is first installed.
 self.addEventListener('install', (event) => {
-  // Perform install steps
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('Opened cache');
-        // Add core app shell files to cache.
-        // This is a minimal set; Next.js assets are handled dynamically.
-        return cache.addAll(urlsToCache);
-      })
-      .then(() => self.skipWaiting()) // Force the waiting service worker to become the active service worker.
-  );
+  console.log('[SW] Install');
+  // The service worker should take over the page immediately.
+  event.waitUntil(self.skipWaiting());
 });
 
+// This event listener is fired when the service worker is activated.
+// Activation is the perfect time to clean up old caches.
 self.addEventListener('activate', (event) => {
-  const cacheWhitelist = [CACHE_NAME];
+  console.log('[SW] Activate');
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          // If the cache name is not in our whitelist, delete it.
-          // This is the key step to clearing out old caches.
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
+    (async () => {
+      // Get all the cache keys (cache names)
+      const keys = await caches.keys();
+      // Delete all caches that are not the current one
+      await Promise.all(
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            console.log(`[SW] Deleting old cache: ${key}`);
+            return caches.delete(key);
           }
         })
       );
-    }).then(() => self.clients.claim()) // Take control of all open clients.
+      // After activation, the service worker should take control of all open clients.
+      return self.clients.claim();
+    })()
   );
 });
 
+// This event listener is fired for every network request.
+// It implements a "network first, falling back to cache" strategy.
 self.addEventListener('fetch', (event) => {
-  // We will use a "network falling back to cache" strategy for navigation requests
-  // to ensure users get the latest version if they are online.
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match(event.request))
-    );
+  // We only want to handle GET requests.
+  if (event.request.method !== 'GET') {
     return;
   }
 
-  // For other requests (CSS, JS, images), "cache first" is a good strategy.
   event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Cache hit - return response
-        if (response) {
-          return response;
-        }
-
-        return fetch(event.request).then(
-          (response) => {
-            // Check if we received a valid response
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
-
-            // IMPORTANT: Clone the response. A response is a stream
-            // and because we want the browser to consume the response
-            // as well as the cache consuming the response, we need
-            // to clone it so we have two streams.
-            const responseToCache = response.clone();
-
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                cache.put(event.request, responseToCache);
-              });
-
-            return response;
-          }
-        );
-      })
+    (async () => {
+      try {
+        // Try to fetch the resource from the network.
+        const networkResponse = await fetch(event.request);
+        
+        // If the fetch is successful, open the cache and store a copy of the response.
+        const cache = await caches.open(CACHE_NAME);
+        // We must clone the response because it's a stream and can only be consumed once.
+        cache.put(event.request, networkResponse.clone());
+        
+        // Return the network response.
+        return networkResponse;
+      } catch (error) {
+        // If the network request fails (e.g., user is offline),
+        // try to get the resource from the cache.
+        console.log(`[SW] Network fetch failed for ${event.request.url}. Trying cache.`);
+        const cachedResponse = await caches.match(event.request);
+        
+        // If the resource is in the cache, return it.
+        // Otherwise, the request will fail, which is the expected behavior for offline.
+        return cachedResponse;
+      }
+    })()
   );
 });
