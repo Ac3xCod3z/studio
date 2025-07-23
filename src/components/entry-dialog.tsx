@@ -85,7 +85,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
         category: entry?.category || undefined,
       });
     }
-  }, [isOpen, selectedDate, entry, form, timezone]);
+  }, [isOpen, selectedDate, entry, timezone, form.reset]);
 
 
   function onSubmit(values: z.infer<typeof formSchema>) {
@@ -181,7 +181,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
               )}
             />
 
-            {entryType === 'bill' && (
+            {(entryType === 'bill' || (entry && entry.type === 'bill')) && (
               <FormField
                 control={form.control}
                 name="category"
