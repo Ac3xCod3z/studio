@@ -26,7 +26,8 @@ import { useToast } from "@/hooks/use-toast";
 const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry[] => {
     const instances: Entry[] = [];
     if (!entry.date) return [];
-    const originalEntryDate = new Date(entry.date + 'T00:00:00');
+    // Treat as local to avoid timezone shifts from parseISO
+    const originalEntryDate = new Date(entry.date + 'T00:00:00'); 
     
     if (isBefore(end, originalEntryDate)) return [];
 
@@ -107,9 +108,9 @@ export default function FiscalFlowDashboard() {
   const isMobile = useMedia("(max-width: 1024px)", false);
   const { toast } = useToast();
 
-  const handleNotificationsToggle = useCallback((enabled: boolean) => {
+  const handleNotificationsToggle = (enabled: boolean) => {
     setNotificationsEnabled(enabled);
-  }, [setNotificationsEnabled]);
+  };
 
   useEffect(() => {
     if (isClient && notificationsEnabled) {
@@ -190,6 +191,8 @@ export default function FiscalFlowDashboard() {
   }, [entries]);
 
   useEffect(() => {
+    if (!isClient) return;
+
     if (allGeneratedEntries.length === 0) {
         setMonthlyLeftovers({});
         return;
@@ -221,10 +224,11 @@ export default function FiscalFlowDashboard() {
         current = addMonths(current, 1);
     }
     
+    // Check if an update is actually needed to prevent infinite loops
     if (JSON.stringify(newLeftovers) !== JSON.stringify(monthlyLeftovers)) {
         setMonthlyLeftovers(newLeftovers);
     }
-  }, [allGeneratedEntries, rollover, timezone, setMonthlyLeftovers, monthlyLeftovers]);
+  }, [isClient, allGeneratedEntries, rollover, timezone, setMonthlyLeftovers]);
 
 
   const { dayEntries, weeklyTotals} = useMemo(() => {
