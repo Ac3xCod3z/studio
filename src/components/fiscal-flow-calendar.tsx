@@ -15,27 +15,16 @@ import {
   isToday,
   isSameMonth,
   isSameDay,
-  getWeek,
-  getDate,
-  parseISO,
-  isBefore,
-  differenceInCalendarMonths,
-  eachWeekOfInterval,
-  getDay,
-  setDate,
-  add,
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Repeat, Trash2, X, PieChart } from "lucide-react";
 
-import useLocalStorage from "@/hooks/use-local-storage";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { Entry, RolloverPreference, MonthlyLeftovers } from "@/lib/types";
-import { recurrenceIntervalMonths } from "@/lib/constants";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -46,6 +35,7 @@ const parseDateInTimezone = (dateString: string, timeZone: string) => {
 
 type FiscalFlowCalendarProps = {
     entries: Entry[];
+    generatedEntries: Entry[];
     setEntries: (value: Entry[] | ((val: Entry[]) => Entry[])) => void;
     rollover: RolloverPreference;
     timezone: string;
@@ -56,12 +46,14 @@ type FiscalFlowCalendarProps = {
     isMobile: boolean;
     openDayEntriesDialog: () => void;
     isReadOnly?: boolean;
-    setMonthlyLeftovers: (value: any | ((val: any) => any)) => void;
+    monthlyLeftovers: MonthlyLeftovers;
+    weeklyTotals: any;
     onOpenBreakdown: () => void;
 }
 
 export function FiscalFlowCalendar({
     entries,
+    generatedEntries,
     setEntries,
     rollover,
     timezone,
@@ -72,100 +64,28 @@ export function FiscalFlowCalendar({
     isMobile,
     openDayEntriesDialog,
     isReadOnly = false,
-    setMonthlyLeftovers,
+    monthlyLeftovers,
+    weeklyTotals,
     onOpenBreakdown,
 }: FiscalFlowCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
-  // This hook is not used in read-only mode, but we need the setter for the main component.
-  const [localMonthlyLeftovers, setLocalMonthlyLeftovers] = useLocalStorage<MonthlyLeftovers>("fiscalFlowLeftovers", {});
-  const monthlyLeftovers = isReadOnly ? {} : localMonthlyLeftovers;
-  const finalSetMonthlyLeftovers = isReadOnly ? setMonthlyLeftovers : setLocalMonthlyLeftovers;
 
   const [draggingEntryId, setDraggingEntryId] = useState<string | null>(null);
   
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedEntryInstances, setSelectedEntryInstances] = useState<Set<string>>(new Set());
 
-  const { daysInMonth, calendarInterval, entriesForGrid } = useMemo(() => {
+  const { daysInMonth } = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth));
     const end = endOfWeek(endOfMonth(currentMonth));
     const days = eachDayOfInterval({ start, end });
-    
-    const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry[] => {
-        const instances: Entry[] = [];
-        if (!entry.date) return [];
-        const originalEntryDate = new Date(entry.date + 'T00:00:00');
-        
-        if (isBefore(end, originalEntryDate)) return [];
-
-        if (entry.recurrence === 'weekly') {
-            let currentDate = startOfWeek(originalEntryDate);
-             while (isBefore(currentDate, start)) {
-                currentDate = add(currentDate, { weeks: 1 });
-            }
-
-            while (isBefore(currentDate, end)) {
-                if (currentDate >= start) {
-                     instances.push({
-                        ...entry,
-                        date: format(currentDate, 'yyyy-MM-dd'),
-                        id: `${entry.id}-${format(currentDate, 'yyyy-MM-dd')}` // Instance ID
-                    });
-                }
-                currentDate = add(currentDate, { weeks: 1 });
-            }
-            return instances;
-        }
-        
-        const recurrenceInterval = entry.recurrence ? recurrenceIntervalMonths[entry.recurrence as keyof typeof recurrenceIntervalMonths] : 0;
-        if (entry.recurrence && entry.recurrence !== 'none' && recurrenceInterval > 0) {
-            let recurringDate = originalEntryDate;
-            while(isBefore(recurringDate, end)) {
-                 if (recurringDate >= start) {
-                    const lastDayOfMonth = endOfMonth(recurringDate).getDate();
-                    const originalDay = getDate(originalEntryDate);
-                    const dayForMonth = Math.min(originalDay, lastDayOfMonth);
-                    const finalDate = setDate(recurringDate, dayForMonth);
-
-                    instances.push({ 
-                        ...entry, 
-                        date: format(finalDate, 'yyyy-MM-dd'), 
-                        id: `${entry.id}-${format(finalDate, 'yyyy-MM-dd')}` 
-                    });
-                 }
-                 recurringDate = add(recurringDate, { months: recurrenceInterval });
-            }
-            return instances;
-        }
-
-        return [];
-    };
-
-    const entriesForGrid = entries.flatMap((e) => {
-        const instances: Entry[] = [];
-
-        // Handle non-recurring
-        if (e.recurrence === 'none') {
-            const entryDate = parseDateInTimezone(e.date, timezone);
-            if (entryDate >= start && entryDate <= end) {
-                instances.push(e);
-            }
-        } else {
-            // Handle recurring
-            instances.push(...generateRecurringInstances(e, start, end));
-        }
-
-        return instances;
-    });
-
-    return { daysInMonth: days, calendarInterval: { start, end }, entriesForGrid };
-  }, [currentMonth, entries, timezone]);
+    return { daysInMonth: days };
+  }, [currentMonth]);
 
   const handleDayClick = (day: Date) => {
       if (isReadOnly) return;
       if (isSelectionMode) {
-          // In selection mode, clicking the day does nothing to avoid confusion.
           return;
       }
       
@@ -173,7 +93,7 @@ export function FiscalFlowCalendar({
       setGlobalSelectedDate(day);
 
       if (isMobile) {
-        const dayHasEntries = entriesForGrid.some(e => e.date === format(day, 'yyyy-MM-dd'));
+        const dayHasEntries = generatedEntries.some(e => e.date === format(day, 'yyyy-MM-dd'));
         if (dayHasEntries) {
             openDayEntriesDialog();
         }
@@ -195,9 +115,13 @@ export function FiscalFlowCalendar({
   const handleDeleteSelected = () => {
     if (isReadOnly || selectedEntryInstances.size === 0) return;
     
-    // Get the base IDs of the entries to delete.
     const baseIdsToDelete = new Set(
-        Array.from(selectedEntryInstances).map(instanceId => instanceId.split('-')[0])
+        Array.from(selectedEntryInstances).map(instanceId => {
+            const parts = instanceId.split('-');
+            // If it's a recurring instance, the ID will have multiple parts. The base ID is the first part.
+            // If it's a non-recurring entry, the ID is the whole string.
+            return entryIsRecurringInstance(instanceId) ? parts[0] : instanceId;
+        })
     );
 
     setEntries(prevEntries => 
@@ -208,10 +132,14 @@ export function FiscalFlowCalendar({
     setSelectedEntryInstances(new Set());
   };
 
+  const entryIsRecurringInstance = (entryId: string) => {
+      // e.g. 'uuid-2024-08-15'
+      return entryId.match(/.*-\d{4}-\d{2}-\d{2}$/);
+  }
+
   const openEditEntryDialog = (entry: Entry) => {
     if (isReadOnly) return;
-    // For recurring entries, we need to find the original entry to edit.
-    const originalEntryId = entry.id.split('-')[0];
+    const originalEntryId = entryIsRecurringInstance(entry.id) ? entry.id.split('-')[0] : entry.id;
     const originalEntry = entries.find(e => e.id === originalEntryId) || entry;
 
     setEditingEntry(originalEntry);
@@ -219,15 +147,14 @@ export function FiscalFlowCalendar({
     setEntryDialogOpen(true);
   }
 
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, entryId: string) => {
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, entry: Entry) => {
     if (isReadOnly) return;
-    // Drag and drop only works for non-recurring entries.
-     if (entryId.includes('-')) {
+     if (entryIsRecurringInstance(entry.id)) {
         e.preventDefault();
         return;
     }
     e.dataTransfer.effectAllowed = 'move';
-    setDraggingEntryId(entryId);
+    setDraggingEntryId(entry.id);
   };
   
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -250,74 +177,28 @@ export function FiscalFlowCalendar({
     setDraggingEntryId(null);
   };
 
-    const { monthlyTotals, weeklyTotals } = useMemo(() => {
+  const monthlyTotals = useMemo(() => {
     const monthKey = format(currentMonth, 'yyyy-MM');
-    const prevMonth = subMonths(currentMonth, 1);
-    const prevMonthKey = format(prevMonth, 'yyyy-MM');
+    const prevMonthKey = format(subMonths(currentMonth, 1), 'yyyy-MM');
     const previousMonthLeftover = (rollover === 'carryover' && monthlyLeftovers[prevMonthKey]) || 0;
     
-    // Monthly calculation still focuses on the current month's view
-    const entriesForCurrentMonth = entriesForGrid.filter(e => isSameMonth(parseDateInTimezone(e.date, timezone), currentMonth));
+    const entriesForCurrentMonth = generatedEntries.filter(e => isSameMonth(parseDateInTimezone(e.date, timezone), currentMonth));
     const monthlyBills = entriesForCurrentMonth.filter((e) => e.type === "bill").reduce((sum, e) => sum + e.amount, 0);
     const currentMonthIncome = entriesForCurrentMonth.filter((e) => e.type === "income").reduce((sum, e) => sum + e.amount, 0);
     
     const monthlyNet = currentMonthIncome - monthlyBills;
     const endOfMonthBalance = currentMonthIncome + previousMonthLeftover - monthlyBills;
     
-    // Weekly calculation uses the full grid range
-    const weekStart = startOfWeek(selectedDate);
-    const weekEnd = endOfWeek(selectedDate);
-    const weekEntries = entriesForGrid.filter(e => {
-        const entryDate = parseDateInTimezone(e.date, timezone);
-        return entryDate >= weekStart && entryDate <= weekEnd;
-    });
-
-    const weeklyIncome = weekEntries.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
-    const weeklyBills = weekEntries.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
-    const initialWeeklyNet = weeklyIncome - weeklyBills;
-    
-    // Find previous leftover for weekly rollover calculation
-    const weeklyRolloverSourceKey = isBefore(weekStart, startOfMonth(currentMonth)) 
-      ? format(subMonths(weekStart, 1), 'yyyy-MM') 
-      : monthKey;
-      
-    const startOfWeekLeftover = (rollover === 'carryover' && monthlyLeftovers[weeklyRolloverSourceKey]) || 0;
-    
-    let rolloverApplied = 0;
-    if (initialWeeklyNet < 0 && startOfWeekLeftover > 0) {
-        rolloverApplied = Math.min(Math.abs(initialWeeklyNet), startOfWeekLeftover);
-    }
-    
-    const finalWeeklyNet = initialWeeklyNet + rolloverApplied;
-
     return {
-      monthlyTotals: { 
         bills: monthlyBills, 
         income: currentMonthIncome, 
         net: monthlyNet, 
         endOfMonthBalance: endOfMonthBalance, 
         rollover: previousMonthLeftover,
         monthKey
-      },
-      weeklyTotals: {
-          income: weeklyIncome,
-          bills: weeklyBills,
-          net: finalWeeklyNet,
-          rolloverApplied,
-      },
     };
-  }, [entriesForGrid, currentMonth, selectedDate, rollover, monthlyLeftovers, timezone]);
+  }, [generatedEntries, currentMonth, rollover, monthlyLeftovers, timezone]);
 
-  useEffect(() => {
-    if (isReadOnly) return;
-    const { monthKey, endOfMonthBalance } = monthlyTotals;
-    finalSetMonthlyLeftovers(prev => {
-        if (prev[monthKey] !== endOfMonthBalance) {
-            return {...prev, [monthKey]: endOfMonthBalance };
-        }
-        return prev;
-    });
-  }, [monthlyTotals, finalSetMonthlyLeftovers, isReadOnly]);
 
   const Sidebar = () => (
     <SidebarContent 
@@ -372,7 +253,7 @@ export function FiscalFlowCalendar({
           </div>
           <div className="grid grid-cols-7 grid-rows-5 gap-1 mt-1">
             {daysInMonth.map((day) => {
-              const dayEntries = entriesForGrid
+              const dayEntries = generatedEntries
                 .filter((e) => {
                     const entryDate = parseDateInTimezone(e.date, timezone);
                     return isSameDay(entryDate, day);
@@ -412,12 +293,12 @@ export function FiscalFlowCalendar({
                           <div 
                               key={entry.id}
                               onClick={(e) => { e.stopPropagation(); isSelectionMode ? handleEntrySelection(entry.id) : openEditEntryDialog(entry); }}
-                              onDragStart={(e) => handleDragStart(e, entry.id)}
-                              draggable={!isReadOnly && !entry.id.includes('-')}
+                              onDragStart={(e) => handleDragStart(e, entry)}
+                              draggable={!isReadOnly && !entryIsRecurringInstance(entry.id)}
                               className={cn(
                                   "p-1 rounded-md truncate flex items-center gap-2",
                                   isSelectionMode && "cursor-pointer",
-                                  !isSelectionMode && !entry.id.includes('-') && !isReadOnly && "cursor-grab active:cursor-grabbing",
+                                  !isSelectionMode && !entryIsRecurringInstance(entry.id) && !isReadOnly && "cursor-grab active:cursor-grabbing",
                                   entry.type === 'bill' ? 'bg-destructive text-destructive-foreground' : 'bg-accent text-accent-foreground',
                                   draggingEntryId === entry.id && 'opacity-50',
                                   selectedEntryInstances.has(entry.id) && 'ring-2 ring-offset-2 ring-offset-background ring-primary'
@@ -527,3 +408,5 @@ export const SidebarContent = ({
       </div>
   </div>
 );
+
+    
