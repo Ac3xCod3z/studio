@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import useLocalStorage from "@/hooks/use-local-storage";
 import { useMedia } from "react-use";
 
@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import type { Entry, RolloverPreference, MonthlyLeftovers } from "@/lib/types";
 import { FiscalFlowCalendar, SidebarContent } from "./fiscal-flow-calendar";
-import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, parseISO, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths, parseISO } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { recurrenceIntervalMonths } from "@/lib/constants";
 import { ScrollArea } from "./ui/scroll-area";
@@ -90,7 +90,6 @@ const parseDateInTimezone = (dateString: string, timeZone: string) => {
 
 
 export default function FiscalFlowDashboard() {
-  const [isClient, setIsClient] = useState(false);
   const [entries, setEntries] = useLocalStorage<Entry[]>("fiscalFlowEntries", []);
   const [rollover, setRollover] = useLocalStorage<RolloverPreference>("fiscalFlowRollover", "carryover");
   const [timezone, setTimezone] = useLocalStorage<string>('fiscalFlowTimezone', 'UTC');
@@ -105,6 +104,7 @@ export default function FiscalFlowDashboard() {
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
+  const [isMounted, setIsMounted] = useState(false);
   const isMobile = useMedia("(max-width: 1024px)", false);
   const { toast } = useToast();
 
@@ -113,24 +113,23 @@ export default function FiscalFlowDashboard() {
   };
 
   useEffect(() => {
-    if (isClient && notificationsEnabled) {
+    if (notificationsEnabled) {
       if ('Notification' in window && Notification.permission === 'granted') {
         scheduleNotifications(entries, timezone, toast);
       } else {
         setNotificationsEnabled(false);
       }
-    } else if (isClient && !notificationsEnabled) {
+    } else {
       cancelAllNotifications(toast);
     }
-  }, [isClient, entries, timezone, notificationsEnabled, setNotificationsEnabled, toast]);
+  }, [entries, timezone, notificationsEnabled, setNotificationsEnabled, toast]);
 
 
   useEffect(() => {
-    setIsClient(true);
+    setIsMounted(true);
   }, []);
 
   useEffect(() => {
-    if (isClient) {
       const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         if (!localStorage.getItem('fiscalFlowTimezone') && detectedTimezone) {
             setTimezone(detectedTimezone);
@@ -144,8 +143,7 @@ export default function FiscalFlowDashboard() {
             });
           });
         }
-    }
-  }, [isClient, setTimezone]);
+  }, [setTimezone]);
 
 
   const handleEntrySave = (entryData: Omit<Entry, "id"> & { id?: string }) => {
@@ -191,14 +189,12 @@ export default function FiscalFlowDashboard() {
   }, [entries]);
 
   useEffect(() => {
-    if (!isClient) return;
-
     if (allGeneratedEntries.length === 0) {
         setMonthlyLeftovers({});
         return;
     }
     const oldestEntry = allGeneratedEntries.reduce((oldest, entry) => {
-        const entryDate = new Date(entry.date);
+        const entryDate = parseISO(entry.date);
         return entryDate < oldest ? entryDate : oldest;
     }, new Date());
 
@@ -224,11 +220,10 @@ export default function FiscalFlowDashboard() {
         current = addMonths(current, 1);
     }
     
-    // Check if an update is actually needed to prevent infinite loops
     if (JSON.stringify(newLeftovers) !== JSON.stringify(monthlyLeftovers)) {
         setMonthlyLeftovers(newLeftovers);
     }
-  }, [isClient, allGeneratedEntries, rollover, timezone, monthlyLeftovers]);
+  }, [allGeneratedEntries, rollover, timezone, setMonthlyLeftovers]);
 
 
   const { dayEntries, weeklyTotals} = useMemo(() => {
@@ -281,7 +276,7 @@ export default function FiscalFlowDashboard() {
       }
   }, [selectedDate, allGeneratedEntries, timezone, rollover, monthlyLeftovers]);
 
-  if (!isClient) {
+  if (!isMounted) {
     return (
       <div className="flex h-screen w-full flex-col bg-background">
         <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
@@ -416,5 +411,7 @@ export default function FiscalFlowDashboard() {
     </div>
   );
 }
+
+    
 
     
