@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import type { Entry, RolloverPreference, MonthlyLeftovers } from "@/lib/types";
 import { FiscalFlowCalendar, SidebarContent } from "./fiscal-flow-calendar";
-import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, parseISO, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, parseISO, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { recurrenceIntervalMonths } from "@/lib/constants";
 import { ScrollArea } from "./ui/scroll-area";
@@ -225,7 +225,7 @@ export default function FiscalFlowDashboard() {
     if (JSON.stringify(newLeftovers) !== JSON.stringify(monthlyLeftovers)) {
         setMonthlyLeftovers(newLeftovers);
     }
-  }, [allGeneratedEntries, rollover, timezone, setMonthlyLeftovers]); // Removed monthlyLeftovers
+  }, [allGeneratedEntries, rollover, timezone, setMonthlyLeftovers]);
 
 
   const { entriesForCurrentMonthView, dayEntries, weeklyTotals} = useMemo(() => {
@@ -416,5 +416,3 @@ export default function FiscalFlowDashboard() {
     </div>
   );
 }
-
-    
