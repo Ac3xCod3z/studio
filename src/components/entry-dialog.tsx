@@ -82,7 +82,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
         amount: entry?.amount || 0,
         date: resetDate,
         recurrence: entry?.recurrence || 'none',
-        category: entry?.category || undefined,
+        category: entry?.category,
       });
     }
   }, [isOpen, selectedDate, entry, timezone, form.reset]);
@@ -181,7 +181,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
               )}
             />
 
-            {(entryType === 'bill' || (entry && entry.type === 'bill')) && (
+            {(entryType === 'bill') && (
               <FormField
                 control={form.control}
                 name="category"
@@ -270,16 +270,18 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
                 </FormItem>
               )}
             />
-            <DialogFooter className="pt-4">
+            <DialogFooter className="pt-4 sm:justify-between">
               {entry && onDelete && (
                  <Button type="button" variant="destructive" onClick={handleDelete} className="mr-auto">
                     <Trash2 className="mr-2 h-4 w-4" /> Delete
                 </Button>
               )}
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button type="submit">Save</Button>
+              <div className="flex gap-2 justify-end">
+                <Button type="button" variant="outline" onClick={onClose}>
+                    Cancel
+                </Button>
+                <Button type="submit">Save</Button>
+              </div>
             </DialogFooter>
           </form>
         </Form>

@@ -17,12 +17,11 @@ import {
   isSameDay,
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
-import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Repeat, Trash2, X, PieChart } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Repeat, PieChart } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Checkbox } from "@/components/ui/checkbox";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { Entry, RolloverPreference, MonthlyLeftovers } from "@/lib/types";
 
@@ -47,6 +46,7 @@ type FiscalFlowCalendarProps = {
     openDayEntriesDialog: () => void;
     isReadOnly?: boolean;
     monthlyLeftovers: MonthlyLeftovers;
+    setMonthlyLeftovers: (value: MonthlyLeftovers | ((val: MonthlyLeftovers) => MonthlyLeftovers)) => void;
     weeklyTotals: any;
     onOpenBreakdown: () => void;
 }
@@ -65,6 +65,7 @@ export function FiscalFlowCalendar({
     openDayEntriesDialog,
     isReadOnly = false,
     monthlyLeftovers,
+    setMonthlyLeftovers,
     weeklyTotals,
     onOpenBreakdown,
 }: FiscalFlowCalendarProps) {
@@ -72,9 +73,6 @@ export function FiscalFlowCalendar({
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   const [draggingEntryId, setDraggingEntryId] = useState<string | null>(null);
-  
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
-  const [selectedEntryInstances, setSelectedEntryInstances] = useState<Set<string>>(new Set());
 
   const { daysInMonth } = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth));
@@ -82,12 +80,42 @@ export function FiscalFlowCalendar({
     const days = eachDayOfInterval({ start, end });
     return { daysInMonth: days };
   }, [currentMonth]);
+  
+  useEffect(() => {
+    const oldestEntry = entries.reduce((oldest, entry) => {
+        const entryDate = new Date(entry.date);
+        return entryDate < oldest ? entryDate : oldest;
+    }, new Date());
+
+    const start = startOfMonth(oldestEntry);
+    const end = new Date(); 
+    
+    const newLeftovers: MonthlyLeftovers = {};
+    let current = start;
+    let lastMonthLeftover = 0;
+
+    while(isBefore(current, end)) {
+        const monthKey = format(current, 'yyyy-MM');
+        
+        const entriesForMonth = generatedEntries.filter(e => isSameMonth(parseDateInTimezone(e.date, timezone), current));
+        const income = entriesForMonth.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
+        const bills = entriesForMonth.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
+        
+        const endOfMonthBalance = income + (rollover === 'carryover' ? lastMonthLeftover : 0) - bills;
+
+        newLeftovers[monthKey] = endOfMonthBalance;
+        lastMonthLeftover = endOfMonthBalance;
+        
+        current = addMonths(current, 1);
+    }
+    
+    if (JSON.stringify(newLeftovers) !== JSON.stringify(monthlyLeftovers)) {
+        setMonthlyLeftovers(newLeftovers);
+    }
+  }, [entries, rollover, timezone, generatedEntries, monthlyLeftovers, setMonthlyLeftovers]);
 
   const handleDayClick = (day: Date) => {
       if (isReadOnly) return;
-      if (isSelectionMode) {
-          return;
-      }
       
       setSelectedDate(day);
       setGlobalSelectedDate(day);
@@ -99,38 +127,6 @@ export function FiscalFlowCalendar({
         }
       }
   }
-  
-  const handleEntrySelection = (instanceId: string) => {
-    setSelectedEntryInstances(prevSelected => {
-        const newSelected = new Set(prevSelected);
-        if (newSelected.has(instanceId)) {
-            newSelected.delete(instanceId);
-        } else {
-            newSelected.add(instanceId);
-        }
-        return newSelected;
-    });
-  };
-
-  const handleDeleteSelected = () => {
-    if (isReadOnly || selectedEntryInstances.size === 0) return;
-    
-    const baseIdsToDelete = new Set(
-        Array.from(selectedEntryInstances).map(instanceId => {
-            const parts = instanceId.split('-');
-            // If it's a recurring instance, the ID will have multiple parts. The base ID is the first part.
-            // If it's a non-recurring entry, the ID is the whole string.
-            return entryIsRecurringInstance(instanceId) ? parts[0] : instanceId;
-        })
-    );
-
-    setEntries(prevEntries => 
-        prevEntries.filter(entry => !baseIdsToDelete.has(entry.id))
-    );
-    
-    setIsSelectionMode(false);
-    setSelectedEntryInstances(new Set());
-  };
 
   const entryIsRecurringInstance = (entryId: string) => {
       // e.g. 'uuid-2024-08-15'
@@ -148,8 +144,7 @@ export function FiscalFlowCalendar({
   }
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, entry: Entry) => {
-    if (isReadOnly) return;
-     if (entryIsRecurringInstance(entry.id)) {
+    if (isReadOnly || entryIsRecurringInstance(entry.id)) {
         e.preventDefault();
         return;
     }
@@ -213,39 +208,13 @@ export function FiscalFlowCalendar({
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl sm:text-2xl font-bold">{format(currentMonth, "MMMM yyyy")}</h1>
             <div className="flex items-center gap-1 sm:gap-2">
-              {!isSelectionMode && !isReadOnly ? (
-                <>
-                    <Button variant="outline" onClick={() => setIsSelectionMode(true)}>Select</Button>
-                    <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
-                        <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" onClick={() => setCurrentMonth(new Date())} className="px-2 sm:px-4">Today</Button>
-                    <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
-                        <ChevronRight className="h-4 w-4" />
-                    </Button>
-                </>
-              ) : null}
-               {isSelectionMode && !isReadOnly ? (
-                <>
-                    <Button variant="destructive" size="sm" onClick={handleDeleteSelected} disabled={selectedEntryInstances.size === 0}>
-                        <Trash2 className="mr-2 h-4 w-4" /> Delete ({selectedEntryInstances.size})
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => { setIsSelectionMode(false); setSelectedEntryInstances(new Set()); }}>
-                        <X className="mr-2 h-4 w-4" /> Cancel
-                    </Button>
-                </>
-              ) : null}
-              {isReadOnly && (
-                 <>
-                    <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
-                        <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" onClick={() => setCurrentMonth(new Date())} className="px-2 sm:px-4">Today</Button>
-                    <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
-                        <ChevronRight className="h-4 w-4" />
-                    </Button>
-                </>
-              )}
+              <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+                  <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" onClick={() => setCurrentMonth(new Date())} className="px-2 sm:px-4">Today</Button>
+              <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+                  <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
           </div>
           <div className="grid grid-cols-7 gap-1 text-center font-semibold text-muted-foreground text-xs sm:text-sm">
@@ -269,11 +238,11 @@ export function FiscalFlowCalendar({
                   key={format(day, 'yyyy-MM-dd')}
                   className={cn(
                     "relative flex flex-col h-24 sm:h-32 rounded-lg p-1 sm:p-2 border transition-colors",
-                    !isReadOnly && !isSelectionMode && "cursor-pointer",
+                    !isReadOnly && "cursor-pointer",
                     !isSameMonth(day, currentMonth) ? "bg-muted/50 text-muted-foreground" : "bg-card",
-                    !isReadOnly && !isSelectionMode && isSameMonth(day, currentMonth) && "hover:bg-card/80",
+                    !isReadOnly && isSameMonth(day, currentMonth) && "hover:bg-card/80",
                     isToday(day) && "border-primary",
-                    isSameDay(day, selectedDate) && !isSelectionMode && "ring-2 ring-primary"
+                    isSameDay(day, selectedDate) && "ring-2 ring-primary"
                   )}
                   onClick={() => handleDayClick(day)}
                   onDragOver={handleDragOver}
@@ -281,7 +250,7 @@ export function FiscalFlowCalendar({
                 >
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-xs sm:text-base">{format(day, "d")}</span>
-                    {!isSelectionMode && !isReadOnly && (
+                    {!isReadOnly && (
                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); openNewEntryDialog(day); }}>
                             <Plus className="h-4 w-4" />
                         </Button>
@@ -292,27 +261,17 @@ export function FiscalFlowCalendar({
                       {dayEntries.map(entry => (
                           <div 
                               key={entry.id}
-                              onClick={(e) => { e.stopPropagation(); isSelectionMode ? handleEntrySelection(entry.id) : openEditEntryDialog(entry); }}
+                              onClick={(e) => { e.stopPropagation(); openEditEntryDialog(entry); }}
                               onDragStart={(e) => handleDragStart(e, entry)}
                               draggable={!isReadOnly && !entryIsRecurringInstance(entry.id)}
                               className={cn(
                                   "p-1 rounded-md truncate flex items-center gap-2",
-                                  isSelectionMode && "cursor-pointer",
-                                  !isSelectionMode && !entryIsRecurringInstance(entry.id) && !isReadOnly && "cursor-grab active:cursor-grabbing",
+                                  !entryIsRecurringInstance(entry.id) && !isReadOnly && "cursor-grab active:cursor-grabbing",
                                   entry.type === 'bill' ? 'bg-destructive text-destructive-foreground' : 'bg-accent text-accent-foreground',
                                   draggingEntryId === entry.id && 'opacity-50',
-                                  selectedEntryInstances.has(entry.id) && 'ring-2 ring-offset-2 ring-offset-background ring-primary'
                               )}
                           >
-                            {isSelectionMode && !isReadOnly && (
-                                <Checkbox 
-                                    checked={selectedEntryInstances.has(entry.id)}
-                                    onCheckedChange={() => handleEntrySelection(entry.id)}
-                                    className="h-4 w-4 border-primary-foreground data-[state=checked]:bg-primary-foreground data-[state=checked]:text-primary"
-                                    onClick={(e) => e.stopPropagation()}
-                                />
-                            )}
-                              <span className="flex-1 truncate"><span className="hidden sm:inline">{entry.name}: </span>{formatCurrency(entry.amount)}</span>
+                            <span className="flex-1 truncate"><span className="hidden sm:inline">{entry.name}: </span>{formatCurrency(entry.amount)}</span>
                           </div>
                       ))}
                     </div>
