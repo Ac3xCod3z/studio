@@ -70,24 +70,7 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val
   
   useEffect(() => {
     setStoredValue(readValue());
-  }, [key, readValue]);
-  
-  useEffect(() => {
-    const handleStorageChange = () => {
-      setStoredValue(readValue());
-    };
-
-    // this only works for other documents, not the current one
-    window.addEventListener('storage', handleStorageChange);
-    // this is for the current document
-    window.addEventListener('local-storage', handleStorageChange);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('local-storage', handleStorageChange);
-    };
-  }, [readValue]);
-
+  }, []);
 
   return [storedValue, setValue];
 }
