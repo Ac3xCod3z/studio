@@ -59,37 +59,26 @@ export default function CentsiLoader() {
     })
     // 1. Fade in logo and name
     .fromTo([logoRef.current, nameRef.current], 
-        { opacity: 0, scale: 0.9 },
-        { opacity: 1, scale: 1, duration: 1, ease: 'power2.out', stagger: 0.2 }
+        { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.8, ease: 'power2.out', stagger: 0.2 }
     )
-    .add("swirl", "+=0.5") // Add a label for the start of the swirl
-    // 2. Make name swirl around the logo and disappear
+    .add("swirl", "+=0.3") // Add a label for the start of the swirl
+    // 2. Animate name in a circular path and fade into the logo
     .to(nameRef.current, {
-        duration: 1.5,
-        x: '+=50', // Move right
-        y: '-=20', // Move up
-        rotation: 90,
-        ease: 'power2.in',
-    }, "swirl")
-    .to(nameRef.current, {
-        duration: 1.5,
-        x: '-=50', // Move left
-        y: '+=100', // Move down
-        rotation: 270,
-        ease: 'circ.inOut',
-    }, "swirl+=0.5")
-     .to(nameRef.current, {
-        duration: 1,
+        duration: 2,
+        motionPath: {
+            path: [{x: 60, y: -30}, {x: 0, y: -60}, {x: -60, y: -30}, {x: 0, y: 0}],
+            curviness: 1.25,
+        },
         scale: 0,
         opacity: 0,
-        rotation: 360,
+        ease: 'power1.inOut',
         transformOrigin: "center center",
-        ease: 'power2.in',
-    }, "swirl+=1")
+    }, "swirl")
     // 3. Fade out logo and container
     .to(logoRef.current, 
         { opacity: 0, scale: 0.9, duration: 0.7, ease: 'power2.in' },
-        "-=0.8"
+        "swirl+=1.3" // Delay the logo fade-out
     )
     .to(containerRef.current, 
         { opacity: 0, duration: 0.5, ease: 'power2.in' },
@@ -104,7 +93,7 @@ export default function CentsiLoader() {
   return (
     <div ref={containerRef} className="flex h-screen w-full items-center justify-center bg-background flex-col gap-4 overflow-hidden">
       <div ref={logoRef}>
-        <Logo className="h-24 w-24 text-primary" />
+        <Logo className="h-20 w-20 text-primary" />
       </div>
       <div ref={nameRef}>
         <h1 className="text-4xl font-bold tracking-tight">Centsei</h1>
