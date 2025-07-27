@@ -52,6 +52,11 @@ export default function CentsiLoader() {
   const containerRef = useRef(null);
 
   useEffect(() => {
+    // Ensure MotionPathPlugin is registered
+    if (typeof window !== "undefined") {
+      gsap.registerPlugin(window.MotionPathPlugin);
+    }
+      
     gsap.timeline({
       onComplete: () => {
         setAnimationComplete(true);
@@ -65,10 +70,11 @@ export default function CentsiLoader() {
     .add("swirl", "+=0.3") // Add a label for the start of the swirl
     // 2. Animate name in a circular path and fade into the logo
     .to(nameRef.current, {
-        duration: 2,
+        duration: 1.5, // slightly faster
         motionPath: {
-            path: [{x: 60, y: -30}, {x: 0, y: -60}, {x: -60, y: -30}, {x: 0, y: 0}],
+            path: [{x: 50, y: -25}, {x: 0, y: -50}, {x: -50, y: -25}, {x: 0, y: 0}],
             curviness: 1.25,
+            autoRotate: true,
         },
         scale: 0,
         opacity: 0,
@@ -78,7 +84,7 @@ export default function CentsiLoader() {
     // 3. Fade out logo and container
     .to(logoRef.current, 
         { opacity: 0, scale: 0.9, duration: 0.7, ease: 'power2.in' },
-        "swirl+=1.3" // Delay the logo fade-out
+        "swirl+=1.0" // Delay the logo fade-out
     )
     .to(containerRef.current, 
         { opacity: 0, duration: 0.5, ease: 'power2.in' },
