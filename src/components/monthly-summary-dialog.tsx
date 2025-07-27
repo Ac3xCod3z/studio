@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -57,9 +58,9 @@ export function MonthlySummaryDialog({
   currentMonth,
 }: MonthlySummaryDialogProps) {
 
-  const { dialogRef, overlayRef } = useDialogAnimation(isOpen, onClose);
+  const { dialogRef, overlayRef, isRendered } = useDialogAnimation(isOpen, onClose);
 
-  if (!isOpen && dialogRef.current?.style.display === 'none') {
+  if (!isRendered) {
     return null;
   }
   

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -86,7 +87,7 @@ export function SettingsDialog({
   const [hasCopied, setHasCopied] = useState(false);
   const { setTheme, theme } = useTheme();
 
-  const { dialogRef, overlayRef } = useDialogAnimation(isOpen, onClose);
+  const { dialogRef, overlayRef, isRendered } = useDialogAnimation(isOpen, onClose);
 
   useEffect(() => {
     if (isOpen) {
@@ -177,7 +178,7 @@ export function SettingsDialog({
     });
   };
 
-  if (!isOpen && dialogRef.current?.style.display === 'none') {
+  if (!isRendered) {
     return null;
   }
   

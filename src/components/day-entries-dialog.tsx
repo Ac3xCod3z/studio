@@ -1,3 +1,4 @@
+
 "use client";
 
 import { format } from "date-fns";
@@ -37,7 +38,7 @@ export function DayEntriesDialog({
   onEditEntry
 }: DayEntriesDialogProps) {
   
-  const { dialogRef, overlayRef } = useDialogAnimation(isOpen, onClose);
+  const { dialogRef, overlayRef, isRendered } = useDialogAnimation(isOpen, onClose);
 
   const sortedEntries = React.useMemo(() => 
     [...entries].sort((a, b) => {
@@ -46,7 +47,7 @@ export function DayEntriesDialog({
         return a.name.localeCompare(b.name);
     }), [entries]);
 
-  if (!isOpen && dialogRef.current?.style.display === 'none') {
+  if (!isRendered) {
     return null;
   }
 

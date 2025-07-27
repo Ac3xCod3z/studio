@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from "react";
@@ -68,7 +69,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
     resolver: zodResolver(formSchema),
   });
   
-  const { dialogRef, overlayRef } = useDialogAnimation(isOpen, onClose);
+  const { dialogRef, overlayRef, isRendered } = useDialogAnimation(isOpen, onClose);
   
   const entryType = form.watch("type");
 
@@ -112,7 +113,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
     }
   }
 
-  if (!isOpen && dialogRef.current?.style.display === 'none') {
+  if (!isRendered) {
     return null;
   }
 

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo } from 'react';
@@ -66,7 +67,7 @@ export function MonthlyBreakdownDialog({
   currentMonth,
   timezone,
 }: MonthlyBreakdownDialogProps) {
-  const { dialogRef, overlayRef } = useDialogAnimation(isOpen, onClose);
+  const { dialogRef, overlayRef, isRendered } = useDialogAnimation(isOpen, onClose);
 
   const breakdownData = useMemo(() => {
     const monthlyBills = entries.filter(entry => {
@@ -106,7 +107,7 @@ export function MonthlyBreakdownDialog({
     }));
   }, [breakdownData]);
 
-  if (!isOpen && dialogRef.current?.style.display === 'none') {
+  if (!isRendered) {
     return null;
   }
 
