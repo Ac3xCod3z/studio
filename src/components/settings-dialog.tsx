@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { Sparkles, Loader2, Bell, BellOff, Share2, Check, Copy, Moon, Sun } from "lucide-react";
+import { Sparkles, Loader2, Bell, BellOff, Share2, Check, Copy, Moon, Sun, Repeat } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { Button } from "@/components/ui/button";
@@ -179,7 +179,7 @@ export function SettingsDialog({
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-md grid-rows-[auto_minmax(0,1fr)_auto] p-0 max-h-[90vh]" onInteractOutside={(e) => e.preventDefault()}>
+        <DialogContent className="sm:max-w-md grid-rows-[auto_minmax(0,1fr)_auto] p-0 max-h-[90vh]">
           <DialogHeader className="p-6 pb-2">
             <DialogTitle>Settings</DialogTitle>
             <DialogDescription>
@@ -361,3 +361,5 @@ export function SettingsDialog({
     </Dialog>
   );
 }
+
+    
