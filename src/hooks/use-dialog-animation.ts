@@ -22,25 +22,25 @@ export function useDialogAnimation(isOpen: boolean, onAfterClose?: () => void) {
     }
 
     if (isOpen) {
-      // Entrance Animation
+      // Entrance Animation - "Blow Up"
       gsap.timeline()
         .set([dialogRef.current, overlayRef.current], { display: 'grid' })
-        .to(overlayRef.current, { opacity: 1, duration: 0.3, ease: 'power2.inOut' })
+        .to(overlayRef.current, { opacity: 1, duration: 0.2, ease: 'power2.inOut' })
         .fromTo(dialogRef.current, 
-          { scale: 0.9, opacity: 0, y: 30 },
-          { scale: 1, opacity: 1, y: 0, duration: 0.4, ease: 'back.out(1.7)' }, 
-          "-=0.2"
+          { scale: 0, opacity: 0 },
+          { scale: 1, opacity: 1, duration: 0.4, ease: 'back.out(1.7)' }, 
+          "-=0.1"
         );
     } else {
-      // Exit Animation
+      // Exit Animation - "Blow Out"
       gsap.timeline({
           onComplete: () => {
             setIsRendered(false);
             if (onAfterClose) onAfterClose();
           }
         })
-        .to(dialogRef.current, { scale: 0.95, opacity: 0, y: 10, duration: 0.2, ease: 'power2.in' })
-        .to(overlayRef.current, { opacity: 0, duration: 0.2, ease: 'power2.out' }, "-=0.1")
+        .to(dialogRef.current, { scale: 1.05, opacity: 0, duration: 0.2, ease: 'power1.in' })
+        .to(overlayRef.current, { opacity: 0, duration: 0.2, ease: 'power1.out' }, "-=0.1")
         .set([dialogRef.current, overlayRef.current], { display: 'none' });
     }
   }, [isOpen, isRendered, onAfterClose]);
