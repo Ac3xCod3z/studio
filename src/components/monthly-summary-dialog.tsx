@@ -10,13 +10,11 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogOverlay,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowDown, ArrowUp, Repeat, TrendingUp, TrendingDown } from "lucide-react";
 import { cn, formatCurrency } from '@/lib/utils';
-import { useDialogAnimation } from '@/hooks/use-dialog-animation';
 
 
 type MonthlySummary = {
@@ -57,16 +55,13 @@ export function MonthlySummaryDialog({
   currentMonth,
 }: MonthlySummaryDialogProps) {
 
-  const { dialogRef, overlayRef, isRendered } = useDialogAnimation(isOpen, onClose);
-
-  if (!isRendered) {
+  if (!isOpen) {
     return null;
   }
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogOverlay ref={overlayRef} onClick={onClose} />
-        <DialogContent ref={dialogRef} className="sm:max-w-xl" onInteractOutside={onClose}>
+        <DialogContent className="sm:max-w-xl" onInteractOutside={(e) => e.preventDefault()}>
             <DialogHeader>
             <DialogTitle>
                 {format(currentMonth, 'MMMM yyyy')} Summary

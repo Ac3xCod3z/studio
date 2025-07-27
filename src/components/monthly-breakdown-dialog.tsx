@@ -9,7 +9,6 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogOverlay
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -37,7 +36,6 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import { PieChart, Pie, Cell, Tooltip } from 'recharts';
-import { useDialogAnimation } from '@/hooks/use-dialog-animation';
 
 type MonthlyBreakdownDialogProps = {
   isOpen: boolean;
@@ -66,7 +64,6 @@ export function MonthlyBreakdownDialog({
   currentMonth,
   timezone,
 }: MonthlyBreakdownDialogProps) {
-  const { dialogRef, overlayRef, isRendered } = useDialogAnimation(isOpen, onClose);
 
   const breakdownData = useMemo(() => {
     const monthlyBills = entries.filter(entry => {
@@ -106,14 +103,13 @@ export function MonthlyBreakdownDialog({
     }));
   }, [breakdownData]);
 
-  if (!isRendered) {
+  if (!isOpen) {
     return null;
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogOverlay ref={overlayRef} onClick={onClose}/>
-        <DialogContent ref={dialogRef} className="sm:max-w-lg" onInteractOutside={onClose}>
+        <DialogContent className="sm:max-w-lg" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>
               Category Breakdown for {format(currentMonth, 'MMMM yyyy')}

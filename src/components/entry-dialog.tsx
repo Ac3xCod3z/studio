@@ -8,7 +8,6 @@ import { z } from "zod";
 import { format } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { CalendarIcon, Trash2 } from "lucide-react";
-import { useDialogAnimation } from '@/hooks/use-dialog-animation';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +17,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogOverlay,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -68,8 +66,6 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
     resolver: zodResolver(formSchema),
   });
   
-  const { dialogRef, overlayRef, isRendered } = useDialogAnimation(isOpen, onClose);
-  
   const entryType = form.watch("type");
 
    React.useEffect(() => {
@@ -84,7 +80,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
         category: entry?.category,
       });
     }
-  }, [isOpen, selectedDate, entry, timezone, form.reset]);
+  }, [isOpen, selectedDate, entry, timezone, form.reset, form]);
 
 
   function onSubmit(values: z.infer<typeof formSchema>) {
@@ -112,14 +108,13 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
     }
   }
 
-  if (!isRendered) {
+  if (!isOpen) {
     return null;
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogOverlay ref={overlayRef} onClick={onClose} />
-        <DialogContent ref={dialogRef} className="sm:max-w-[425px]" onInteractOutside={onClose}>
+        <DialogContent className="sm:max-w-[425px]" onInteractOutside={(e) => e.preventDefault()}>
             <DialogHeader>
             <DialogTitle>{entry ? "Edit Entry" : "Add New Entry"}</DialogTitle>
             <DialogDescription>

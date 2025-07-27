@@ -11,13 +11,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogOverlay,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Entry } from "@/lib/types";
 import { cn, formatCurrency } from "@/lib/utils";
 import React from "react";
-import { useDialogAnimation } from "@/hooks/use-dialog-animation";
 
 type DayEntriesDialogProps = {
   isOpen: boolean;
@@ -37,8 +35,6 @@ export function DayEntriesDialog({
   onEditEntry
 }: DayEntriesDialogProps) {
   
-  const { dialogRef, overlayRef, isRendered } = useDialogAnimation(isOpen, onClose);
-
   const sortedEntries = React.useMemo(() => 
     [...entries].sort((a, b) => {
         if (a.type === 'income' && b.type === 'bill') return -1;
@@ -46,14 +42,13 @@ export function DayEntriesDialog({
         return a.name.localeCompare(b.name);
     }), [entries]);
 
-  if (!isRendered) {
+  if (!isOpen) {
     return null;
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogOverlay ref={overlayRef} onClick={onClose}/>
-        <DialogContent ref={dialogRef} className="sm:max-w-md" onInteractOutside={onClose}>
+        <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Entries for {format(date, "MMMM d, yyyy")}</DialogTitle>
             <DialogDescription>

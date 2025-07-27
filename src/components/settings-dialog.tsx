@@ -7,7 +7,6 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Sparkles, Loader2, Bell, BellOff, Share2, Check, Copy, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useDialogAnimation } from '@/hooks/use-dialog-animation';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +16,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogOverlay,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -85,8 +83,6 @@ export function SettingsDialog({
   const [shareLink, setShareLink] = useState('');
   const [hasCopied, setHasCopied] = useState(false);
   const { setTheme, theme } = useTheme();
-
-  const { dialogRef, overlayRef, isRendered } = useDialogAnimation(isOpen, onClose);
 
   useEffect(() => {
     if (isOpen) {
@@ -177,14 +173,13 @@ export function SettingsDialog({
     });
   };
 
-  if (!isRendered) {
+  if (!isOpen) {
     return null;
   }
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogOverlay ref={overlayRef} onClick={onClose} />
-        <DialogContent ref={dialogRef} className="sm:max-w-md grid-rows-[auto_minmax(0,1fr)_auto] p-0 max-h-[90vh]" onInteractOutside={onClose}>
+        <DialogContent className="sm:max-w-md grid-rows-[auto_minmax(0,1fr)_auto] p-0 max-h-[90vh]" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader className="p-6 pb-2">
             <DialogTitle>Settings</DialogTitle>
             <DialogDescription>
