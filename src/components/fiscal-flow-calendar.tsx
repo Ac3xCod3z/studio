@@ -2,7 +2,7 @@
 // src/components/fiscal-flow-calendar.tsx
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import {
   addMonths,
   subMonths,
@@ -78,6 +78,9 @@ export function FiscalFlowCalendar({
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   const [draggingEntryId, setDraggingEntryId] = useState<string | null>(null);
+  const [touchDraggingEntry, setTouchDraggingEntry] = useState<Entry | null>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
+
 
   const { daysWithEntries } = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth));
@@ -87,11 +90,11 @@ export function FiscalFlowCalendar({
     const daysMap = new Map<string, { day: Date; entries: Entry[] }>();
     
     daysInMonth.forEach(day => {
-        daysMap.set(format(day, 'yyyy-MM-dd'), { day, entries: [] });
+        const dayKey = format(day, 'yyyy-MM-dd');
+        daysMap.set(dayKey, { day, entries: [] });
     });
     
     generatedEntries.forEach(entry => {
-        // Use parseISO and toZonedTime to handle date strings correctly
         const entryDayStr = format(parseDateInTimezone(entry.date, timezone), 'yyyy-MM-dd');
         if (daysMap.has(entryDayStr)) {
             daysMap.get(entryDayStr)!.entries.push(entry);
@@ -110,7 +113,6 @@ export function FiscalFlowCalendar({
 }, [currentMonth, generatedEntries, timezone]);
   
   const getOriginalIdFromInstance = (instanceId: string) => {
-    // e.g. 'uuid-2024-08-15' -> 'uuid'
     const parts = instanceId.split('-');
     if (parts.length > 5) { // Assuming UUID is 5 parts
         return parts.slice(0, 5).join('-');
@@ -149,7 +151,6 @@ export function FiscalFlowCalendar({
   }
 
   const entryIsRecurringInstance = (entryId: string) => {
-      // e.g. 'uuid-2024-08-15'
       return entryId.match(/.*-\d{4}-\d{2}-\d{2}$/);
   }
 
@@ -184,13 +185,68 @@ export function FiscalFlowCalendar({
       setEntries(prevEntries => 
         prevEntries.map(entry => 
           entry.id === draggingEntryId 
-            ? { ...entry, date: format(targetDate, 'yyyy-M-dd'), recurrence: 'none' } // Dropping makes it non-recurring
+            ? { ...entry, date: format(targetDate, 'yyyy-MM-dd'), recurrence: 'none' } 
             : entry
         )
       );
     }
     setDraggingEntryId(null);
   };
+
+  // Touch handlers for mobile drag-and-drop
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>, entry: Entry) => {
+    if (isReadOnly || isSelectionMode || entryIsRecurringInstance(entry.id)) return;
+    setTouchDraggingEntry(entry);
+  };
+  
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!touchDraggingEntry || !calendarRef.current) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
+    
+    // Visually highlight the day cell being hovered over
+    if (targetElement) {
+        const dayCell = targetElement.closest('[data-day-cell]');
+        calendarRef.current.querySelectorAll('[data-day-cell]').forEach(cell => {
+            cell.classList.remove('bg-primary/20', 'ring-2', 'ring-primary');
+        });
+        if (dayCell) {
+            dayCell.classList.add('bg-primary/20', 'ring-2', 'ring-primary');
+        }
+    }
+  };
+  
+  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!touchDraggingEntry || !calendarRef.current) return;
+    
+    // Find the drop target
+    const touch = e.changedTouches[0];
+    const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
+    
+    if (targetElement) {
+        const dayCell = targetElement.closest('[data-day-cell]');
+        if (dayCell) {
+            const targetDateStr = dayCell.getAttribute('data-date');
+            if (targetDateStr) {
+                 setEntries(prevEntries => 
+                    prevEntries.map(entry => 
+                        entry.id === getOriginalIdFromInstance(touchDraggingEntry.id)
+                        ? { ...entry, date: targetDateStr, recurrence: 'none' }
+                        : entry
+                    )
+                );
+            }
+        }
+    }
+    
+    // Cleanup
+    calendarRef.current.querySelectorAll('[data-day-cell]').forEach(cell => {
+       cell.classList.remove('bg-primary/20', 'ring-2', 'ring-primary');
+    });
+    setTouchDraggingEntry(null);
+  };
+
 
   const Sidebar = () => (
     <SidebarContent 
@@ -201,7 +257,12 @@ export function FiscalFlowCalendar({
 
   return (
     <div className="flex flex-1 overflow-hidden">
-        <main className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-6">
+        <main 
+            ref={calendarRef}
+            className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-6"
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+        >
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl sm:text-2xl font-bold">{format(currentMonth, "MMMM yyyy")}</h1>
             <div className="flex items-center gap-1 sm:gap-2">
@@ -228,9 +289,12 @@ export function FiscalFlowCalendar({
           <div className="grid grid-cols-7 grid-rows-5 gap-1 mt-1">
             {daysWithEntries.map(({ day, entries: dayEntries }) => {
               const dayHasSelectedEntry = dayEntries.some(e => selectedIds.includes(getOriginalIdFromInstance(e.id)))
+              const dayStr = format(day, 'yyyy-MM-dd');
               return (
                 <div
-                  key={format(day, 'yyyy-MM-dd')}
+                  key={dayStr}
+                  data-day-cell
+                  data-date={dayStr}
                   className={cn(
                     "relative flex flex-col h-24 sm:h-32 rounded-lg p-1 sm:p-2 border transition-colors",
                     !isReadOnly && "cursor-pointer",
@@ -267,12 +331,13 @@ export function FiscalFlowCalendar({
                               key={entry.id}
                               onClick={(e) => { e.stopPropagation(); openEditEntryDialog(entry); }}
                               onDragStart={(e) => handleDragStart(e, entry)}
+                              onTouchStart={(e) => handleTouchStart(e, entry)}
                               draggable={!isReadOnly && !isSelectionMode && !entryIsRecurringInstance(entry.id)}
                               className={cn(
-                                  "p-1 rounded-md truncate flex items-center gap-2",
+                                  "p-1 rounded-md truncate flex items-center gap-2 touch-none",
                                   !entryIsRecurringInstance(entry.id) && !isReadOnly && !isSelectionMode && "cursor-grab active:cursor-grabbing",
                                   entry.type === 'bill' ? 'bg-destructive/80 text-destructive-foreground' : 'bg-emerald-500 text-white',
-                                  draggingEntryId === entry.id && 'opacity-50',
+                                  (draggingEntryId === entry.id || touchDraggingEntry?.id === entry.id) && 'opacity-50',
                                   isSelectionMode && selectedIds.includes(getOriginalIdFromInstance(entry.id)) && "opacity-60",
                               )}
                           >
@@ -336,5 +401,3 @@ export const SidebarContent = ({
       </div>
   </div>
 );
-
-    
