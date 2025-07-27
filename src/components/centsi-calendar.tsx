@@ -2,7 +2,7 @@
 // src/components/centsi-calendar.tsx
 "use client";
 
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   addMonths,
   subMonths,
@@ -18,6 +18,7 @@ import {
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Repeat, Trash2, TrendingUp, TrendingDown } from "lucide-react";
+import { gsap } from "gsap";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -399,21 +400,36 @@ export const SidebarContent = ({
 }: {
   weeklyTotals: any;
   selectedDate: Date;
-}) => (
-  <div className="flex flex-col gap-6 p-4 md:p-6">
-      <div className="space-y-4">
-          <h3 className="font-semibold text-lg">Week of {format(startOfWeek(selectedDate), "MMM d")}</h3>
-          <SummaryCard title="Starting Balance" amount={weeklyTotals.startOfWeekBalance} icon={<Repeat className="text-muted-foreground animate-spin"/>} description="From previous week" />
-          <SummaryCard title="Income" amount={weeklyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
-          <SummaryCard title="Bills Due" amount={weeklyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
-          <SummaryCard 
-            title="Weekly Status" 
-            amount={weeklyTotals.status} 
-            icon={weeklyTotals.status >= 0 ? <TrendingUp className="text-emerald-500" /> : <TrendingDown className="text-destructive" />}
-            variant={weeklyTotals.status >= 0 ? 'positive' : 'negative'}
-            description={weeklyTotals.status >= 0 ? 'Surplus for the week' : 'Deficit for the week'}
-          />
-          <SummaryCard title="End of Week Balance" amount={weeklyTotals.net} variant={weeklyTotals.net >= 0 ? 'positive' : 'negative'} />
-      </div>
-  </div>
-);
+}) => {
+  const iconRef = useRef(null);
+
+  useEffect(() => {
+    if (iconRef.current) {
+        gsap.to(iconRef.current, {
+            rotation: 360,
+            duration: 2,
+            ease: 'none',
+            repeat: -1,
+        });
+    }
+  }, []);
+
+  return (
+    <div className="flex flex-col gap-6 p-4 md:p-6">
+        <div className="space-y-4">
+            <h3 className="font-semibold text-lg">Week of {format(startOfWeek(selectedDate), "MMM d")}</h3>
+            <SummaryCard title="Starting Balance" amount={weeklyTotals.startOfWeekBalance} icon={<Repeat ref={iconRef} className="text-muted-foreground"/>} description="From previous week" />
+            <SummaryCard title="Income" amount={weeklyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
+            <SummaryCard title="Bills Due" amount={weeklyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
+            <SummaryCard 
+              title="Weekly Status" 
+              amount={weeklyTotals.status} 
+              icon={weeklyTotals.status >= 0 ? <TrendingUp className="text-emerald-500" /> : <TrendingDown className="text-destructive" />}
+              variant={weeklyTotals.status >= 0 ? 'positive' : 'negative'}
+              description={weeklyTotals.status >= 0 ? 'Surplus for the week' : 'Deficit for the week'}
+            />
+            <SummaryCard title="End of Week Balance" amount={weeklyTotals.net} variant={weeklyTotals.net >= 0 ? 'positive' : 'negative'} />
+        </div>
+    </div>
+  );
+};
