@@ -17,7 +17,7 @@ import {
   isSameDay,
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
-import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Repeat, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Repeat, Trash2, TrendingUp, TrendingDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -322,9 +322,16 @@ export const SidebarContent = ({
   <div className="flex flex-col gap-6 p-4 md:p-6">
       <div className="space-y-4">
           <h3 className="font-semibold text-lg">Week of {format(startOfWeek(selectedDate), "MMM d")}</h3>
-          <SummaryCard title="Starting Balance" amount={weeklyTotals.startOfWeekBalance} icon={<Repeat />} description="From previous week" />
+          <SummaryCard title="Starting Balance" amount={weeklyTotals.startOfWeekBalance} icon={<Repeat />} description="Rollover from previous week" />
           <SummaryCard title="Income" amount={weeklyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
           <SummaryCard title="Bills Due" amount={weeklyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
+          <SummaryCard 
+            title="Weekly Status" 
+            amount={weeklyTotals.status} 
+            icon={weeklyTotals.status >= 0 ? <TrendingUp className="text-emerald-500" /> : <TrendingDown className="text-destructive" />}
+            variant={weeklyTotals.status >= 0 ? 'positive' : 'negative'}
+            description={weeklyTotals.status >= 0 ? 'Surplus for the week' : 'Deficit for the week'}
+          />
           <SummaryCard title="Weekly Net" amount={weeklyTotals.net} variant={weeklyTotals.net >= 0 ? 'positive' : 'negative'} description="End of week balance" />
       </div>
   </div>

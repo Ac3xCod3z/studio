@@ -317,7 +317,7 @@ export default function FiscalFlowDashboard() {
       if (!allGeneratedEntries.length) {
         return {
           dayEntries: [],
-          weeklyTotals: { income: 0, bills: 0, net: 0, startOfWeekBalance: 0 }
+          weeklyTotals: { income: 0, bills: 0, net: 0, startOfWeekBalance: 0, status: 0 }
         };
       }
 
@@ -337,6 +337,7 @@ export default function FiscalFlowDashboard() {
 
       const weeklyIncome = weekEntries.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
       const weeklyBills = weekEntries.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
+      const weeklyStatus = weeklyIncome - weeklyBills;
 
       return {
         dayEntries,
@@ -345,6 +346,7 @@ export default function FiscalFlowDashboard() {
             bills: weeklyBills,
             net: endOfWeekBalance,
             startOfWeekBalance: startOfWeekBalance,
+            status: weeklyStatus,
         }
       }
   }, [selectedDate, allGeneratedEntries, timezone, weeklyBalances]);
