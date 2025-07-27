@@ -5,7 +5,8 @@ import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { Sparkles, Loader2, Bell, BellOff, Share2, Check, Copy } from "lucide-react";
+import { Sparkles, Loader2, Bell, BellOff, Share2, Check, Copy, Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -45,6 +46,7 @@ import { ScrollArea } from "./ui/scroll-area";
 import useLocalStorage from "@/hooks/use-local-storage";
 import { auth, googleProvider } from "@/lib/firebase";
 import { signInWithRedirect, type User } from "firebase/auth";
+import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
 
 const formSchema = z.object({
   incomeLevel: z.coerce.number().positive({ message: "Income must be a positive number." }),
@@ -80,6 +82,7 @@ export function SettingsDialog({
   const [entries] = useLocalStorage<Entry[]>("fiscalFlowEntries", []);
   const [shareLink, setShareLink] = useState('');
   const [hasCopied, setHasCopied] = useState(false);
+  const { setTheme, theme } = useTheme();
 
   useEffect(() => {
     if ("Notification" in window) {
@@ -181,6 +184,25 @@ export function SettingsDialog({
         
         <ScrollArea className="px-6">
           <div className="space-y-4 py-4">
+             <div className="space-y-2">
+                <h3 className="font-semibold">Appearance</h3>
+                 <Tabs value={theme} onValueChange={setTheme} className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="light">
+                            <Sun className="mr-2 h-4 w-4" />
+                            Light
+                        </TabsTrigger>
+                        <TabsTrigger value="dark">
+                            <Moon className="mr-2 h-4 w-4" />
+                            Dark
+                        </TabsTrigger>
+                        <TabsTrigger value="system">System</TabsTrigger>
+                    </TabsList>
+                </Tabs>
+            </div>
+
+            <Separator />
+            
              <div className="space-y-2">
                 <h3 className="font-semibold">Google Calendar</h3>
                 <p className="text-sm text-muted-foreground">
