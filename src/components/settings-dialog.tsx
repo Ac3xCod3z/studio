@@ -44,7 +44,7 @@ import { timezones } from "@/lib/timezones";
 import { ScrollArea } from "./ui/scroll-area";
 import useLocalStorage from "@/hooks/use-local-storage";
 import { auth, googleProvider } from "@/lib/firebase";
-import { signInWithPopup, signOut, type User } from "firebase/auth";
+import { signInWithRedirect, signOut, type User } from "firebase/auth";
 
 const formSchema = z.object({
   incomeLevel: z.coerce.number().positive({ message: "Income must be a positive number." }),
@@ -94,12 +94,10 @@ export function SettingsDialog({
 
   const handleGoogleSignIn = async () => {
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      setUser(result.user);
-      toast({ title: "Signed in successfully!" });
+      await signInWithRedirect(auth, googleProvider);
     } catch (error) {
       console.error("Google Sign-In Error:", error);
-      toast({ title: "Sign-in failed", description: "Could not sign in with Google. Ensure your domain is authorized in Firebase.", variant: "destructive" });
+      toast({ title: "Sign-in failed", description: "Could not sign in with Google.", variant: "destructive" });
     }
   };
 

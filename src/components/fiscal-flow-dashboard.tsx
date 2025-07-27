@@ -6,6 +6,7 @@ import useLocalStorage from "@/hooks/use-local-storage";
 import { useMedia } from "react-use";
 import { auth } from "@/lib/firebase";
 import type { User } from "firebase/auth";
+import { getRedirectResult } from "firebase/auth";
 
 import { EntryDialog } from "./entry-dialog";
 import { SettingsDialog } from "./settings-dialog";
@@ -117,6 +118,22 @@ export default function FiscalFlowDashboard() {
     const unsubscribe = auth.onAuthStateChanged(setUser);
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const handleRedirectResult = async () => {
+        try {
+            const result = await getRedirectResult(auth);
+            if (result) {
+                setUser(result.user);
+                toast({ title: "Signed in successfully!" });
+            }
+        } catch (error: any) {
+            console.error("Google Sign-In Redirect Error:", error);
+            toast({ title: "Sign-in failed", description: error.message, variant: "destructive" });
+        }
+    };
+    handleRedirectResult();
+  }, [toast]);
 
   const handleNotificationsToggle = (enabled: boolean) => {
     setNotificationsEnabled(enabled);
