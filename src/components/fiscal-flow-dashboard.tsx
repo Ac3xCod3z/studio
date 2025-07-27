@@ -6,14 +6,14 @@ import useLocalStorage from "@/hooks/use-local-storage";
 import { useMedia } from "react-use";
 import { auth } from "@/lib/firebase";
 import type { User } from "firebase/auth";
-import { getRedirectResult } from "firebase/auth";
+import { getRedirectResult, signOut } from "firebase/auth";
 
 import { EntryDialog } from "./entry-dialog";
 import { SettingsDialog } from "./settings-dialog";
 import { DayEntriesDialog } from "./day-entries-dialog";
 import { MonthlyBreakdownDialog } from "./monthly-breakdown-dialog";
 import { Logo } from "./icons";
-import { Settings, Menu, Plus, CalendarSync, Loader2 } from "lucide-react";
+import { Settings, Menu, Plus, CalendarSync, Loader2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
@@ -26,6 +26,14 @@ import { ScrollArea } from "./ui/scroll-area";
 import { scheduleNotifications, cancelAllNotifications } from "@/lib/notification-manager";
 import { useToast } from "@/hooks/use-toast";
 import { syncToGoogleCalendar } from "@/ai/flows/sync-to-google-calendar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
 
 const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry[] => {
     const instances: Entry[] = [];
@@ -113,30 +121,45 @@ export default function FiscalFlowDashboard() {
   const isMobile = useMedia("(max-width: 1024px)", false);
   const { toast } = useToast();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(setUser);
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+        setUser(user);
+        setIsAuthLoading(false);
+    });
     return () => unsubscribe();
   }, []);
-
+  
   useEffect(() => {
-    const handleRedirectResult = async () => {
-        try {
-            const result = await getRedirectResult(auth);
-            if (result) {
-                setUser(result.user);
-                toast({ title: "Signed in successfully!" });
-            }
-        } catch (error: any) {
-            console.error("Google Sign-In Redirect Error:", error);
-            toast({ title: "Sign-in failed", description: error.message, variant: "destructive" });
-        }
-    };
-    handleRedirectResult();
-  }, [toast]);
+      const handleRedirectResult = async () => {
+          try {
+              const result = await getRedirectResult(auth);
+              if (result) {
+                  setUser(result.user);
+                  toast({ title: "Signed in successfully!" });
+              }
+          } catch (error: any) {
+              console.error("Google Sign-In Redirect Error:", error);
+              toast({ title: "Sign-in failed", description: error.message, variant: "destructive" });
+          } finally {
+              setIsAuthLoading(false);
+          }
+      };
+      // Only run this if not loading from onAuthStateChanged
+      if(isAuthLoading) {
+        handleRedirectResult();
+      }
+  }, [toast, isAuthLoading]);
 
   const handleNotificationsToggle = (enabled: boolean) => {
     setNotificationsEnabled(enabled);
+  };
+  
+  const handleSignOut = async () => {
+    await signOut(auth);
+    setUser(null);
+    toast({ title: "Signed out." });
   };
 
   useEffect(() => {
@@ -330,7 +353,7 @@ export default function FiscalFlowDashboard() {
     }
   };
 
-  if (!isMounted) {
+  if (!isMounted || isAuthLoading) {
     return (
       <div className="flex h-screen w-full flex-col bg-background">
         <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
@@ -371,22 +394,40 @@ export default function FiscalFlowDashboard() {
             <span className="text-xl font-bold">FiscalFlow</span>
         </div>
         <div className="flex items-center gap-2">
-           {user && (
-             <Button onClick={handleSyncCalendar} size="sm" className="hidden md:flex" disabled={isSyncing}>
-                {isSyncing ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                    <CalendarSync className="mr-2 h-4 w-4" />
-                )}
-                Sync Calendar
-             </Button>
-           )}
           <Button onClick={() => openNewEntryDialog(new Date())} size="sm" className="hidden md:flex">
             <Plus className="-ml-1 mr-2 h-4 w-4" /> Add Entry
           </Button>
           <Button onClick={() => setSettingsDialogOpen(true)} variant="ghost" size="icon">
             <Settings className="h-5 w-5" />
           </Button>
+
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                  <Avatar>
+                    <AvatarImage src={user.photoURL || ''} alt={user.displayName || 'User'} />
+                    <AvatarFallback>{user.displayName?.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuItem onClick={handleSyncCalendar} disabled={isSyncing}>
+                  {isSyncing ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                      <CalendarSync className="mr-2 h-4 w-4" />
+                  )}
+                  <span>Sync Calendar</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSignOut}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           {isMobile && (
             <Sheet open={isMobileSheetOpen} onOpenChange={setMobileSheetOpen}>
               <SheetTrigger asChild>
@@ -404,18 +445,6 @@ export default function FiscalFlowDashboard() {
                     weeklyTotals={weeklyTotals}
                     selectedDate={selectedDate}
                   />
-                   {user && (
-                     <div className="p-4 md:p-6">
-                        <Button onClick={handleSyncCalendar} className="w-full" disabled={isSyncing}>
-                            {isSyncing ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                                <CalendarSync className="mr-2 h-4 w-4" />
-                            )}
-                            Sync Calendar
-                        </Button>
-                    </div>
-                    )}
                 </ScrollArea>
               </SheetContent>
             </Sheet>
