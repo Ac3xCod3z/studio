@@ -107,7 +107,14 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry
         return instances;
     }
 
-    return [];
+    // Handle non-recurring entries
+    if (entry.recurrence === 'none' || !entry.recurrence) {
+        const entryDate = parseISO(e.date);
+        if (entryDate >= start && entryDate <= end) {
+            instances.push(entry);
+        }
+    }
+    return instances;
 };
 
 
@@ -158,26 +165,28 @@ export default function FiscalFlowDashboard() {
 
 
   useEffect(() => {
+    // This effect should only run once on mount to handle the initial auth state.
     const processAuth = async () => {
-      setIsAuthLoading(true);
-      try {
-        const result = await getRedirectResult(auth);
-        if (result) {
-          setUser(result.user);
-          toast({ title: "Signed in successfully!" });
+        try {
+            const result = await getRedirectResult(auth);
+            if (result) {
+                // User has just signed in via redirect.
+                // The onAuthStateChanged listener below will handle setting the user.
+                toast({ title: "Signed in successfully!" });
+            }
+        } catch (error: any) {
+            console.error("Google Sign-In Redirect Error:", error);
+            toast({ title: "Sign-in failed", description: error.message, variant: "destructive" });
+        } finally {
+            // After processing the redirect, set up the state listener.
+            // This is the single source of truth for the user's auth state.
+            const unsubscribe = auth.onAuthStateChanged(currentUser => {
+                setUser(currentUser);
+                setIsAuthLoading(false); // Stop loading once we have the auth state.
+            });
+            // Cleanup the listener on unmount.
+            return () => unsubscribe();
         }
-      } catch (error: any) {
-        console.error("Google Sign-In Redirect Error:", error);
-        toast({ title: "Sign-in failed", description: error.message, variant: "destructive" });
-      } finally {
-        // This will run regardless of whether a redirect just happened.
-        // It ensures we have the most up-to-date user state.
-        const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-          setUser(currentUser);
-          setIsAuthLoading(false);
-        });
-        return () => unsubscribe();
-      }
     };
     processAuth();
   }, [toast]);
@@ -255,18 +264,7 @@ export default function FiscalFlowDashboard() {
     const viewEnd = endOfMonth(addMonths(new Date(), 12));
 
     return entries.flatMap((e) => {
-        const instances: Entry[] = [];
-        // Handle non-recurring entries
-        if (e.recurrence === 'none' || !e.recurrence) {
-            const entryDate = parseISO(e.date);
-            if (entryDate >= viewStart && entryDate <= viewEnd) {
-                instances.push(e);
-            }
-        } else {
-            // Handle recurring entries
-            instances.push(...generateRecurringInstances(e, viewStart, viewEnd));
-        }
-        return instances;
+        return generateRecurringInstances(e, viewStart, viewEnd);
     });
   }, [entries, isMounted]);
 
@@ -572,7 +570,7 @@ export default function FiscalFlowDashboard() {
         }}
         onEditEntry={(entry) => {
             setDayEntriesDialogOpen(false);
-            const originalEntryId = entry.id.split('-')[0];
+            const originalEntryId = getOriginalIdFromInstance(entry.id);
             const originalEntry = entries.find(e => e.id === originalEntryId) || entry;
             setEditingEntry(originalEntry);
             setEntryDialogOpen(true);
