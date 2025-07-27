@@ -60,7 +60,6 @@ type SettingsDialogProps = {
   onTimezoneChange: (timezone: string) => void;
   onNotificationsToggle: (enabled: boolean) => void;
   user: User | null;
-  setUser: (user: User | null) => void;
 };
 
 export function SettingsDialog({
@@ -72,7 +71,6 @@ export function SettingsDialog({
   onTimezoneChange,
   onNotificationsToggle,
   user,
-  setUser
 }: SettingsDialogProps) {
   const [recommendation, setRecommendation] = useState("");
   const [isLoading, setIsLoading] = useState(false);
