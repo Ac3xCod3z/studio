@@ -1,121 +1,110 @@
-import { toZonedTime } from 'date-fns-tz';
-import { Entry } from './types';
-import { formatCurrency } from './utils';
-import { add, getDay, isAfter, isBefore, set } from 'date-fns';
-import { recurrenceIntervalMonths } from './constants';
 
-const NOTIFICATION_TAG_PREFIX = 'centsi-bill-';
-const NOTIFICATION_WINDOW_DAYS = 90; // Schedule notifications for the next 90 days.
+"use client";
 
-async function getServiceWorkerRegistration() {
-  if (!('serviceWorker' in navigator)) {
-    return null;
-  }
-  return navigator.serviceWorker.ready;
+import React, { useState, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
+import { gsap } from 'gsap';
+import { MotionPathPlugin } from "gsap/MotionPathPlugin";
+import { Logo } from './icons';
+import { Skeleton } from './ui/skeleton';
+
+const FiscalFlowDashboard = dynamic(() => import('@/components/fiscal-flow-dashboard'), {
+  ssr: false,
+  loading: () => <DashboardSkeleton />,
+});
+
+function DashboardSkeleton() {
+  return (
+    <div className="flex h-screen w-full flex-col bg-background">
+      <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
+        <div className="flex items-center gap-2">
+          <Logo className="h-8 w-8 text-primary" />
+          <span className="text-xl font-bold">FiscalFlow</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-9 w-28 hidden md:flex" />
+          <Skeleton className="h-10 w-10" />
+          <Skeleton className="h-10 w-10 md:hidden" />
+        </div>
+      </header>
+      <div className="flex flex-1 overflow-hidden">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <Skeleton className="h-8 w-48 mb-4" />
+          <div className="grid grid-cols-7 gap-1">
+            {Array.from({ length: 35 }).map((_, i) => (
+              <Skeleton key={i} className="h-32 rounded-lg" />
+            ))}
+          </div>
+        </main>
+        <aside className="w-[350px] border-l overflow-y-auto p-6 hidden lg:block">
+          <Skeleton className="h-8 w-32 mb-6" />
+          <Skeleton className="h-24 w-full mb-4" />
+          <Skeleton className="h-24 w-full" />
+        </aside>
+      </div>
+    </div>
+  );
 }
 
-export async function cancelAllNotifications(toast: any) {
-  const registration = await getServiceWorkerRegistration();
-  if (!registration) return;
+export default function FiscalFlowLoader() {
+  const [animationComplete, setAnimationComplete] = useState(false);
+  const logoRef = useRef(null);
+  const nameRef = useRef(null);
+  const containerRef = useRef(null);
 
-  try {
-    const notifications = await registration.getNotifications({
-      tag: NOTIFICATION_TAG_PREFIX,
-      includeTriggered: true,
+  useEffect(() => {
+    // Ensure MotionPathPlugin is registered on the client
+    if (typeof window !== "undefined") {
+        gsap.registerPlugin(MotionPathPlugin);
+    }
+      
+    const tl = gsap.timeline({
+      onComplete: () => {
+        setAnimationComplete(true);
+      },
     });
-    notifications.forEach((notification) => notification.close());
-    if (notifications.length > 0) {
-       console.log(`${notifications.length} notifications cancelled.`);
-    }
-  } catch (e) {
-    console.error('Error cancelling notifications:', e);
-  }
-}
 
-function getNextBillOccurrences(entry: Entry, timezone: string): Date[] {
-  const occurrences: Date[] = [];
-  const now = new Date();
-  const scheduleUntil = add(now, { days: NOTIFICATION_WINDOW_DAYS });
+    // 1. Fade in logo and name
+    tl.fromTo([logoRef.current, nameRef.current], 
+        { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.8, ease: 'power2.out', stagger: 0.2 }
+    )
+    .add("swirl", "+=0.5") 
+    // 2. Animate name in a circular path into the logo
+    .to(nameRef.current, {
+        duration: 1.2,
+        opacity: 0,
+        scale: 0.1,
+        motionPath: {
+            path: [{x: 60, y: -30}, {x: 0, y: -60}, {x: -60, y: -30}, {x: 0, y: 0}],
+            curviness: 1.25,
+            autoRotate: false,
+        },
+        ease: 'power1.in',
+        transformOrigin: "center center",
+    }, "swirl")
+    .to(logoRef.current, 
+        { opacity: 0, scale: 0.8, duration: 0.5, ease: 'power2.in' },
+        "-=0.5" 
+    )
+    .to(containerRef.current, 
+        { opacity: 0, duration: 0.3, ease: 'power2.in' },
+        "-=0.3"
+    );
+  }, []);
 
-  const [year, month, day] = entry.date.split('-').map(Number);
-  const baseDate = toZonedTime(new Date(year, month - 1, day), timezone);
-
-  // Set the notification time to 8 AM for all occurrences
-  const notificationTime = { hours: 8, minutes: 0, seconds: 0, milliseconds: 0 };
-
-  if (entry.recurrence === 'none') {
-    const occurrence = set(baseDate, notificationTime);
-    if (isAfter(occurrence, now) && isBefore(occurrence, scheduleUntil)) {
-      occurrences.push(occurrence);
-    }
-  } else if (entry.recurrence === 'weekly') {
-    let nextOccurrence = set(baseDate, notificationTime);
-    
-    while(isBefore(nextOccurrence, now)){
-      nextOccurrence = add(nextOccurrence, { weeks: 1 });
-    }
-
-    while (isBefore(nextOccurrence, scheduleUntil)) {
-      occurrences.push(nextOccurrence);
-      nextOccurrence = add(nextOccurrence, { weeks: 1 });
-    }
-  } else {
-    const interval = recurrenceIntervalMonths[entry.recurrence as keyof typeof recurrenceIntervalMonths];
-    let nextOccurrence = set(baseDate, notificationTime);
-
-    while(isBefore(nextOccurrence, now)){
-      nextOccurrence = add(nextOccurrence, { months: interval });
-    }
-
-    while (isBefore(nextOccurrence, scheduleUntil)) {
-      occurrences.push(nextOccurrence);
-      nextOccurrence = add(nextOccurrence, { months: interval });
-    }
+  if (animationComplete) {
+    return <FiscalFlowDashboard />;
   }
 
-  return occurrences;
-}
-
-
-export async function scheduleNotifications(entries: Entry[], timezone: string, toast: any) {
-  const registration = await getServiceWorkerRegistration();
-  if (!registration || !('showNotification' in registration)) {
-    toast({
-      title: 'Notification Scheduling Error',
-      description: 'Could not access service worker for notifications.',
-      variant: 'destructive',
-    });
-    return;
-  }
-  
-  // First, cancel all previously scheduled notifications
-  await cancelAllNotifications(toast);
-
-  const billEntries = entries.filter((entry) => entry.type === 'bill');
-  let scheduledCount = 0;
-
-  for (const entry of billEntries) {
-    const occurrences = getNextBillOccurrences(entry, timezone);
-    
-    for (const occurrenceDate of occurrences) {
-      try {
-        await registration.showNotification('Bill Due Today', {
-          tag: `${NOTIFICATION_TAG_PREFIX}${entry.id}-${occurrenceDate.toISOString().split('T')[0]}`,
-          body: `${entry.name} (${formatCurrency(entry.amount)}) is due.`,
-          showTrigger: new (window as any).TimestampTrigger(occurrenceDate.getTime()),
-          icon: '/icon-192x192.png',
-          badge: '/icon-192x192.png',
-          silent: false,
-        });
-        scheduledCount++;
-      } catch (e) {
-        console.error('Error scheduling notification:', e);
-        // This can fail if the timestamp is in the past, which is expected for some logic.
-      }
-    }
-  }
-
-  if (scheduledCount > 0) {
-    console.log(`Successfully scheduled ${scheduledCount} bill notifications.`);
-  }
+  return (
+    <div ref={containerRef} className="flex h-screen w-full items-center justify-center bg-background flex-col gap-4 overflow-hidden">
+      <div ref={logoRef}>
+        <Logo className="h-20 w-20 text-primary" />
+      </div>
+      <div ref={nameRef}>
+        <h1 className="text-4xl font-bold tracking-tight">FiscalFlow</h1>
+      </div>
+    </div>
+  );
 }

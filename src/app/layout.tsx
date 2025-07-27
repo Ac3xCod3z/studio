@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { ThemeProvider } from '@/components/theme-provider';
 
 export const metadata: Metadata = {
-  title: 'Centsei',
+  title: 'FiscalFlow',
   description: 'Your personal finance sensei',
   manifest: '/manifest.json',
 };
