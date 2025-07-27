@@ -157,32 +157,37 @@ export default function FiscalFlowDashboard() {
 
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-        setUser(user);
-        setIsAuthLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
-  
-  useEffect(() => {
-      const handleRedirectResult = async () => {
-          try {
-              const result = await getRedirectResult(auth);
-              if (result) {
-                  setUser(result.user);
-                  toast({ title: "Signed in successfully!" });
-              }
-          } catch (error: any) {
-              console.error("Google Sign-In Redirect Error:", error);
-              toast({ title: "Sign-in failed", description: error.message, variant: "destructive" });
-          } finally {
-              setIsAuthLoading(false);
-          }
-      };
-      if(isAuthLoading) {
-        handleRedirectResult();
-      }
+    const processAuth = async () => {
+        try {
+            const result = await getRedirectResult(auth);
+            if (result) {
+                // User just signed in via redirect.
+                setUser(result.user);
+                toast({ title: "Signed in successfully!" });
+            }
+            // This is to handle the case where user is already signed in
+            // and just visiting the page, getRedirectResult will be null.
+            else if (auth.currentUser) {
+                setUser(auth.currentUser);
+            }
+        } catch (error: any) {
+            console.error("Google Sign-In Error:", error);
+            toast({ title: "Sign-in failed", description: error.message, variant: "destructive" });
+        } finally {
+            setIsAuthLoading(false);
+        }
+
+        const unsubscribe = auth.onAuthStateChanged((user) => {
+            setUser(user);
+            if(isAuthLoading) setIsAuthLoading(false);
+        });
+        
+        return () => unsubscribe();
+    };
+
+    processAuth();
   }, [toast, isAuthLoading]);
+  
 
   const handleNotificationsToggle = (enabled: boolean) => {
     setNotificationsEnabled(enabled);
