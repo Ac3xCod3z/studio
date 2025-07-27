@@ -73,12 +73,34 @@ export function FiscalFlowCalendar({
 
   const [draggingEntryId, setDraggingEntryId] = useState<string | null>(null);
 
-  const { daysInMonth } = useMemo(() => {
+  const { daysWithEntries } = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth));
     const end = endOfWeek(endOfMonth(currentMonth));
-    const days = eachDayOfInterval({ start, end });
-    return { daysInMonth: days };
-  }, [currentMonth]);
+    const daysInMonth = eachDayOfInterval({ start, end });
+    
+    const daysMap = new Map<string, { day: Date; entries: Entry[] }>();
+    
+    daysInMonth.forEach(day => {
+        daysMap.set(format(day, 'yyyy-MM-dd'), { day, entries: [] });
+    });
+    
+    generatedEntries.forEach(entry => {
+        const entryDayStr = format(parseDateInTimezone(entry.date, timezone), 'yyyy-MM-dd');
+        if (daysMap.has(entryDayStr)) {
+            daysMap.get(entryDayStr)!.entries.push(entry);
+        }
+    });
+
+    daysMap.forEach(dayData => {
+        dayData.entries.sort((a, b) => {
+            if (a.type === 'income' && b.type === 'bill') return -1;
+            if (a.type === 'bill' && b.type === 'income') return 1;
+            return a.name.localeCompare(b.name);
+        });
+    });
+
+    return { daysWithEntries: Array.from(daysMap.values()) };
+}, [currentMonth, generatedEntries, timezone]);
   
 
   const handleDayClick = (day: Date) => {
@@ -188,18 +210,7 @@ export function FiscalFlowCalendar({
             {WEEKDAYS.map((day) => (<div key={day}>{day}</div>))}
           </div>
           <div className="grid grid-cols-7 grid-rows-5 gap-1 mt-1">
-            {daysInMonth.map((day) => {
-              const dayEntries = generatedEntries
-                .filter((e) => {
-                    const entryDate = parseDateInTimezone(e.date, timezone);
-                    return isSameDay(entryDate, day);
-                })
-                .sort((a, b) => {
-                    if (a.type === 'income' && b.type === 'bill') return -1;
-                    if (a.type === 'bill' && b.type === 'income') return 1;
-                    return 0;
-                });
-
+            {daysWithEntries.map(({ day, entries: dayEntries }) => {
               return (
                 <div
                   key={format(day, 'yyyy-MM-dd')}
