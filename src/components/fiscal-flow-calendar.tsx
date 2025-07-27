@@ -267,15 +267,15 @@ export function FiscalFlowCalendar({
   )
 
   return (
-    <div className="flex flex-1 overflow-hidden">
+    <div className="flex flex-1 overflow-hidden bg-background">
         <main 
             ref={calendarRef}
             className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-6"
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
         >
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-xl sm:text-2xl font-bold">{format(currentMonth, "MMMM yyyy")}</h1>
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{format(currentMonth, "MMMM yyyy")}</h1>
             <div className="flex items-center gap-1 sm:gap-2">
               <Button variant="outline" onClick={toggleSelectionMode}>
                 {isSelectionMode ? 'Cancel' : 'Select'}
@@ -294,10 +294,10 @@ export function FiscalFlowCalendar({
               </Button>
             </div>
           </div>
-          <div className="grid grid-cols-7 gap-1 text-center font-semibold text-muted-foreground text-xs sm:text-sm">
-            {WEEKDAYS.map((day) => (<div key={day}>{day}</div>))}
+          <div className="grid grid-cols-7 gap-2 text-center font-semibold text-muted-foreground text-xs sm:text-sm">
+            {WEEKDAYS.map((day) => (<div key={day} className="py-2">{day}</div>))}
           </div>
-          <div className="grid grid-cols-7 grid-rows-5 gap-1 mt-1">
+          <div className="grid grid-cols-7 grid-rows-5 gap-1.5 md:gap-2">
             {daysWithEntries.map(({ day, entries: dayEntries }) => {
               const dayHasSelectedEntry = dayEntries.some(e => selectedIds.includes(getOriginalIdFromInstance(e.id)))
               const dayStr = format(day, 'yyyy-MM-dd');
@@ -307,12 +307,12 @@ export function FiscalFlowCalendar({
                   data-day-cell
                   data-date={dayStr}
                   className={cn(
-                    "relative flex flex-col h-24 sm:h-32 rounded-lg p-1 sm:p-2 border transition-colors",
+                    "relative flex flex-col h-28 sm:h-36 rounded-xl p-2 border transition-all duration-300 ease-in-out transform",
                     !isReadOnly && "cursor-pointer",
                     !isSameMonth(day, currentMonth) ? "bg-muted/50 text-muted-foreground" : "bg-card",
-                    !isReadOnly && isSameMonth(day, currentMonth) && !isSelectionMode && "hover:bg-card/80",
-                    isToday(day) && "border-primary",
-                    isSameDay(day, selectedDate) && !isSelectionMode && "ring-2 ring-primary",
+                    !isReadOnly && isSameMonth(day, currentMonth) && !isSelectionMode && "hover:bg-accent hover:shadow-md hover:-translate-y-1",
+                    isToday(day) && "border-primary/50",
+                    isSameDay(day, selectedDate) && !isSelectionMode && "ring-2 ring-primary ring-offset-2 ring-offset-background",
                     isSelectionMode && "hover:bg-primary/10",
                     isSelectionMode && dayHasSelectedEntry && "ring-2 ring-primary bg-primary/20",
 
@@ -321,10 +321,10 @@ export function FiscalFlowCalendar({
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, day)}
                 >
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-xs sm:text-base">{format(day, "d")}</span>
+                  <div className="flex justify-between items-start">
+                    <span className={cn("font-bold text-xs sm:text-base", isToday(day) && "text-primary")}>{format(day, "d")}</span>
                     {!isReadOnly && !isSelectionMode && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); openNewEntryDialog(day); }}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); openNewEntryDialog(day); }}>
                             <Plus className="h-4 w-4" />
                         </Button>
                     )}
@@ -335,8 +335,8 @@ export function FiscalFlowCalendar({
                         />
                     )}
                   </div>
-                  <ScrollArea className="flex-1 mt-1">
-                    <div className="space-y-1 text-[10px] sm:text-xs">
+                  <ScrollArea className="flex-1 mt-1 -mx-2 px-2">
+                    <div className="space-y-1.5 text-xs sm:text-sm">
                       {dayEntries.map(entry => (
                           <div 
                               key={entry.id}
@@ -345,15 +345,19 @@ export function FiscalFlowCalendar({
                               onTouchStart={(e) => handleTouchStart(e, entry)}
                               draggable={!isReadOnly && !isSelectionMode && !entryIsRecurringInstance(entry.id)}
                               className={cn(
-                                  "p-1 rounded-md truncate flex items-center gap-2",
+                                  "px-2 py-1 rounded-full text-left flex items-center gap-2 transition-all duration-200",
                                   isMobile && 'touch-none',
-                                  !entryIsRecurringInstance(entry.id) && !isReadOnly && !isSelectionMode && "cursor-grab active:cursor-grabbing",
-                                  entry.type === 'bill' ? 'bg-destructive/80 text-destructive-foreground' : 'bg-emerald-500 text-white',
-                                  (draggingEntryId === entry.id || touchDraggingEntry?.id === entry.id) && 'opacity-50',
+                                  !entryIsRecurringInstance(entry.id) && !isReadOnly && !isSelectionMode && "cursor-grab active:cursor-grabbing hover:shadow-lg",
+                                  (draggingEntryId === entry.id || touchDraggingEntry?.id === entry.id) && 'opacity-50 scale-105 shadow-xl',
                                   isSelectionMode && selectedIds.includes(getOriginalIdFromInstance(entry.id)) && "opacity-60",
+                                  "bg-secondary/50 hover:bg-secondary",
                               )}
                           >
-                            <span className="flex-1 truncate"><span className="hidden sm:inline">{entry.name}: </span>{formatCurrency(entry.amount)}</span>
+                            <div className={cn("p-1.5 rounded-full", entry.type === 'bill' ? 'bg-destructive/20 text-destructive' : 'bg-emerald-500/20 text-emerald-500')}>
+                               {entry.type === 'bill' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />}
+                            </div>
+                            <span className="flex-1 truncate font-medium">{entry.name}</span>
+                            <span className="font-semibold">{formatCurrency(entry.amount)}</span>
                           </div>
                       ))}
                     </div>
@@ -364,7 +368,7 @@ export function FiscalFlowCalendar({
           </div>
         </main>
         {!isMobile && (
-          <aside className="w-[350px] border-l overflow-y-auto hidden lg:block">
+          <aside className="w-[350px] border-l bg-secondary/30 overflow-y-auto hidden lg:block">
             <Sidebar />
           </aside>
         )}
@@ -374,9 +378,9 @@ export function FiscalFlowCalendar({
 
 
 function SummaryCard({ title, amount, icon, description, variant = 'default', className }: { title: string, amount: number, icon?: React.ReactNode, description?: string, variant?: 'default' | 'positive' | 'negative', className?: string }) {
-    const amountColor = variant === 'positive' ? 'text-emerald-600 dark:text-emerald-400' : variant === 'negative' ? 'text-destructive' : '';
+    const amountColor = variant === 'positive' ? 'text-emerald-500' : variant === 'negative' ? 'text-destructive' : '';
     return (
-        <Card className={cn(className)}>
+        <Card className={cn("bg-background/50 backdrop-blur-sm", className)}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{title}</CardTitle>
                 {icon}
@@ -399,7 +403,7 @@ export const SidebarContent = ({
   <div className="flex flex-col gap-6 p-4 md:p-6">
       <div className="space-y-4">
           <h3 className="font-semibold text-lg">Week of {format(startOfWeek(selectedDate), "MMM d")}</h3>
-          <SummaryCard title="Starting Balance" amount={weeklyTotals.startOfWeekBalance} icon={<Repeat />} description="Rollover from previous week" />
+          <SummaryCard title="Starting Balance" amount={weeklyTotals.startOfWeekBalance} icon={<Repeat className="text-muted-foreground"/>} description="From previous week" />
           <SummaryCard title="Income" amount={weeklyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
           <SummaryCard title="Bills Due" amount={weeklyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
           <SummaryCard 
@@ -409,7 +413,7 @@ export const SidebarContent = ({
             variant={weeklyTotals.status >= 0 ? 'positive' : 'negative'}
             description={weeklyTotals.status >= 0 ? 'Surplus for the week' : 'Deficit for the week'}
           />
-          <SummaryCard title="Weekly Net" amount={weeklyTotals.net} variant={weeklyTotals.net >= 0 ? 'positive' : 'negative'} description="End of week balance" />
+          <SummaryCard title="End of Week Balance" amount={weeklyTotals.net} variant={weeklyTotals.net >= 0 ? 'positive' : 'negative'} />
       </div>
   </div>
 );

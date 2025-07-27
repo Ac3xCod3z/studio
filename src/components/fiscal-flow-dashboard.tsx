@@ -496,8 +496,8 @@ export default function FiscalFlowDashboard() {
               <SheetTrigger asChild>
                   <Button variant="ghost" size="icon"><Menu /></Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[300px] sm:w-[400px] p-0 flex flex-col">
-                 <SheetHeader className="p-4 md:p-6 border-b shrink-0">
+              <SheetContent side="right" className="w-[300px] sm:w-[400px] p-0 flex flex-col bg-secondary/30">
+                 <SheetHeader className="p-4 md:p-6 border-b shrink-0 bg-background">
                     <SheetTitle>Summary</SheetTitle>
                     <SheetDescription>
                         Weekly summary for {format(selectedDate, "MMM d, yyyy")}.
@@ -508,7 +508,7 @@ export default function FiscalFlowDashboard() {
                     weeklyTotals={weeklyTotals}
                     selectedDate={selectedDate}
                   />
-                   <div className="p-4 flex flex-col gap-2">
+                   <div className="p-4 flex flex-col gap-2 border-t">
                      <Button onClick={() => { setSummaryDialogOpen(true); setMobileSheetOpen(false); }} variant="outline" className="w-full">
                         <BarChartBig className="mr-2 h-4 w-4" /> Monthly Summary
                     </Button>
