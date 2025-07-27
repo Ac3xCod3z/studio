@@ -1,10 +1,11 @@
+
 import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 import { ThemeProvider } from '@/components/theme-provider';
 
 export const metadata: Metadata = {
-  title: 'FiscalFlow',
+  title: 'Centsei',
   description: 'Your personal finance sensei',
   manifest: '/manifest.json',
 };
