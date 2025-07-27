@@ -403,7 +403,7 @@ export const SidebarContent = ({
   <div className="flex flex-col gap-6 p-4 md:p-6">
       <div className="space-y-4">
           <h3 className="font-semibold text-lg">Week of {format(startOfWeek(selectedDate), "MMM d")}</h3>
-          <SummaryCard title="Starting Balance" amount={weeklyTotals.startOfWeekBalance} icon={<Repeat className="text-muted-foreground"/>} description="From previous week" />
+          <SummaryCard title="Starting Balance" amount={weeklyTotals.startOfWeekBalance} icon={<Repeat className="text-muted-foreground animate-spin"/>} description="From previous week" />
           <SummaryCard title="Income" amount={weeklyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
           <SummaryCard title="Bills Due" amount={weeklyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
           <SummaryCard 
