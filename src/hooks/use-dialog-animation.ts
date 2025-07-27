@@ -24,10 +24,10 @@ export function useDialogAnimation(isOpen: boolean, onAfterClose?: () => void) {
     if (isOpen) {
       // Entrance Animation
       gsap.timeline()
-        .set([dialogRef.current, overlayRef.current], { display: 'grid', immediateRender: false })
+        .set([dialogRef.current, overlayRef.current], { display: 'grid' })
         .to(overlayRef.current, { opacity: 1, duration: 0.3, ease: 'power2.inOut' })
         .fromTo(dialogRef.current, 
-          { scale: 0.95, opacity: 0, y: 20 },
+          { scale: 0.9, opacity: 0, y: 30 },
           { scale: 1, opacity: 1, y: 0, duration: 0.4, ease: 'back.out(1.7)' }, 
           "-=0.2"
         );
