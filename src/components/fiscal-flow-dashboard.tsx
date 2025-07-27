@@ -337,15 +337,11 @@ export default function FiscalFlowDashboard() {
       const initialWeeklyNet = weeklyIncome - weeklyBills;
       
       const prevMonthKey = format(subMonths(weekStart, 1), 'yyyy-MM');
-      // Only apply rollover if the week is starting in a new month (i.e. not the same month as the previous day)
-      // Or if the start of the week IS the start of the month
-      const startOfWeekLeftover = (rollover === 'carryover' && !isSameMonth(weekStart, subMonths(weekStart, 0))) || getDate(weekStart) === 1 
-        ? monthlyLeftovers[prevMonthKey] || 0
-        : 0;
-
+      const monthLeftover = (rollover === 'carryover' ? monthlyLeftovers[prevMonthKey] : 0) || 0;
+      
       let rolloverApplied = 0;
-      if (initialWeeklyNet < 0 && startOfWeekLeftover > 0) {
-          rolloverApplied = Math.min(Math.abs(initialWeeklyNet), startOfWeekLeftover);
+      if (initialWeeklyNet < 0 && monthLeftover > 0) {
+          rolloverApplied = Math.min(Math.abs(initialWeeklyNet), monthLeftover);
       }
       
       const finalWeeklyNet = initialWeeklyNet + rolloverApplied;

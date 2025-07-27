@@ -115,15 +115,12 @@ const calculateMobileSummary = (
     const weeklyBills = weekEntries.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
     const initialWeeklyNet = weeklyIncome - weeklyBills;
     
-    // Determine the relevant previous month for rollover based on the week's start date
     const prevMonthKey = format(subMonths(weekStart, 1), 'yyyy-MM');
-    const startOfWeekLeftover = (rollover === 'carryover' && !isSameMonth(weekStart, subMonths(weekStart, 0))) || getDate(weekStart) === 1
-        ? monthlyLeftovers[prevMonthKey] || 0
-        : 0;
-
+    const monthLeftover = (rollover === 'carryover' ? monthlyLeftovers[prevMonthKey] : 0) || 0;
+    
     let rolloverApplied = 0;
-    if (initialWeeklyNet < 0 && startOfWeekLeftover > 0) {
-        rolloverApplied = Math.min(Math.abs(initialWeeklyNet), startOfWeekLeftover);
+    if (initialWeeklyNet < 0 && monthLeftover > 0) {
+        rolloverApplied = Math.min(Math.abs(initialWeeklyNet), monthLeftover);
     }
     
     const finalWeeklyNet = initialWeeklyNet + rolloverApplied;
