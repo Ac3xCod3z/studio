@@ -159,35 +159,28 @@ export default function FiscalFlowDashboard() {
 
   useEffect(() => {
     const processAuth = async () => {
-        try {
-            const result = await getRedirectResult(auth);
-            if (result) {
-                // User just signed in via redirect.
-                setUser(result.user);
-                toast({ title: "Signed in successfully!" });
-            }
-            // This is to handle the case where user is already signed in
-            // and just visiting the page, getRedirectResult will be null.
-            else if (auth.currentUser) {
-                setUser(auth.currentUser);
-            }
-        } catch (error: any) {
-            console.error("Google Sign-In Error:", error);
-            toast({ title: "Sign-in failed", description: error.message, variant: "destructive" });
-        } finally {
-            setIsAuthLoading(false);
+      setIsAuthLoading(true);
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          setUser(result.user);
+          toast({ title: "Signed in successfully!" });
         }
-
-        const unsubscribe = auth.onAuthStateChanged((user) => {
-            setUser(user);
-            if(isAuthLoading) setIsAuthLoading(false);
+      } catch (error: any) {
+        console.error("Google Sign-In Redirect Error:", error);
+        toast({ title: "Sign-in failed", description: error.message, variant: "destructive" });
+      } finally {
+        // This will run regardless of whether a redirect just happened.
+        // It ensures we have the most up-to-date user state.
+        const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+          setUser(currentUser);
+          setIsAuthLoading(false);
         });
-        
         return () => unsubscribe();
+      }
     };
-
     processAuth();
-  }, [toast, isAuthLoading]);
+  }, [toast]);
   
 
   const handleNotificationsToggle = (enabled: boolean) => {
@@ -632,3 +625,5 @@ export default function FiscalFlowDashboard() {
     </div>
   );
 }
+
+    
