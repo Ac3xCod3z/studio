@@ -39,9 +39,8 @@ export function useDialogAnimation(isOpen: boolean, onAfterClose?: () => void) {
             if (onAfterClose) onAfterClose();
           }
         })
-        .to(dialogRef.current, { scale: 1.05, opacity: 0, duration: 0.2, ease: 'power1.in' })
-        .to(overlayRef.current, { opacity: 0, duration: 0.2, ease: 'power1.out' }, "-=0.1")
-        .set([dialogRef.current, overlayRef.current], { display: 'none' });
+        .to(dialogRef.current, { scale: 0, opacity: 0, duration: 0.3, ease: 'power2.in' })
+        .to(overlayRef.current, { opacity: 0, duration: 0.3, ease: 'power2.out' }, "<");
     }
   }, [isOpen, isRendered, onAfterClose]);
 
