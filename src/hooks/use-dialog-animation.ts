@@ -1,3 +1,4 @@
+
 // src/hooks/use-dialog-animation.ts
 "use client";
 
@@ -16,20 +17,20 @@ export function useDialogAnimation(isOpen: boolean, onAfterClose?: () => void) {
   }, [isOpen]);
   
   useEffect(() => {
-    // Wait until the component is rendered and refs are attached
     if (!isRendered || !dialogRef.current || !overlayRef.current) {
-        return;
+      return;
     }
 
     if (isOpen) {
       // Entrance Animation - "Blow Up"
       gsap.timeline()
-        .set([dialogRef.current, overlayRef.current], { display: 'grid' })
-        .to(overlayRef.current, { opacity: 1, duration: 0.2, ease: 'power2.inOut' })
+        .set(overlayRef.current, { display: 'block' })
+        .set(dialogRef.current, { display: 'grid' })
+        .to(overlayRef.current, { opacity: 1, duration: 0.3, ease: 'power2.inOut' })
         .fromTo(dialogRef.current, 
           { scale: 0, opacity: 0 },
-          { scale: 1, opacity: 1, duration: 0.4, ease: 'back.out(1.7)' }, 
-          "-=0.1"
+          { scale: 1, opacity: 1, duration: 0.5, ease: 'back.out(1.7)' }, 
+          "<"
         );
     } else {
       // Exit Animation - "Blow Out"

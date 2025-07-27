@@ -18,7 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogOverlay,
-  DialogPortal,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -184,7 +183,6 @@ export function SettingsDialog({
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogPortal>
         <DialogOverlay ref={overlayRef} onClick={onClose} />
         <DialogContent ref={dialogRef} className="sm:max-w-md grid-rows-[auto_minmax(0,1fr)_auto] p-0 max-h-[90vh]" onInteractOutside={onClose}>
           <DialogHeader className="p-6 pb-2">
@@ -365,7 +363,6 @@ export function SettingsDialog({
             </Button>
           </DialogFooter>
         </DialogContent>
-      </DialogPortal>
     </Dialog>
   );
 }

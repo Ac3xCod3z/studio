@@ -9,7 +9,6 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogPortal,
   DialogOverlay
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -113,7 +112,6 @@ export function MonthlyBreakdownDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogPortal>
         <DialogOverlay ref={overlayRef} onClick={onClose}/>
         <DialogContent ref={dialogRef} className="sm:max-w-lg" onInteractOutside={onClose}>
           <DialogHeader>
@@ -210,7 +208,6 @@ export function MonthlyBreakdownDialog({
             </Button>
           </DialogFooter>
         </DialogContent>
-      </DialogPortal>
     </Dialog>
   );
 }

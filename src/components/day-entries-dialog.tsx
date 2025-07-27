@@ -12,7 +12,6 @@ import {
   DialogTitle,
   DialogFooter,
   DialogOverlay,
-  DialogPortal,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Entry } from "@/lib/types";
@@ -53,7 +52,6 @@ export function DayEntriesDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogPortal>
         <DialogOverlay ref={overlayRef} onClick={onClose}/>
         <DialogContent ref={dialogRef} className="sm:max-w-md" onInteractOutside={onClose}>
           <DialogHeader>
@@ -110,7 +108,6 @@ export function DayEntriesDialog({
             </Button>
           </DialogFooter>
         </DialogContent>
-      </DialogPortal>
     </Dialog>
   );
 }
