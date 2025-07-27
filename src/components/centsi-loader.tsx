@@ -53,8 +53,11 @@ export default function CentsiLoader() {
 
   useEffect(() => {
     // Ensure MotionPathPlugin is registered on the client
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && (window as any).MotionPathPlugin) {
         gsap.registerPlugin((window as any).MotionPathPlugin);
+    } else {
+        // Handle case where plugin might not be loaded, maybe from a script tag
+        // For this setup, it's bundled, but this is a safe fallback.
     }
       
     const tl = gsap.timeline({
@@ -68,7 +71,6 @@ export default function CentsiLoader() {
         { opacity: 0, y: 20 },
         { opacity: 1, y: 0, duration: 0.8, ease: 'power2.out', stagger: 0.2 }
     )
-    // Add a label for the start of the swirl, with a slight delay
     .add("swirl", "+=0.5") 
     // 2. Animate name in a circular path into the logo
     .to(nameRef.current, {
@@ -83,12 +85,10 @@ export default function CentsiLoader() {
         ease: 'power1.in',
         transformOrigin: "center center",
     }, "swirl")
-    // 3. Scale and fade out the logo after the text is gone
     .to(logoRef.current, 
         { opacity: 0, scale: 0.8, duration: 0.5, ease: 'power2.in' },
         "-=0.5" 
     )
-    // 4. Fade out the entire container to transition smoothly
     .to(containerRef.current, 
         { opacity: 0, duration: 0.3, ease: 'power2.in' },
         "-=0.3"
