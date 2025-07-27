@@ -109,7 +109,7 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry
 
     // Handle non-recurring entries
     if (entry.recurrence === 'none' || !entry.recurrence) {
-        const entryDate = parseISO(e.date);
+        const entryDate = parseISO(entry.date);
         if (entryDate >= start && entryDate <= end) {
             instances.push(entry);
         }
@@ -167,11 +167,13 @@ export default function FiscalFlowDashboard() {
   useEffect(() => {
     // This effect should only run once on mount to handle the initial auth state.
     const processAuth = async () => {
+        setIsAuthLoading(true);
         try {
             const result = await getRedirectResult(auth);
             if (result) {
                 // User has just signed in via redirect.
                 // The onAuthStateChanged listener below will handle setting the user.
+                setUser(result.user);
                 toast({ title: "Signed in successfully!" });
             }
         } catch (error: any) {
@@ -181,7 +183,9 @@ export default function FiscalFlowDashboard() {
             // After processing the redirect, set up the state listener.
             // This is the single source of truth for the user's auth state.
             const unsubscribe = auth.onAuthStateChanged(currentUser => {
-                setUser(currentUser);
+                if(!user) { // Prevent re-setting user if already set by redirect
+                    setUser(currentUser);
+                }
                 setIsAuthLoading(false); // Stop loading once we have the auth state.
             });
             // Cleanup the listener on unmount.
@@ -189,7 +193,7 @@ export default function FiscalFlowDashboard() {
         }
     };
     processAuth();
-  }, [toast]);
+  }, [toast, user]);
   
 
   const handleNotificationsToggle = (enabled: boolean) => {
@@ -623,5 +627,6 @@ export default function FiscalFlowDashboard() {
     </div>
   );
 }
+    
 
     
