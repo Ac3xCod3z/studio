@@ -186,7 +186,7 @@ export default function ViewOnlyCalendar() {
 
   const weeklyTotals = useMemo(() => {
     if (!data) {
-      return { income: 0, bills: 0, net: 0, startOfWeekBalance: 0 };
+      return { income: 0, bills: 0, net: 0, startOfWeekBalance: 0, status: 0 };
     }
     const { timezone } = data;
     const weekStart = startOfWeek(selectedDate);
@@ -209,6 +209,7 @@ export default function ViewOnlyCalendar() {
         bills: weeklyBills,
         net: endOfWeekBalance,
         startOfWeekBalance: startOfWeekBalance,
+        status: weeklyIncome - weeklyBills,
     };
   }, [data, allGeneratedEntries, selectedDate, weeklyBalances]);
 
@@ -235,7 +236,7 @@ export default function ViewOnlyCalendar() {
       <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
         <div className="flex items-center gap-2">
           <Logo className="h-8 w-8 text-primary" />
-          <span className="text-xl font-bold">Centsi (View Only)</span>
+          <span className="text-xl font-bold">Centsei (View Only)</span>
         </div>
         {isMobile && (
           <Sheet open={isMobileSheetOpen} onOpenChange={setMobileSheetOpen}>

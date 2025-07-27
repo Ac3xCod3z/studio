@@ -307,7 +307,7 @@ export function CentsiCalendar({
                   data-day-cell
                   data-date={dayStr}
                   className={cn(
-                    "relative flex flex-col h-28 sm:h-36 rounded-xl p-2 border transition-all duration-300 ease-in-out transform",
+                    "relative flex flex-col h-28 sm:h-36 rounded-xl p-2 border transition-all duration-300 ease-in-out transform group",
                     !isReadOnly && "cursor-pointer",
                     !isSameMonth(day, currentMonth) ? "bg-muted/50 text-muted-foreground" : "bg-card",
                     !isReadOnly && isSameMonth(day, currentMonth) && !isSelectionMode && "hover:bg-accent hover:shadow-md hover:-translate-y-1",
@@ -324,7 +324,7 @@ export function CentsiCalendar({
                   <div className="flex justify-between items-start">
                     <span className={cn("font-bold text-xs sm:text-base", isToday(day) && "text-primary")}>{format(day, "d")}</span>
                     {!isReadOnly && !isSelectionMode && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); openNewEntryDialog(day); }}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-foreground/50 hover:text-foreground" onClick={(e) => { e.stopPropagation(); openNewEntryDialog(day); }}>
                             <Plus className="h-4 w-4" />
                         </Button>
                     )}
