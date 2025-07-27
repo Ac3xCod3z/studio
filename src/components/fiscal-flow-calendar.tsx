@@ -175,7 +175,15 @@ export function FiscalFlowCalendar({
   
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     if (isReadOnly || isSelectionMode) return;
-    e.preventDefault(); 
+    e.preventDefault();
+    const target = e.currentTarget as HTMLDivElement;
+    if (!target.classList.contains('ring-2')) {
+        // Debounce or check before adding class
+        calendarRef.current?.querySelectorAll('[data-day-cell]').forEach(cell => {
+            cell.classList.remove('ring-2', 'ring-primary');
+        });
+        target.classList.add('ring-2', 'ring-primary');
+    }
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetDate: Date) => {
@@ -191,6 +199,9 @@ export function FiscalFlowCalendar({
       );
     }
     setDraggingEntryId(null);
+     calendarRef.current?.querySelectorAll('[data-day-cell]').forEach(cell => {
+       cell.classList.remove('ring-2', 'ring-primary');
+    });
   };
 
   // Touch handlers for mobile drag-and-drop
@@ -334,7 +345,8 @@ export function FiscalFlowCalendar({
                               onTouchStart={(e) => handleTouchStart(e, entry)}
                               draggable={!isReadOnly && !isSelectionMode && !entryIsRecurringInstance(entry.id)}
                               className={cn(
-                                  "p-1 rounded-md truncate flex items-center gap-2 touch-none",
+                                  "p-1 rounded-md truncate flex items-center gap-2",
+                                  isMobile && 'touch-none',
                                   !entryIsRecurringInstance(entry.id) && !isReadOnly && !isSelectionMode && "cursor-grab active:cursor-grabbing",
                                   entry.type === 'bill' ? 'bg-destructive/80 text-destructive-foreground' : 'bg-emerald-500 text-white',
                                   (draggingEntryId === entry.id || touchDraggingEntry?.id === entry.id) && 'opacity-50',
