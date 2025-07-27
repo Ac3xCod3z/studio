@@ -15,7 +15,7 @@ import { DayEntriesDialog } from "./day-entries-dialog";
 import { MonthlyBreakdownDialog } from "./monthly-breakdown-dialog";
 import { MonthlySummaryDialog } from "./monthly-summary-dialog";
 import { Logo } from "./icons";
-import { Settings, Menu, Plus, CalendarSync, Loader2, LogOut, Trash2, BarChartBig, PieChart } from "lucide-react";
+import { Settings, Menu, Plus, CalendarSync, Loader2, LogOut, Trash2, BarChartBig, PieChart, Repeat } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
@@ -446,7 +446,7 @@ export default function FiscalFlowDashboard() {
         </div>
         <div className="flex items-center gap-2">
           {!isSelectionMode && (
-            <Button onClick={() => openNewEntryDialog(new Date())} size="sm" className="hidden md:flex">
+            <Button onClick={() => openNewEntryDialog(new Date())} size="sm" className="hidden md:flex btn-primary-hover">
               <Plus className="-ml-1 mr-2 h-4 w-4" /> Add Entry
             </Button>
           )}

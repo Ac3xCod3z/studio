@@ -215,7 +215,7 @@ export function SettingsDialog({
                       {user ? `Connected as ${user.displayName}. Sync and sign out via the user menu in the header.` : "Connect your account to sync your financial entries."}
                   </p>
                   {!user && (
-                      <Button onClick={handleGoogleSignIn} className="w-full">
+                      <Button onClick={handleGoogleSignIn} className="w-full btn-primary-hover">
                           Connect Google Calendar
                       </Button>
                   )}
@@ -226,13 +226,13 @@ export function SettingsDialog({
               <div className="space-y-2">
                   <h3 className="font-semibold">Share Calendar</h3>
                   <p className="text-sm text-muted-foreground">Generate a read-only link to share your calendar with others.</p>
-                  <Button onClick={handleGenerateShareLink} className="w-full">
+                  <Button onClick={handleGenerateShareLink} className="w-full btn-primary-hover">
                       <Share2 className="mr-2 h-4 w-4" /> Generate Share Link
                   </Button>
                   {shareLink && (
                       <div className="p-2 border rounded-md bg-muted">
                           <p className="text-sm text-muted-foreground break-all mb-2">{shareLink}</p>
-                          <Button onClick={handleCopyToClipboard} size="sm" className="w-full">
+                          <Button onClick={handleCopyToClipboard} size="sm" className="w-full btn-primary-hover">
                               {hasCopied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
                               {hasCopied ? 'Copied!' : 'Copy Link'}
                           </Button>
@@ -247,7 +247,7 @@ export function SettingsDialog({
                   <p className="text-sm text-muted-foreground">Get reminders for your upcoming bills, delivered right to your device.</p>
                   <Button 
                       onClick={handleNotificationToggle} 
-                      className="w-full"
+                      className="w-full btn-primary-hover"
                       variant={notificationsEnabled && notificationStatus === 'granted' ? 'secondary' : 'default'}
                       disabled={notificationStatus === 'denied'}
                   >
@@ -335,7 +335,7 @@ export function SettingsDialog({
                               </FormItem>
                           )}
                       />
-                      <Button type="submit" disabled={isLoading} className="w-full">
+                      <Button type="submit" disabled={isLoading} className="w-full btn-primary-hover">
                           {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                           Get Recommendation
                       </Button>
