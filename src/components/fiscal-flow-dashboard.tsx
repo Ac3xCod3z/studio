@@ -12,8 +12,9 @@ import { EntryDialog } from "./entry-dialog";
 import { SettingsDialog } from "./settings-dialog";
 import { DayEntriesDialog } from "./day-entries-dialog";
 import { MonthlyBreakdownDialog } from "./monthly-breakdown-dialog";
+import { MonthlySummaryDialog } from "./monthly-summary-dialog";
 import { Logo } from "./icons";
-import { Settings, Menu, Plus, CalendarSync, Loader2, LogOut, Trash2, BarChartBig } from "lucide-react";
+import { Settings, Menu, Plus, CalendarSync, Loader2, LogOut, Trash2, BarChartBig, PieChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
@@ -29,8 +30,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Entry, RolloverPreference, WeeklyBalances } from "@/lib/types";
 import { FiscalFlowCalendar, SidebarContent } from "./fiscal-flow-calendar";
-import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths, parseISO, differenceInCalendarMonths, isAfter, eachWeekOfInterval, getWeek } from "date-fns";
-import { toZonedTime } from "date-fns-tz";
+import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths, parseISO, differenceInCalendarMonths, isAfter, eachWeekOfInterval, getWeek, lastDayOfMonth } from "date-fns";
+import { toZonedTime } from 'date-fns-tz';
 import { recurrenceIntervalMonths } from "@/lib/constants";
 import { ScrollArea } from "./ui/scroll-area";
 import { scheduleNotifications, cancelAllNotifications } from "@/lib/notification-manager";
@@ -127,6 +128,7 @@ export default function FiscalFlowDashboard() {
   const [isMobileSheetOpen, setMobileSheetOpen] = useState(false);
   const [isDayEntriesDialogOpen, setDayEntriesDialogOpen] = useState(false);
   const [isBreakdownDialogOpen, setBreakdownDialogOpen] = useState(false);
+  const [isSummaryDialogOpen, setSummaryDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -313,11 +315,12 @@ export default function FiscalFlowDashboard() {
   }, [isMounted, allGeneratedEntries, timezone, rollover, setWeeklyBalances, weeklyBalances]);
 
 
-  const { dayEntries, weeklyTotals} = useMemo(() => {
+  const { dayEntries, weeklyTotals, monthlySummary} = useMemo(() => {
       if (!allGeneratedEntries.length) {
         return {
           dayEntries: [],
-          weeklyTotals: { income: 0, bills: 0, net: 0, startOfWeekBalance: 0, status: 0 }
+          weeklyTotals: { income: 0, bills: 0, net: 0, startOfWeekBalance: 0, status: 0 },
+          monthlySummary: { income: 0, bills: 0, net: 0, startOfMonthBalance: 0, endOfMonthBalance: 0 }
         };
       }
 
@@ -339,6 +342,21 @@ export default function FiscalFlowDashboard() {
       const weeklyBills = weekEntries.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
       const weeklyStatus = weeklyIncome - weeklyBills;
 
+      // Monthly Summary Calculation
+      const monthStart = startOfMonth(selectedDate);
+      const monthEnd = endOfMonth(selectedDate);
+      
+      const monthEntries = allGeneratedEntries.filter(e => isSameMonth(parseDateInTimezone(e.date, timezone), selectedDate));
+      const monthlyIncome = monthEntries.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0);
+      const monthlyBills = monthEntries.filter(e => e.type === 'bill').reduce((s, e) => s + e.amount, 0);
+
+      const firstWeekOfMonthKey = format(startOfWeek(monthStart), 'yyyy-MM-dd');
+      const startOfMonthBalance = weeklyBalances[firstWeekOfMonthKey]?.start || 0;
+      
+      const lastWeekOfMonthKey = format(startOfWeek(monthEnd), 'yyyy-MM-dd');
+      const endOfMonthBalance = weeklyBalances[lastWeekOfMonthKey]?.end || 0;
+
+
       return {
         dayEntries,
         weeklyTotals: {
@@ -347,6 +365,13 @@ export default function FiscalFlowDashboard() {
             net: endOfWeekBalance,
             startOfWeekBalance: startOfWeekBalance,
             status: weeklyStatus,
+        },
+        monthlySummary: {
+            income: monthlyIncome,
+            bills: monthlyBills,
+            net: monthlyIncome - monthlyBills,
+            startOfMonthBalance: startOfMonthBalance,
+            endOfMonthBalance: endOfMonthBalance,
         }
       }
   }, [selectedDate, allGeneratedEntries, timezone, weeklyBalances]);
@@ -424,8 +449,11 @@ export default function FiscalFlowDashboard() {
               <Plus className="-ml-1 mr-2 h-4 w-4" /> Add Entry
             </Button>
           )}
-           <Button onClick={() => setBreakdownDialogOpen(true)} variant="outline" size="sm" className="hidden md:flex">
-              <BarChartBig className="mr-2 h-4 w-4" /> Monthly
+           <Button onClick={() => setSummaryDialogOpen(true)} variant="outline" size="sm" className="hidden md:flex">
+              <BarChartBig className="mr-2 h-4 w-4" /> Monthly Summary
+            </Button>
+            <Button onClick={() => setBreakdownDialogOpen(true)} variant="outline" size="sm" className="hidden md:flex">
+              <PieChart className="mr-2 h-4 w-4" /> Category Breakdown
             </Button>
            {isSelectionMode && selectedIds.length > 0 && (
              <Button variant="destructive" size="sm" onClick={() => setBulkDeleteAlertOpen(true)}>
@@ -480,9 +508,12 @@ export default function FiscalFlowDashboard() {
                     weeklyTotals={weeklyTotals}
                     selectedDate={selectedDate}
                   />
-                   <div className="p-4">
+                   <div className="p-4 flex flex-col gap-2">
+                     <Button onClick={() => { setSummaryDialogOpen(true); setMobileSheetOpen(false); }} variant="outline" className="w-full">
+                        <BarChartBig className="mr-2 h-4 w-4" /> Monthly Summary
+                    </Button>
                      <Button onClick={() => { setBreakdownDialogOpen(true); setMobileSheetOpen(false); }} variant="outline" className="w-full">
-                        <BarChartBig className="mr-2 h-4 w-4" /> Monthly Breakdown
+                        <PieChart className="mr-2 h-4 w-4" /> Category Breakdown
                     </Button>
                   </div>
                 </ScrollArea>
@@ -547,6 +578,14 @@ export default function FiscalFlowDashboard() {
         currentMonth={selectedDate}
         timezone={timezone}
       />
+      
+       <MonthlySummaryDialog
+        isOpen={isSummaryDialogOpen}
+        onClose={() => setSummaryDialogOpen(false)}
+        summary={monthlySummary}
+        currentMonth={selectedDate}
+      />
+
 
       <SettingsDialog 
         isOpen={isSettingsDialogOpen}

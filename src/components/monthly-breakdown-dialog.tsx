@@ -66,6 +66,7 @@ export function MonthlyBreakdownDialog({
 }: MonthlyBreakdownDialogProps) {
   const breakdownData = useMemo(() => {
     const monthlyBills = entries.filter(entry => {
+        if (!entry.date) return false;
         const entryDate = toZonedTime(entry.date, timezone);
         return entry.type === 'bill' && isSameMonth(entryDate, currentMonth);
     });
@@ -106,7 +107,7 @@ export function MonthlyBreakdownDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
-            Monthly Bill Breakdown for {format(currentMonth, 'MMMM yyyy')}
+            Category Breakdown for {format(currentMonth, 'MMMM yyyy')}
           </DialogTitle>
           <DialogDescription>
             A summary of your expenses by category. Click a category to see details.
@@ -187,7 +188,7 @@ export function MonthlyBreakdownDialog({
                 )}
             </Accordion>
              <div className="border-t mt-4 pt-4 flex justify-between items-center text-lg font-bold">
-                <span>Total</span>
+                <span>Total Expenses</span>
                 <span>{formatCurrency(breakdownData.total)}</span>
              </div>
           </div>
