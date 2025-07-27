@@ -16,11 +16,15 @@ export function useDialogAnimation(isOpen: boolean, onAfterClose?: () => void) {
   }, [isOpen]);
   
   useEffect(() => {
-    if (!isRendered) return;
+    // Wait until the component is rendered and refs are attached
+    if (!isRendered || !dialogRef.current || !overlayRef.current) {
+        return;
+    }
 
     if (isOpen) {
+      // Entrance Animation
       gsap.timeline()
-        .set([dialogRef.current, overlayRef.current], { display: 'grid' })
+        .set([dialogRef.current, overlayRef.current], { display: 'grid', immediateRender: false })
         .to(overlayRef.current, { opacity: 1, duration: 0.3, ease: 'power2.inOut' })
         .fromTo(dialogRef.current, 
           { scale: 0.95, opacity: 0, y: 20 },
@@ -28,6 +32,7 @@ export function useDialogAnimation(isOpen: boolean, onAfterClose?: () => void) {
           "-=0.2"
         );
     } else {
+      // Exit Animation
       gsap.timeline({
           onComplete: () => {
             setIsRendered(false);
