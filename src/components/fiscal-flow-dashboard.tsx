@@ -240,40 +240,51 @@ export default function FiscalFlowDashboard() {
 
   useEffect(() => {
     if (allGeneratedEntries.length === 0) {
+      if (Object.keys(monthlyLeftovers).length > 0) {
         setMonthlyLeftovers({});
-        return;
+      }
+      return;
     }
-    const oldestEntry = allGeneratedEntries.reduce((oldest, entry) => {
-        const entryDate = parseISO(entry.date);
-        return entryDate < oldest ? entryDate : oldest;
+
+    const oldestEntryDate = allGeneratedEntries.reduce((oldest, entry) => {
+      const entryDate = parseISO(entry.date);
+      return entryDate < oldest ? entryDate : oldest;
     }, new Date());
 
-    const start = startOfMonth(oldestEntry);
-    const end = new Date(); 
-    
+    const start = startOfMonth(oldestEntryDate);
+    const end = new Date();
+
     const newLeftovers: MonthlyLeftovers = {};
     let current = start;
     let lastMonthLeftover = 0;
 
-    while(isBefore(current, end)) {
-        const monthKey = format(current, 'yyyy-MM');
-        
-        const entriesForMonth = allGeneratedEntries.filter(e => isSameMonth(parseDateInTimezone(e.date, timezone), current));
-        const income = entriesForMonth.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
-        const bills = entriesForMonth.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
-        
-        const endOfMonthBalance = income + (rollover === 'carryover' ? lastMonthLeftover : 0) - bills;
+    while (isBefore(current, end) || isSameMonth(current, end)) {
+      const monthKey = format(current, 'yyyy-MM');
 
-        newLeftovers[monthKey] = endOfMonthBalance;
-        lastMonthLeftover = endOfMonthBalance;
-        
-        current = addMonths(current, 1);
+      const entriesForMonth = allGeneratedEntries.filter(e =>
+        isSameMonth(parseDateInTimezone(e.date, timezone), current)
+      );
+      const income = entriesForMonth
+        .filter(e => e.type === 'income')
+        .reduce((sum, e) => sum + e.amount, 0);
+      const bills = entriesForMonth
+        .filter(e => e.type === 'bill')
+        .reduce((sum, e) => sum + e.amount, 0);
+
+      const endOfMonthBalance =
+        income + (rollover === 'carryover' ? lastMonthLeftover : 0) - bills;
+
+      newLeftovers[monthKey] = endOfMonthBalance;
+      lastMonthLeftover = endOfMonthBalance;
+
+      current = addMonths(current, 1);
     }
-    
+
+    // Deep comparison to prevent infinite loops
     if (JSON.stringify(newLeftovers) !== JSON.stringify(monthlyLeftovers)) {
-        setMonthlyLeftovers(newLeftovers);
+      setMonthlyLeftovers(newLeftovers);
     }
-  }, [allGeneratedEntries, rollover, timezone, setMonthlyLeftovers, monthlyLeftovers]);
+  }, [allGeneratedEntries, rollover, timezone, monthlyLeftovers, setMonthlyLeftovers]);
 
 
   const { dayEntries, weeklyTotals} = useMemo(() => {
@@ -333,11 +344,11 @@ export default function FiscalFlowDashboard() {
     }
     setIsSyncing(true);
     try {
-        const accessToken = await user.getIdToken(true);
+        const idToken = await user.getIdToken();
         const result = await syncToGoogleCalendar({
             entries: allGeneratedEntries.filter(e => isSameMonth(parseDateInTimezone(e.date, timezone), selectedDate)),
             timezone,
-            accessToken,
+            accessToken: idToken,
         });
 
         toast({

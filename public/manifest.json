@@ -1,10 +1,7 @@
 {
   "name": "FiscalFlow",
   "short_name": "FiscalFlow",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#4299e1",
+  "description": "Your personal finance tracker",
   "icons": [
     {
       "src": "/icon-192x192.png",
@@ -16,5 +13,9 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ]
+  ],
+  "theme_color": "#38A3A5",
+  "background_color": "#E0E5D9",
+  "start_url": "/",
+  "display": "standalone"
 }
