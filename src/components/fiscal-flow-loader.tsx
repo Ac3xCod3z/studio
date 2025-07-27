@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -76,7 +77,7 @@ export default function FiscalFlowLoader() {
         opacity: 0,
         scale: 0.1,
         motionPath: {
-            path: [{x: 60, y: -30}, {x: 0, y: -60}, {x: -60, y: -30}, {x: 0, y: 0}],
+            path: [{x: 0, y: 0}, {x: 60, y: -30}, {x: 0, y: -60}, {x: -60, y: -30}, {x: 0, y: 0}],
             curviness: 1.25,
             autoRotate: false,
         },

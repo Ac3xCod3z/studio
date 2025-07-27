@@ -16,7 +16,7 @@ import {
   isSameDay,
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
-import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Trash2, TrendingUp, TrendingDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Trash2, TrendingUp, TrendingDown, Repeat } from "lucide-react";
 import { gsap } from "gsap";
 import { MotionPathPlugin } from "gsap/MotionPathPlugin";
 
@@ -399,51 +399,6 @@ function SummaryCard({ title, amount, icon, description, variant = 'default', cl
     );
 }
 
-const ChasingArrowsIcon = () => {
-    const svgRef = useRef<SVGSVGElement>(null);
-
-    useEffect(() => {
-        if (svgRef.current) {
-            const tl = gsap.timeline({ repeat: -1 });
-            tl.to("#arrow1", {
-                motionPath: {
-                    path: "#track",
-                    align: "#track",
-                    alignOrigin: [0.5, 0.5],
-                    autoRotate: true,
-                },
-                duration: 2,
-                ease: "linear",
-            }, 0);
-            tl.to("#arrow2", {
-                motionPath: {
-                    path: "#track",
-                    align: "#track",
-                    alignOrigin: [0.5, 0.5],
-                    autoRotate: true,
-                },
-                duration: 2,
-                ease: "linear",
-            }, 1); // Start the second arrow halfway through the first one's animation
-        }
-    }, []);
-
-    return (
-        <svg ref={svgRef} className="h-6 w-6 text-muted-foreground" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-            {/* The invisible track for the arrows to follow */}
-            <path id="track" d="M 50,10 A 40,20 0 1,1 50,90 A 40,20 0 1,1 50,10" stroke="none" fill="none" />
-            
-            {/* The visible track */}
-            <path d="M 50,10 A 40,20 0 1,1 50,90 A 40,20 0 1,1 50,10" stroke="currentColor" strokeWidth="8" strokeLinecap="round" />
-
-            {/* The arrows to be animated */}
-            <path id="arrow1" d="M -5,-5 L 5,0 L -5,5 z" fill="currentColor" />
-            <path id="arrow2" d="M -5,-5 L 5,0 L -5,5 z" fill="currentColor" />
-        </svg>
-    );
-};
-
-
 export const SidebarContent = ({
   weeklyTotals,
   selectedDate,
@@ -455,7 +410,7 @@ export const SidebarContent = ({
     <div className="flex flex-col gap-6 p-4 md:p-6">
         <div className="space-y-4">
             <h3 className="font-semibold text-lg">Week of {format(startOfWeek(selectedDate), "MMM d")}</h3>
-            <SummaryCard title="Starting Balance" amount={weeklyTotals.startOfWeekBalance} icon={<ChasingArrowsIcon />} description="From previous week" />
+            <SummaryCard title="Starting Balance" amount={weeklyTotals.startOfWeekBalance} icon={<Repeat className="h-4 w-4 text-muted-foreground" />} description="From previous week" />
             <SummaryCard title="Income" amount={weeklyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
             <SummaryCard title="Bills Due" amount={weeklyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
             <SummaryCard 

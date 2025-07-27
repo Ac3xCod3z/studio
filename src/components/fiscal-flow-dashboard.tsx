@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
@@ -29,7 +30,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { Entry, RolloverPreference, WeeklyBalances } from "@/lib/types";
-import { FiscalFlowCalendar, SidebarContent } from "./fiscal-flow-calendar";
+import { CentsiCalendar, SidebarContent } from "./centsi-calendar";
 import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths, parseISO, differenceInCalendarMonths, isAfter, eachWeekOfInterval, getWeek, lastDayOfMonth } from "date-fns";
 import { toZonedTime } from 'date-fns-tz';
 import { recurrenceIntervalMonths } from "@/lib/constants";
@@ -523,7 +524,7 @@ export default function FiscalFlowDashboard() {
         </div>
       </header>
       
-      <FiscalFlowCalendar 
+      <CentsiCalendar 
         entries={entries}
         setEntries={setEntries}
         generatedEntries={allGeneratedEntries}
@@ -617,5 +618,3 @@ export default function FiscalFlowDashboard() {
     </div>
   );
 }
-
-    
