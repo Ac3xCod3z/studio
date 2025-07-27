@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -78,8 +79,8 @@ export function SettingsDialog({
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const [notificationStatus, setNotificationStatus] = useState("default");
-  const [notificationsEnabled, setNotificationsEnabled] = useLocalStorage('centsiNotificationsEnabled', false);
-  const [entries] = useLocalStorage<Entry[]>("centsiEntries", []);
+  const [notificationsEnabled, setNotificationsEnabled] = useLocalStorage('fiscalFlowNotificationsEnabled', false);
+  const [entries] = useLocalStorage<Entry[]>("fiscalFlowEntries", []);
   const [shareLink, setShareLink] = useState('');
   const [hasCopied, setHasCopied] = useState(false);
   const { setTheme, theme } = useTheme();
