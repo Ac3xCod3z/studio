@@ -1,4 +1,3 @@
-
 // src/components/centsi-calendar.tsx
 "use client";
 
@@ -402,32 +401,29 @@ function SummaryCard({ title, amount, icon, description, variant = 'default', cl
 
 const ChasingArrowsIcon = () => {
     const svgRef = useRef<SVGSVGElement>(null);
-    const arrow1Ref = useRef<SVGPathElement>(null);
-    const arrow2Ref = useRef<SVGPathElement>(null);
 
     useEffect(() => {
-        if (svgRef.current && arrow1Ref.current && arrow2Ref.current) {
+        if (svgRef.current) {
             const tl = gsap.timeline({ repeat: -1, defaults: { ease: "linear" } });
-            const path = "#track";
-
-            tl.to(arrow1Ref.current, {
+            
+            tl.to("#arrow1", {
+                duration: 2,
                 motionPath: {
-                    path: path,
-                    align: path,
+                    path: "#track",
+                    align: "#track",
                     alignOrigin: [0.5, 0.5],
                     autoRotate: true,
-                },
-                duration: 2,
+                }
             }, 0);
             
-            tl.to(arrow2Ref.current, {
+            tl.to("#arrow2", {
+                duration: 2,
                 motionPath: {
-                    path: path,
-                    align: path,
+                    path: "#track",
+                    align: "#track",
                     alignOrigin: [0.5, 0.5],
                     autoRotate: true,
-                },
-                duration: 2,
+                }
             }, 1);
         }
     }, []);
@@ -435,8 +431,8 @@ const ChasingArrowsIcon = () => {
     return (
         <svg ref={svgRef} className="h-6 w-6 text-muted-foreground" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path id="track" d="M 50,10 A 40,20 0 1,1 50,90 A 40,20 0 1,1 50,10" stroke="currentColor" strokeWidth="8" strokeLinecap="round" fill="none" />
-            <path ref={arrow1Ref} d="M -5,-5 L 5,0 L -5,5 z" fill="currentColor" />
-            <path ref={arrow2Ref} d="M -5,-5 L 5,0 L -5,5 z" fill="currentColor" />
+            <path id="arrow1" d="M -5,-5 L 5,0 L -5,5 z" fill="currentColor" />
+            <path id="arrow2" d="M -5,-5 L 5,0 L -5,5 z" fill="currentColor" />
         </svg>
     );
 };
