@@ -13,7 +13,7 @@ import { SettingsDialog } from "./settings-dialog";
 import { DayEntriesDialog } from "./day-entries-dialog";
 import { MonthlyBreakdownDialog } from "./monthly-breakdown-dialog";
 import { Logo } from "./icons";
-import { Settings, Menu, Plus, CalendarSync, Loader2, LogOut, Trash2 } from "lucide-react";
+import { Settings, Menu, Plus, CalendarSync, Loader2, LogOut, Trash2, BarChartBig } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
@@ -278,6 +278,7 @@ export default function FiscalFlowDashboard() {
         const firstDate = parseISO(sortedEntries[0].date);
         const lastDate = parseISO(sortedEntries[sortedEntries.length - 1].date);
         
+        // Ensure the interval covers full weeks
         const weeks = eachWeekOfInterval({ start: firstDate, end: lastDate });
         let lastWeekBalance = 0;
 
@@ -293,8 +294,13 @@ export default function FiscalFlowDashboard() {
             const income = entriesForWeek.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
             const bills = entriesForWeek.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
             
-            const endOfWeekBalance = lastWeekBalance + income - bills;
-            newWeeklyBalances[weekKey] = { start: lastWeekBalance, end: endOfWeekBalance };
+            let currentWeekStartBalance = lastWeekBalance;
+            if (rollover === 'reset' && getDay(weekStart) === startOfWeek(new Date()).getDay() && weekStart.getDate() <= 7) {
+                // Logic for monthly reset if needed, currently not fully implemented
+            }
+
+            const endOfWeekBalance = currentWeekStartBalance + income - bills;
+            newWeeklyBalances[weekKey] = { start: currentWeekStartBalance, end: endOfWeekBalance };
             lastWeekBalance = endOfWeekBalance;
         });
     }
@@ -304,7 +310,7 @@ export default function FiscalFlowDashboard() {
         setWeeklyBalances(newWeeklyBalances);
     }
 
-  }, [isMounted, allGeneratedEntries, timezone, setWeeklyBalances, weeklyBalances]);
+  }, [isMounted, allGeneratedEntries, timezone, rollover, setWeeklyBalances, weeklyBalances]);
 
 
   const { dayEntries, weeklyTotals} = useMemo(() => {
@@ -416,9 +422,9 @@ export default function FiscalFlowDashboard() {
               <Plus className="-ml-1 mr-2 h-4 w-4" /> Add Entry
             </Button>
           )}
-           <Button onClick={toggleSelectionMode} variant="ghost">
-             {isSelectionMode ? 'Cancel' : 'Select'}
-           </Button>
+           <Button onClick={() => setBreakdownDialogOpen(true)} variant="outline" size="sm" className="hidden md:flex">
+              <BarChartBig className="mr-2 h-4 w-4" /> Monthly
+            </Button>
            {isSelectionMode && selectedIds.length > 0 && (
              <Button variant="destructive" size="sm" onClick={() => setBulkDeleteAlertOpen(true)}>
                <Trash2 className="mr-2 h-4 w-4" /> Delete ({selectedIds.length})
@@ -472,6 +478,11 @@ export default function FiscalFlowDashboard() {
                     weeklyTotals={weeklyTotals}
                     selectedDate={selectedDate}
                   />
+                   <div className="p-4">
+                     <Button onClick={() => { setBreakdownDialogOpen(true); setMobileSheetOpen(false); }} variant="outline" className="w-full">
+                        <BarChartBig className="mr-2 h-4 w-4" /> Monthly Breakdown
+                    </Button>
+                  </div>
                 </ScrollArea>
               </SheetContent>
             </Sheet>
@@ -565,3 +576,5 @@ export default function FiscalFlowDashboard() {
     </div>
   );
 }
+
+    

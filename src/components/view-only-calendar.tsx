@@ -7,12 +7,12 @@ import { useMedia } from "react-use";
 
 import { Logo } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Entry, RolloverPreference, MonthlyLeftovers } from "@/lib/types";
+import type { Entry, RolloverPreference, WeeklyBalances } from "@/lib/types";
 import { FiscalFlowCalendar, SidebarContent } from "@/components/fiscal-flow-calendar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
-import { format, subMonths, startOfMonth, endOfMonth, isBefore, getDay, add, setDate, getDate, startOfWeek, endOfWeek, isSameDay, addMonths, parseISO, isSameMonth, differenceInCalendarMonths, isAfter } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, isBefore, getDay, add, setDate, getDate, startOfWeek, endOfWeek, isSameDay, addMonths, parseISO, isSameMonth, differenceInCalendarMonths, isAfter, eachWeekOfInterval } from "date-fns";
 import { toZonedTime } from 'date-fns-tz';
 import { recurrenceIntervalMonths } from "@/lib/constants";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -91,50 +91,6 @@ const parseDateInTimezone = (dateString: string, timeZone: string) => {
 };
 
 
-// This is a simplified version of the dashboard's data calculation logic
-// for the mobile summary sheet.
-const calculateMobileSummary = (
-    allGeneratedEntries: Entry[], 
-    rollover: RolloverPreference, 
-    timezone: string, 
-    selectedDate: Date,
-    monthlyLeftovers: any
-) => {
-    if (!allGeneratedEntries.length) {
-      return { weeklyTotals: { income: 0, bills: 0, net: 0, rolloverApplied: 0 } };
-    }
-
-    const weekStart = startOfWeek(selectedDate);
-    const weekEnd = endOfWeek(selectedDate);
-    const weekEntries = allGeneratedEntries.filter(e => {
-        const entryDate = parseDateInTimezone(e.date, timezone);
-        return entryDate >= weekStart && entryDate <= weekEnd;
-    });
-
-    const weeklyIncome = weekEntries.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
-    const weeklyBills = weekEntries.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
-    const initialWeeklyNet = weeklyIncome - weeklyBills;
-    
-    const prevMonthKey = format(subMonths(weekStart, 1), 'yyyy-MM');
-    const monthLeftover = (rollover === 'carryover' ? monthlyLeftovers[prevMonthKey] : 0) || 0;
-    
-    let rolloverApplied = 0;
-    if (initialWeeklyNet < 0 && monthLeftover > 0) {
-        rolloverApplied = Math.min(Math.abs(initialWeeklyNet), monthLeftover);
-    }
-    
-    const finalWeeklyNet = initialWeeklyNet + rolloverApplied;
-    
-    return {
-      weeklyTotals: {
-          income: weeklyIncome,
-          bills: weeklyBills,
-          net: finalWeeklyNet,
-          rolloverApplied,
-      }
-    };
-};
-
 export default function ViewOnlyCalendar() {
   const searchParams = useSearchParams();
   const [data, setData] = useState<SharedData | null>(null);
@@ -142,7 +98,7 @@ export default function ViewOnlyCalendar() {
   
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isMobileSheetOpen, setMobileSheetOpen] = useState(false);
-  const [monthlyLeftovers, setMonthlyLeftovers] = useState<MonthlyLeftovers>({});
+  const [weeklyBalances, setWeeklyBalances] = useState<WeeklyBalances>({});
 
   const isMobile = useMedia("(max-width: 1024px)", false);
 
@@ -152,7 +108,12 @@ export default function ViewOnlyCalendar() {
       try {
         const decodedString = atob(decodeURIComponent(encodedData));
         const parsedData = JSON.parse(decodedString);
-        setData(parsedData);
+        // Basic validation
+        if (parsedData && Array.isArray(parsedData.entries) && parsedData.timezone) {
+            setData(parsedData);
+        } else {
+            throw new Error("Invalid data structure");
+        }
       } catch (e) {
         console.error("Failed to parse shared data:", e);
         setError("The shared link is invalid or corrupted. Please ask for a new link.");
@@ -168,8 +129,8 @@ export default function ViewOnlyCalendar() {
     const { entries } = data;
     if (entries.length === 0) return [];
     
-    const viewStart = startOfMonth(subMonths(new Date(), 6));
-    const viewEnd = endOfMonth(addMonths(new Date(), 12));
+    const viewStart = startOfMonth(subMonths(new Date(), 12));
+    const viewEnd = endOfMonth(addMonths(new Date(), 24));
 
     return entries.flatMap((e) => {
         const instances: Entry[] = [];
@@ -187,46 +148,69 @@ export default function ViewOnlyCalendar() {
   
   useEffect(() => {
     if (!data || allGeneratedEntries.length === 0) {
-        setMonthlyLeftovers({});
+        setWeeklyBalances({});
         return;
     }
+
     const { rollover, timezone } = data;
-
-    const newLeftovers: MonthlyLeftovers = {};
-
-    const oldestEntryDate = allGeneratedEntries.reduce((oldest, entry) => {
-        const entryDate = parseISO(entry.date);
-        return entryDate < oldest ? entryDate : oldest;
-    }, new Date());
-
-    const start = startOfMonth(oldestEntryDate);
-    const end = new Date(); 
+    const newWeeklyBalances: WeeklyBalances = {};
+    const sortedEntries = allGeneratedEntries.sort((a,b) => a.date.localeCompare(b.date));
+        
+    const firstDate = parseISO(sortedEntries[0].date);
+    const lastDate = parseISO(sortedEntries[sortedEntries.length - 1].date);
     
-    let current = start;
-    let lastMonthLeftover = 0;
+    const weeks = eachWeekOfInterval({ start: firstDate, end: lastDate });
+    let lastWeekBalance = 0;
 
-    while(isBefore(current, end) || isSameMonth(current, end)) {
-        const monthKey = format(current, 'yyyy-MM');
-        
-        const entriesForMonth = allGeneratedEntries.filter(e => isSameMonth(parseDateInTimezone(e.date, timezone), current));
-        const income = entriesForMonth.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
-        const bills = entriesForMonth.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
-        
-        const endOfMonthBalance = income + (rollover === 'carryover' ? lastMonthLeftover : 0) - bills;
+    weeks.forEach(weekStart => {
+        const weekEnd = endOfWeek(weekStart);
+        const weekKey = format(weekStart, 'yyyy-MM-dd');
 
-        newLeftovers[monthKey] = endOfMonthBalance;
-        lastMonthLeftover = endOfMonthBalance;
+        const entriesForWeek = allGeneratedEntries.filter(e => {
+            const entryDate = parseDateInTimezone(e.date, timezone);
+            return entryDate >= weekStart && entryDate <= weekEnd;
+        });
         
-        current = addMonths(current, 1);
-    }
+        const income = entriesForWeek.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
+        const bills = entriesForWeek.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
+        
+        const endOfWeekBalance = lastWeekBalance + income - bills;
+        newWeeklyBalances[weekKey] = { start: lastWeekBalance, end: endOfWeekBalance };
+        lastWeekBalance = rollover === 'carryover' ? endOfWeekBalance : 0;
+    });
     
-    if (JSON.stringify(newLeftovers) !== JSON.stringify(monthlyLeftovers)) {
-        setMonthlyLeftovers(newLeftovers);
+    if (JSON.stringify(newWeeklyBalances) !== JSON.stringify(weeklyBalances)) {
+        setWeeklyBalances(newWeeklyBalances);
     }
-  }, [allGeneratedEntries, data, monthlyLeftovers]);
+  }, [allGeneratedEntries, data, weeklyBalances]);
 
-  const mobileSummaryData = data ? calculateMobileSummary(allGeneratedEntries, data.rollover, data.timezone, selectedDate, monthlyLeftovers) : null;
-  const weeklyTotals = mobileSummaryData ? mobileSummaryData.weeklyTotals : { income: 0, bills: 0, net: 0, rolloverApplied: 0 };
+  const weeklyTotals = useMemo(() => {
+    if (!data) {
+      return { income: 0, bills: 0, net: 0, startOfWeekBalance: 0 };
+    }
+    const { timezone } = data;
+    const weekStart = startOfWeek(selectedDate);
+    const weekKey = format(weekStart, 'yyyy-MM-dd');
+    
+    const weekBalanceInfo = weeklyBalances[weekKey];
+    const startOfWeekBalance = weekBalanceInfo ? weekBalanceInfo.start : 0;
+    const endOfWeekBalance = weekBalanceInfo ? weekBalanceInfo.end : 0;
+
+    const weekEntries = allGeneratedEntries.filter(e => {
+        const entryDate = parseDateInTimezone(e.date, timezone);
+        return entryDate >= weekStart && entryDate <= endOfWeek(weekStart);
+    });
+
+    const weeklyIncome = weekEntries.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
+    const weeklyBills = weekEntries.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
+
+    return {
+        income: weeklyIncome,
+        bills: weeklyBills,
+        net: endOfWeekBalance,
+        startOfWeekBalance: startOfWeekBalance,
+    };
+  }, [data, allGeneratedEntries, selectedDate, weeklyBalances]);
 
 
   if (error) {
@@ -242,7 +226,7 @@ export default function ViewOnlyCalendar() {
   }
 
   if (!data) {
-    // This state will be covered by the Suspense fallback
+    // This state will be covered by the Suspense fallback in the parent
     return null;
   }
 
@@ -265,14 +249,12 @@ export default function ViewOnlyCalendar() {
                   Weekly summary for {format(selectedDate, "MMM d, yyyy")}.
                 </SheetDescription>
               </SheetHeader>
-              {mobileSummaryData && (
-                <ScrollArea className="flex-1">
-                    <SidebarContent
-                      weeklyTotals={mobileSummaryData.weeklyTotals}
-                      selectedDate={selectedDate}
-                    />
-                </ScrollArea>
-              )}
+              <ScrollArea className="flex-1">
+                  <SidebarContent
+                    weeklyTotals={weeklyTotals}
+                    selectedDate={selectedDate}
+                  />
+              </ScrollArea>
             </SheetContent>
           </Sheet>
         )}
@@ -282,7 +264,6 @@ export default function ViewOnlyCalendar() {
         entries={data.entries}
         generatedEntries={allGeneratedEntries}
         setEntries={() => {}} // No-op
-        rollover={data.rollover}
         timezone={data.timezone}
         openNewEntryDialog={() => {}} // No-op
         setEditingEntry={() => {}} // No-op
@@ -291,9 +272,8 @@ export default function ViewOnlyCalendar() {
         isMobile={isMobile}
         openDayEntriesDialog={() => {}} // No-op for read-only view
         isReadOnly={true}
-        monthlyLeftovers={monthlyLeftovers}
+        weeklyBalances={weeklyBalances}
         weeklyTotals={weeklyTotals}
-        onOpenBreakdown={() => {}} // No-op
         isSelectionMode={false}
         toggleSelectionMode={() => {}}
         selectedIds={[]}
@@ -303,3 +283,5 @@ export default function ViewOnlyCalendar() {
     </div>
   );
 }
+
+    
