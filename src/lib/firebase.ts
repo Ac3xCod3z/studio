@@ -7,7 +7,7 @@ const firebaseConfig = {
   "appId": "1:988219596746:web:aabca84ab7b409cba03933",
   "storageBucket": "fiscalflow-xbjkx.firebasestorage.app",
   "apiKey": "AIzaSyCHSnFE6N8V8tcXCYDx1Y45E7oOcFK4mT4",
-  "authDomain": "fiscalflow-xbjkx.firebaseapp.com",
+  "authDomain": "fiscalflow-xbjkx.web.app",
   "messagingSenderId": "988219596746"
 };
 
