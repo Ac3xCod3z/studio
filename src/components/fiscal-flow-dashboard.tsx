@@ -461,6 +461,16 @@ export default function FiscalFlowDashboard() {
                <Trash2 className="mr-2 h-4 w-4" /> Delete ({selectedIds.length})
              </Button>
            )}
+          {user && (
+            <Button onClick={handleSyncCalendar} disabled={isSyncing} variant="outline" size="sm" className="hidden md:flex">
+              {isSyncing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                  <CalendarSync className="mr-2 h-4 w-4" />
+              )}
+              <span>Sync Calendar</span>
+            </Button>
+          )}
           <Button onClick={() => setSettingsDialogOpen(true)} variant="ghost" size="icon">
             <Settings className="h-5 w-5" />
           </Button>
@@ -476,14 +486,6 @@ export default function FiscalFlowDashboard() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuItem onClick={handleSyncCalendar} disabled={isSyncing}>
-                  {isSyncing ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                      <CalendarSync className="mr-2 h-4 w-4" />
-                  )}
-                  <span>Sync Calendar</span>
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleSignOut}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
@@ -510,6 +512,12 @@ export default function FiscalFlowDashboard() {
                     selectedDate={selectedDate}
                   />
                    <div className="p-4 flex flex-col gap-2 border-t">
+                    {user && (
+                      <Button onClick={handleSyncCalendar} disabled={isSyncing} variant="outline" className="w-full">
+                        {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarSync className="mr-2 h-4 w-4" />}
+                        Sync Calendar
+                      </Button>
+                    )}
                      <Button onClick={() => { setSummaryDialogOpen(true); setMobileSheetOpen(false); }} variant="outline" className="w-full">
                         <BarChartBig className="mr-2 h-4 w-4" /> Monthly Summary
                     </Button>
