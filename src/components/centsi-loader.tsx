@@ -52,43 +52,46 @@ export default function CentsiLoader() {
   const containerRef = useRef(null);
 
   useEffect(() => {
-    // Ensure MotionPathPlugin is registered
+    // Ensure MotionPathPlugin is registered on the client
     if (typeof window !== "undefined") {
-      gsap.registerPlugin(window.MotionPathPlugin);
+        gsap.registerPlugin((window as any).MotionPathPlugin);
     }
       
-    gsap.timeline({
+    const tl = gsap.timeline({
       onComplete: () => {
         setAnimationComplete(true);
       },
-    })
+    });
+
     // 1. Fade in logo and name
-    .fromTo([logoRef.current, nameRef.current], 
+    tl.fromTo([logoRef.current, nameRef.current], 
         { opacity: 0, y: 20 },
         { opacity: 1, y: 0, duration: 0.8, ease: 'power2.out', stagger: 0.2 }
     )
-    .add("swirl", "+=0.3") // Add a label for the start of the swirl
-    // 2. Animate name in a circular path and fade into the logo
+    // Add a label for the start of the swirl, with a slight delay
+    .add("swirl", "+=0.5") 
+    // 2. Animate name in a circular path into the logo
     .to(nameRef.current, {
-        duration: 1.5, // slightly faster
-        motionPath: {
-            path: [{x: 50, y: -25}, {x: 0, y: -50}, {x: -50, y: -25}, {x: 0, y: 0}],
-            curviness: 1.25,
-            autoRotate: true,
-        },
-        scale: 0,
+        duration: 1.2,
         opacity: 0,
-        ease: 'power1.inOut',
+        scale: 0.1,
+        motionPath: {
+            path: [{x: 60, y: -30}, {x: 0, y: -60}, {x: -60, y: -30}, {x: 0, y: 0}],
+            curviness: 1.25,
+            autoRotate: false,
+        },
+        ease: 'power1.in',
         transformOrigin: "center center",
     }, "swirl")
-    // 3. Fade out logo and container
+    // 3. Scale and fade out the logo after the text is gone
     .to(logoRef.current, 
-        { opacity: 0, scale: 0.9, duration: 0.7, ease: 'power2.in' },
-        "swirl+=1.0" // Delay the logo fade-out
+        { opacity: 0, scale: 0.8, duration: 0.5, ease: 'power2.in' },
+        "-=0.5" 
     )
+    // 4. Fade out the entire container to transition smoothly
     .to(containerRef.current, 
-        { opacity: 0, duration: 0.5, ease: 'power2.in' },
-        "-=0.5"
+        { opacity: 0, duration: 0.3, ease: 'power2.in' },
+        "-=0.3"
     );
   }, []);
 
