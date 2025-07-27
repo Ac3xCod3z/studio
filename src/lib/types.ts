@@ -21,6 +21,7 @@ export type BillCategory = (typeof BillCategories)[number];
 export type RecurrenceInterval =
   | 'none'
   | 'weekly'
+  | 'bi-weekly'
   | 'monthly'
   | 'bimonthly'
   | '3months'
@@ -33,7 +34,7 @@ export const EntrySchema = z.object({
   name: z.string(),
   amount: z.number(),
   type: z.enum(['bill', 'income']),
-  recurrence: z.enum(["none", "weekly", "monthly", "bimonthly", "3months", "6months", "12months"]).optional(),
+  recurrence: z.enum(["none", "weekly", "bi-weekly", "monthly", "bimonthly", "3months", "6months", "12months"]).optional(),
   category: z.enum(BillCategories).optional(),
 });
 

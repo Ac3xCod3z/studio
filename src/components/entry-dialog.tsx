@@ -40,7 +40,7 @@ const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   amount: z.coerce.number().positive({ message: "Amount must be a positive number." }),
   date: z.date({ required_error: "A date is required." }),
-  recurrence: z.enum(["none", "weekly", "monthly", "bimonthly", "3months", "6months", "12months"]).default("none"),
+  recurrence: z.enum(["none", "weekly", "bi-weekly", "monthly", "bimonthly", "3months", "6months", "12months"]).default("none"),
   category: z.enum(BillCategories).optional(),
 });
 
@@ -258,6 +258,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
                         <SelectContent>
                             <SelectItem value="none">None</SelectItem>
                             <SelectItem value="weekly">Weekly</SelectItem>
+                            <SelectItem value="bi-weekly">Bi-weekly</SelectItem>
                             <SelectItem value="monthly">Monthly</SelectItem>
                             <SelectItem value="bimonthly">Every 2 months</SelectItem>
                             <SelectItem value="3months">Every 3 months</SelectItem>

@@ -1,6 +1,6 @@
 import { RecurrenceInterval } from './types';
 
-export const recurrenceIntervalMonths: Record<Exclude<RecurrenceInterval, 'weekly' | 'none'>, number> = {
+export const recurrenceIntervalMonths: Record<Exclude<RecurrenceInterval, 'weekly' | 'none' | 'bi-weekly'>, number> = {
   monthly: 1,
   bimonthly: 2,
   '3months': 3,

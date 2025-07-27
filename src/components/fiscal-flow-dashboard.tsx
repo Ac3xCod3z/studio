@@ -57,10 +57,11 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry
     
     if (isAfter(originalEntryDate, end)) return [];
 
-    if (entry.recurrence === 'weekly') {
+    if (entry.recurrence === 'weekly' || entry.recurrence === 'bi-weekly') {
+        const weeksToAdd = entry.recurrence === 'weekly' ? 1 : 2;
         let currentDate = startOfWeek(originalEntryDate, { weekStartsOn: getDay(originalEntryDate) });
         while (isBefore(currentDate, start)) {
-            currentDate = add(currentDate, { weeks: 1 });
+            currentDate = add(currentDate, { weeks: weeksToAdd });
         }
         while (isBefore(currentDate, end) || isSameDay(currentDate, end)) {
             if (!isBefore(currentDate, start)) {
@@ -70,7 +71,7 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry
                     id: `${entry.id}-${format(currentDate, 'yyyy-MM-dd')}`
                 });
             }
-            currentDate = add(currentDate, { weeks: 1 });
+            currentDate = add(currentDate, { weeks: weeksToAdd });
         }
         return instances;
     }
