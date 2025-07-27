@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -7,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Sparkles, Loader2, Bell, BellOff, Share2, Check, Copy, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useDialogAnimation } from '@/hooks/use-dialog-animation';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +16,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogOverlay,
+  DialogPortal,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -84,13 +86,16 @@ export function SettingsDialog({
   const [hasCopied, setHasCopied] = useState(false);
   const { setTheme, theme } = useTheme();
 
+  const { dialogRef, overlayRef } = useDialogAnimation(isOpen, onClose);
+
   useEffect(() => {
-    if ("Notification" in window) {
-      setNotificationStatus(Notification.permission);
+    if (isOpen) {
+        if ("Notification" in window) {
+            setNotificationStatus(Notification.permission);
+        }
+        setShareLink('');
+        setHasCopied(false);
     }
-    // Reset share link state when dialog opens
-    setShareLink('');
-    setHasCopied(false);
   }, [isOpen]);
 
   const handleGoogleSignIn = async () => {
@@ -172,187 +177,194 @@ export function SettingsDialog({
     });
   };
 
+  if (!isOpen && dialogRef.current?.style.display === 'none') {
+    return null;
+  }
+  
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md grid-rows-[auto_minmax(0,1fr)_auto] p-0 max-h-[90vh]">
-        <DialogHeader className="p-6 pb-2">
-          <DialogTitle>Settings</DialogTitle>
-          <DialogDescription>
-            Manage your application preferences and integrations.
-          </DialogDescription>
-        </DialogHeader>
-        
-        <ScrollArea className="px-6">
-          <div className="space-y-4 py-4">
-             <div className="space-y-2">
-                <h3 className="font-semibold">Appearance</h3>
-                 <Tabs value={theme} onValueChange={setTheme} className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="light">
-                            <Sun className="mr-2 h-4 w-4" />
-                            Light
-                        </TabsTrigger>
-                        <TabsTrigger value="dark">
-                            <Moon className="mr-2 h-4 w-4" />
-                            Dark
-                        </TabsTrigger>
-                        <TabsTrigger value="system">System</TabsTrigger>
-                    </TabsList>
-                </Tabs>
+      <DialogPortal>
+        <DialogOverlay ref={overlayRef} onClick={onClose} />
+        <DialogContent ref={dialogRef} className="sm:max-w-md grid-rows-[auto_minmax(0,1fr)_auto] p-0 max-h-[90vh]" onInteractOutside={onClose}>
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle>Settings</DialogTitle>
+            <DialogDescription>
+              Manage your application preferences and integrations.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <ScrollArea className="px-6">
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                  <h3 className="font-semibold">Appearance</h3>
+                  <Tabs value={theme} onValueChange={setTheme} className="w-full">
+                      <TabsList className="grid w-full grid-cols-3">
+                          <TabsTrigger value="light">
+                              <Sun className="mr-2 h-4 w-4" />
+                              Light
+                          </TabsTrigger>
+                          <TabsTrigger value="dark">
+                              <Moon className="mr-2 h-4 w-4" />
+                              Dark
+                          </TabsTrigger>
+                          <TabsTrigger value="system">System</TabsTrigger>
+                      </TabsList>
+                  </Tabs>
+              </div>
+
+              <Separator />
+              
+              <div className="space-y-2">
+                  <h3 className="font-semibold">Google Calendar</h3>
+                  <p className="text-sm text-muted-foreground">
+                      {user ? `Connected as ${user.displayName}. Sync and sign out via the user menu in the header.` : "Connect your account to sync your financial entries."}
+                  </p>
+                  {!user && (
+                      <Button onClick={handleGoogleSignIn} className="w-full">
+                          Connect Google Calendar
+                      </Button>
+                  )}
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                  <h3 className="font-semibold">Share Calendar</h3>
+                  <p className="text-sm text-muted-foreground">Generate a read-only link to share your calendar with others.</p>
+                  <Button onClick={handleGenerateShareLink} className="w-full">
+                      <Share2 className="mr-2 h-4 w-4" /> Generate Share Link
+                  </Button>
+                  {shareLink && (
+                      <div className="p-2 border rounded-md bg-muted">
+                          <p className="text-sm text-muted-foreground break-all mb-2">{shareLink}</p>
+                          <Button onClick={handleCopyToClipboard} size="sm" className="w-full">
+                              {hasCopied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+                              {hasCopied ? 'Copied!' : 'Copy Link'}
+                          </Button>
+                      </div>
+                  )}
+              </div>
+
+              <Separator />
+              
+              <div className="space-y-2">
+                  <h3 className="font-semibold">Notifications</h3>
+                  <p className="text-sm text-muted-foreground">Get reminders for your upcoming bills, delivered right to your device.</p>
+                  <Button 
+                      onClick={handleNotificationToggle} 
+                      className="w-full"
+                      variant={notificationsEnabled && notificationStatus === 'granted' ? 'secondary' : 'default'}
+                      disabled={notificationStatus === 'denied'}
+                  >
+                      {notificationsEnabled && notificationStatus === 'granted' ? <BellOff className="mr-2 h-4 w-4" /> : <Bell className="mr-2 h-4 w-4" />}
+                      {notificationsEnabled && notificationStatus === 'granted' ? 'Disable Notifications' : 'Enable Notifications'}
+                  </Button>
+                  {notificationStatus === 'denied' && (
+                      <p className="text-xs text-destructive text-center">You have blocked notifications. Please enable them in your browser settings.</p>
+                  )}
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <Label htmlFor="timezone" className="font-semibold">Timezone</Label>
+                <p className="text-sm text-muted-foreground">Select your local timezone to ensure dates are handled correctly.</p>
+                <Select onValueChange={onTimezoneChange} defaultValue={timezone}>
+                  <SelectTrigger id="timezone" className="w-full">
+                    <SelectValue placeholder="Select a timezone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {timezones.map((tz) => (
+                      <SelectItem key={tz} value={tz}>
+                        {tz}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Separator />
+              
+              <div className="space-y-4">
+                  <h3 className="font-semibold">Rollover Preference</h3>
+                  <p className="text-sm text-muted-foreground">Choose how leftover funds are handled at the end of each month.</p>
+                  <RadioGroup
+                      value={rolloverPreference}
+                      onValueChange={(value) => onRolloverPreferenceChange(value as RolloverPreference)}
+                      className="space-y-2"
+                  >
+                      <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="carryover" id="carryover" />
+                          <Label htmlFor="carryover" className="font-bold">Carry Over</Label>
+                      </div>
+                      <p className="pl-6 text-sm text-muted-foreground">Any leftover funds from this month will be added to next month's starting balance.</p>
+
+                      <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="reset" id="reset" />
+                          <Label htmlFor="reset" className="font-bold">Reset</Label>
+                      </div>
+                      <p className="pl-6 text-sm text-muted-foreground">Each month starts fresh. Leftover funds are not automatically tracked into the next month.</p>
+                  </RadioGroup>
+              </div>
+
+              <Separator />
+              
+              <div className="space-y-4">
+                  <h3 className="font-semibold flex items-center gap-2"><Sparkles className="h-5 w-5 text-accent-foreground/80" /> AI Recommendation</h3>
+                  <p className="text-sm text-muted-foreground">Not sure which rollover option to choose? Let our AI help you decide based on your goals.</p>
+                  <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                      <FormField
+                          control={form.control}
+                          name="incomeLevel"
+                          render={({ field }) => (
+                              <FormItem>
+                              <FormLabel>Average Monthly Income</FormLabel>
+                              <FormControl>
+                                  <Input type="number" placeholder="e.g. 5000" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                              </FormItem>
+                          )}
+                      />
+                      <FormField
+                          control={form.control}
+                          name="financialGoals"
+                          render={({ field }) => (
+                              <FormItem>
+                              <FormLabel>Financial Goals</FormLabel>
+                              <FormControl>
+                                  <Textarea placeholder="e.g. Pay off debt, save for vacation..." {...field} />
+                              </FormControl>
+                              <FormMessage />
+                              </FormItem>
+                          )}
+                      />
+                      <Button type="submit" disabled={isLoading} className="w-full">
+                          {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                          Get Recommendation
+                      </Button>
+                  </form>
+                  </Form>
+                  {recommendation && (
+                      <Alert>
+                          <AlertTitle>AI Suggestion</AlertTitle>
+                          <AlertDescription>
+                              {recommendation}
+                          </AlertDescription>
+                      </Alert>
+                  )}
+              </div>
             </div>
-
-            <Separator />
-            
-             <div className="space-y-2">
-                <h3 className="font-semibold">Google Calendar</h3>
-                <p className="text-sm text-muted-foreground">
-                    {user ? `Connected as ${user.displayName}. Sync and sign out via the user menu in the header.` : "Connect your account to sync your financial entries."}
-                </p>
-                {!user && (
-                    <Button onClick={handleGoogleSignIn} className="w-full">
-                        Connect Google Calendar
-                    </Button>
-                )}
-            </div>
-
-            <Separator />
-
-             <div className="space-y-2">
-                <h3 className="font-semibold">Share Calendar</h3>
-                <p className="text-sm text-muted-foreground">Generate a read-only link to share your calendar with others.</p>
-                <Button onClick={handleGenerateShareLink} className="w-full">
-                    <Share2 className="mr-2 h-4 w-4" /> Generate Share Link
-                </Button>
-                {shareLink && (
-                    <div className="p-2 border rounded-md bg-muted">
-                        <p className="text-sm text-muted-foreground break-all mb-2">{shareLink}</p>
-                        <Button onClick={handleCopyToClipboard} size="sm" className="w-full">
-                            {hasCopied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
-                            {hasCopied ? 'Copied!' : 'Copy Link'}
-                        </Button>
-                    </div>
-                )}
-            </div>
-
-            <Separator />
-            
-             <div className="space-y-2">
-                <h3 className="font-semibold">Notifications</h3>
-                <p className="text-sm text-muted-foreground">Get reminders for your upcoming bills, delivered right to your device.</p>
-                <Button 
-                    onClick={handleNotificationToggle} 
-                    className="w-full"
-                    variant={notificationsEnabled && notificationStatus === 'granted' ? 'secondary' : 'default'}
-                    disabled={notificationStatus === 'denied'}
-                >
-                    {notificationsEnabled && notificationStatus === 'granted' ? <BellOff className="mr-2 h-4 w-4" /> : <Bell className="mr-2 h-4 w-4" />}
-                    {notificationsEnabled && notificationStatus === 'granted' ? 'Disable Notifications' : 'Enable Notifications'}
-                </Button>
-                 {notificationStatus === 'denied' && (
-                    <p className="text-xs text-destructive text-center">You have blocked notifications. Please enable them in your browser settings.</p>
-                )}
-            </div>
-
-            <Separator />
-
-            <div className="space-y-2">
-              <Label htmlFor="timezone" className="font-semibold">Timezone</Label>
-              <p className="text-sm text-muted-foreground">Select your local timezone to ensure dates are handled correctly.</p>
-              <Select onValueChange={onTimezoneChange} defaultValue={timezone}>
-                <SelectTrigger id="timezone" className="w-full">
-                  <SelectValue placeholder="Select a timezone" />
-                </SelectTrigger>
-                <SelectContent>
-                  {timezones.map((tz) => (
-                    <SelectItem key={tz} value={tz}>
-                      {tz}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Separator />
-            
-            <div className="space-y-4">
-                <h3 className="font-semibold">Rollover Preference</h3>
-                <p className="text-sm text-muted-foreground">Choose how leftover funds are handled at the end of each month.</p>
-                <RadioGroup
-                    value={rolloverPreference}
-                    onValueChange={(value) => onRolloverPreferenceChange(value as RolloverPreference)}
-                    className="space-y-2"
-                >
-                    <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="carryover" id="carryover" />
-                        <Label htmlFor="carryover" className="font-bold">Carry Over</Label>
-                    </div>
-                    <p className="pl-6 text-sm text-muted-foreground">Any leftover funds from this month will be added to next month's starting balance.</p>
-
-                    <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="reset" id="reset" />
-                        <Label htmlFor="reset" className="font-bold">Reset</Label>
-                    </div>
-                    <p className="pl-6 text-sm text-muted-foreground">Each month starts fresh. Leftover funds are not automatically tracked into the next month.</p>
-                </RadioGroup>
-            </div>
-
-            <Separator />
-            
-            <div className="space-y-4">
-                <h3 className="font-semibold flex items-center gap-2"><Sparkles className="h-5 w-5 text-accent-foreground/80" /> AI Recommendation</h3>
-                <p className="text-sm text-muted-foreground">Not sure which rollover option to choose? Let our AI help you decide based on your goals.</p>
-                <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <FormField
-                        control={form.control}
-                        name="incomeLevel"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Average Monthly Income</FormLabel>
-                            <FormControl>
-                                <Input type="number" placeholder="e.g. 5000" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="financialGoals"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Financial Goals</FormLabel>
-                            <FormControl>
-                                <Textarea placeholder="e.g. Pay off debt, save for vacation..." {...field} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <Button type="submit" disabled={isLoading} className="w-full">
-                        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                        Get Recommendation
-                    </Button>
-                </form>
-                </Form>
-                {recommendation && (
-                    <Alert>
-                        <AlertTitle>AI Suggestion</AlertTitle>
-                        <AlertDescription>
-                            {recommendation}
-                        </AlertDescription>
-                    </Alert>
-                )}
-            </div>
-          </div>
-        </ScrollArea>
-        
-        <DialogFooter className="p-6 pt-2">
-          <Button type="button" onClick={onClose} className="w-full">
-            Done
-          </Button>
-        </DialogFooter>
-      </DialogContent>
+          </ScrollArea>
+          
+          <DialogFooter className="p-6 pt-2">
+            <Button type="button" onClick={onClose} className="w-full">
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </DialogPortal>
     </Dialog>
   );
 }

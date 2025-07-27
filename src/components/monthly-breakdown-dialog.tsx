@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo } from 'react';
@@ -9,6 +8,8 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogPortal,
+  DialogOverlay
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -36,6 +37,7 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import { PieChart, Pie, Cell, Tooltip } from 'recharts';
+import { useDialogAnimation } from '@/hooks/use-dialog-animation';
 
 type MonthlyBreakdownDialogProps = {
   isOpen: boolean;
@@ -64,6 +66,8 @@ export function MonthlyBreakdownDialog({
   currentMonth,
   timezone,
 }: MonthlyBreakdownDialogProps) {
+  const { dialogRef, overlayRef } = useDialogAnimation(isOpen, onClose);
+
   const breakdownData = useMemo(() => {
     const monthlyBills = entries.filter(entry => {
         if (!entry.date) return false;
@@ -102,103 +106,110 @@ export function MonthlyBreakdownDialog({
     }));
   }, [breakdownData]);
 
+  if (!isOpen && dialogRef.current?.style.display === 'none') {
+    return null;
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>
-            Category Breakdown for {format(currentMonth, 'MMMM yyyy')}
-          </DialogTitle>
-          <DialogDescription>
-            A summary of your expenses by category. Click a category to see details.
-          </DialogDescription>
-        </DialogHeader>
-        <ScrollArea className="max-h-[60vh] pr-4">
-          <div className="space-y-6">
-            {chartData.length > 0 ? (
-                 <div className="w-full h-[250px] flex items-center justify-center">
-                    <ChartContainer config={{}} className="mx-auto aspect-square h-full">
-                        <PieChart>
-                            <Tooltip
-                                cursor={false}
-                                content={<ChartTooltipContent 
-                                    hideLabel 
-                                    formatter={(value) => formatCurrency(value as number)}
-                                />}
-                            />
-                            <Pie
-                                data={chartData}
-                                dataKey="value"
-                                nameKey="name"
-                                innerRadius={60}
-                                strokeWidth={5}
-                            >
-                                {chartData.map((entry, index) => (
-                                    <Cell
-                                        key={`cell-${index}`}
-                                        fill={COLORS[index % COLORS.length]}
-                                    />
-                                ))}
-                            </Pie>
-                        </PieChart>
-                    </ChartContainer>
-                </div>
-            ) : (
-                <div className="text-center text-muted-foreground py-8">
-                  No bills with categories found for this month.
-                </div>
-            )}
-            
-            <Accordion type="single" collapsible className="w-full">
-                {breakdownData.breakdown.length > 0 ? (
-                  breakdownData.breakdown.map(({ category, total, entries }) => (
-                    <AccordionItem value={category} key={category}>
-                       <AccordionTrigger className="hover:no-underline">
-                           <div className="flex justify-between w-full pr-4">
+      <DialogPortal>
+        <DialogOverlay ref={overlayRef} onClick={onClose}/>
+        <DialogContent ref={dialogRef} className="sm:max-w-lg" onInteractOutside={onClose}>
+          <DialogHeader>
+            <DialogTitle>
+              Category Breakdown for {format(currentMonth, 'MMMM yyyy')}
+            </DialogTitle>
+            <DialogDescription>
+              A summary of your expenses by category. Click a category to see details.
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh] pr-4">
+            <div className="space-y-6">
+              {chartData.length > 0 ? (
+                  <div className="w-full h-[250px] flex items-center justify-center">
+                      <ChartContainer config={{}} className="mx-auto aspect-square h-full">
+                          <PieChart>
+                              <Tooltip
+                                  cursor={false}
+                                  content={<ChartTooltipContent 
+                                      hideLabel 
+                                      formatter={(value) => formatCurrency(value as number)}
+                                  />}
+                              />
+                              <Pie
+                                  data={chartData}
+                                  dataKey="value"
+                                  nameKey="name"
+                                  innerRadius={60}
+                                  strokeWidth={5}
+                              >
+                                  {chartData.map((entry, index) => (
+                                      <Cell
+                                          key={`cell-${index}`}
+                                          fill={COLORS[index % COLORS.length]}
+                                      />
+                                  ))}
+                              </Pie>
+                          </PieChart>
+                      </ChartContainer>
+                  </div>
+              ) : (
+                  <div className="text-center text-muted-foreground py-8">
+                    No bills with categories found for this month.
+                  </div>
+              )}
+              
+              <Accordion type="single" collapsible className="w-full">
+                  {breakdownData.breakdown.length > 0 ? (
+                    breakdownData.breakdown.map(({ category, total, entries }) => (
+                      <AccordionItem value={category} key={category}>
+                        <AccordionTrigger className="hover:no-underline">
+                            <div className="flex justify-between w-full pr-4">
                                 <span className="font-medium capitalize">{category}</span>
                                 <span>{formatCurrency(total)}</span>
-                           </div>
-                       </AccordionTrigger>
-                       <AccordionContent>
-                           <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead className="text-right">Amount</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                               <TableBody>
-                                   {entries.sort((a,b) => a.date.localeCompare(b.date)).map((entry, idx) => (
-                                       <TableRow key={`${entry.id}-${idx}`}>
-                                           <TableCell>{entry.name}</TableCell>
-                                           <TableCell>{format(toZonedTime(entry.date, timezone), 'MMM d')}</TableCell>
-                                           <TableCell className="text-right">{formatCurrency(entry.amount)}</TableCell>
-                                       </TableRow>
-                                   ))}
-                               </TableBody>
-                           </Table>
-                       </AccordionContent>
-                    </AccordionItem>
-                  ))
-                ) : (
-                    <div className="text-center text-muted-foreground py-8">
-                      No bills with categories found for this month.
-                    </div>
-                )}
-            </Accordion>
-             <div className="border-t mt-4 pt-4 flex justify-between items-center text-lg font-bold">
-                <span>Total Expenses</span>
-                <span>{formatCurrency(breakdownData.total)}</span>
-             </div>
-          </div>
-        </ScrollArea>
-        <DialogFooter className="sm:justify-end">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Close
-          </Button>
-        </DialogFooter>
-      </DialogContent>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                            <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Date</TableHead>
+                                      <TableHead className="text-right">Amount</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                <TableBody>
+                                    {entries.sort((a,b) => a.date.localeCompare(b.date)).map((entry, idx) => (
+                                        <TableRow key={`${entry.id}-${idx}`}>
+                                            <TableCell>{entry.name}</TableCell>
+                                            <TableCell>{format(toZonedTime(entry.date, timezone), 'MMM d')}</TableCell>
+                                            <TableCell className="text-right">{formatCurrency(entry.amount)}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))
+                  ) : (
+                      <div className="text-center text-muted-foreground py-8">
+                        No bills with categories found for this month.
+                      </div>
+                  )}
+              </Accordion>
+              <div className="border-t mt-4 pt-4 flex justify-between items-center text-lg font-bold">
+                  <span>Total Expenses</span>
+                  <span>{formatCurrency(breakdownData.total)}</span>
+              </div>
+            </div>
+          </ScrollArea>
+          <DialogFooter className="sm:justify-end">
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </DialogPortal>
     </Dialog>
   );
 }
