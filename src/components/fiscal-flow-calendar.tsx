@@ -15,10 +15,9 @@ import {
   isToday,
   isSameMonth,
   isSameDay,
-  isBefore,
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
-import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Repeat, PieChart, Trash2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Repeat, PieChart, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,7 +52,7 @@ type FiscalFlowCalendarProps = {
     isSelectionMode: boolean;
     toggleSelectionMode: () => void;
     selectedIds: string[];
-    setSelectedIds: (ids: string[]) => void;
+    setSelectedIds: (ids: string[] | ((current: string[]) => string[])) => void;
     onBulkDelete: () => void;
 }
 
@@ -117,7 +116,7 @@ export function FiscalFlowCalendar({
     // e.g. 'uuid-2024-08-15' -> 'uuid'
     const parts = instanceId.split('-');
     if (parts.length > 5) { // Assuming UUID is 5 parts
-        return parts.slice(0, parts.length - 3).join('-');
+        return parts.slice(0, 5).join('-');
     }
     return instanceId;
   }
@@ -125,23 +124,25 @@ export function FiscalFlowCalendar({
   const handleDayClick = (day: Date, dayEntries: Entry[]) => {
       if (isReadOnly) return;
       
+      setSelectedDate(day);
+      setGlobalSelectedDate(day);
+      
       if (isSelectionMode) {
           const entryIdsOnDay = dayEntries.map(e => getOriginalIdFromInstance(e.id));
           const uniqueEntryIds = [...new Set(entryIdsOnDay)];
           const areAllSelected = uniqueEntryIds.every(id => selectedIds.includes(id));
           
-          if (areAllSelected) {
-              // Deselect all entries on this day
-              setSelectedIds(selectedIds.filter(id => !uniqueEntryIds.includes(id)));
-          } else {
-              // Select all entries on this day
-              setSelectedIds([...new Set([...selectedIds, ...uniqueEntryIds])]);
-          }
+          setSelectedIds(currentSelectedIds => {
+            const otherIds = currentSelectedIds.filter(id => !uniqueEntryIds.includes(id));
+            if (areAllSelected) {
+              return otherIds;
+            } else {
+              return [...otherIds, ...uniqueEntryIds];
+            }
+          });
           return;
       }
 
-      setSelectedDate(day);
-      setGlobalSelectedDate(day);
 
       if (isMobile) {
         if (dayEntries.length > 0) {
@@ -296,7 +297,7 @@ export function FiscalFlowCalendar({
                               className={cn(
                                   "p-1 rounded-md truncate flex items-center gap-2",
                                   !entryIsRecurringInstance(entry.id) && !isReadOnly && !isSelectionMode && "cursor-grab active:cursor-grabbing",
-                                  entry.type === 'bill' ? 'bg-destructive text-destructive-foreground' : 'bg-accent text-accent-foreground',
+                                  entry.type === 'bill' ? 'bg-destructive/80 text-destructive-foreground' : 'bg-emerald-500 text-white',
                                   draggingEntryId === entry.id && 'opacity-50',
                                   isSelectionMode && selectedIds.includes(getOriginalIdFromInstance(entry.id)) && "opacity-60",
                               )}

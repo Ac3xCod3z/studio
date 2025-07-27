@@ -13,7 +13,7 @@ import { SettingsDialog } from "./settings-dialog";
 import { DayEntriesDialog } from "./day-entries-dialog";
 import { MonthlyBreakdownDialog } from "./monthly-breakdown-dialog";
 import { Logo } from "./icons";
-import { Settings, Menu, Plus, CalendarSync, Loader2, LogOut, ShieldQuestion } from "lucide-react";
+import { Settings, Menu, Plus, CalendarSync, Loader2, LogOut, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
@@ -254,12 +254,14 @@ export default function FiscalFlowDashboard() {
 
     return entries.flatMap((e) => {
         const instances: Entry[] = [];
-        if (e.recurrence === 'none') {
+        // Handle non-recurring entries
+        if (e.recurrence === 'none' || !e.recurrence) {
             const entryDate = parseISO(e.date);
             if (entryDate >= viewStart && entryDate <= viewEnd) {
                 instances.push(e);
             }
         } else {
+            // Handle recurring entries
             instances.push(...generateRecurringInstances(e, viewStart, viewEnd));
         }
         return instances;
@@ -267,47 +269,45 @@ export default function FiscalFlowDashboard() {
   }, [entries, isMounted]);
 
   useEffect(() => {
-    if (!isMounted || allGeneratedEntries.length === 0) {
-      if (Object.keys(monthlyLeftovers).length > 0) {
-        setMonthlyLeftovers({});
-      }
-      return;
-    }
-
-    const oldestEntryDate = allGeneratedEntries.reduce((oldest, entry) => {
-      const entryDate = parseISO(entry.date);
-      return entryDate < oldest ? entryDate : oldest;
-    }, new Date());
-
-    const start = startOfMonth(oldestEntryDate);
-    const end = new Date();
+    if (!isMounted) return;
 
     const newLeftovers: MonthlyLeftovers = {};
-    let current = start;
-    let lastMonthLeftover = 0;
+    if (allGeneratedEntries.length > 0) {
+        const oldestEntryDate = allGeneratedEntries.reduce((oldest, entry) => {
+          const entryDate = parseISO(entry.date);
+          return entryDate < oldest ? entryDate : oldest;
+        }, new Date());
 
-    while (isBefore(current, end) || isSameMonth(current, end)) {
-      const monthKey = format(current, 'yyyy-MM');
+        const start = startOfMonth(oldestEntryDate);
+        const end = new Date(); // Calculate up to the current date
 
-      const entriesForMonth = allGeneratedEntries.filter(e =>
-        isSameMonth(parseDateInTimezone(e.date, timezone), current)
-      );
-      const income = entriesForMonth
-        .filter(e => e.type === 'income')
-        .reduce((sum, e) => sum + e.amount, 0);
-      const bills = entriesForMonth
-        .filter(e => e.type === 'bill')
-        .reduce((sum, e) => sum + e.amount, 0);
+        let current = start;
+        let lastMonthLeftover = 0;
 
-      const endOfMonthBalance =
-        income + (rollover === 'carryover' ? lastMonthLeftover : 0) - bills;
+        while (isBefore(current, end) || isSameMonth(current, end)) {
+          const monthKey = format(current, 'yyyy-MM');
 
-      newLeftovers[monthKey] = endOfMonthBalance;
-      lastMonthLeftover = endOfMonthBalance;
+          const entriesForMonth = allGeneratedEntries.filter(e =>
+            isSameMonth(parseDateInTimezone(e.date, timezone), current)
+          );
+          const income = entriesForMonth
+            .filter(e => e.type === 'income')
+            .reduce((sum, e) => sum + e.amount, 0);
+          const bills = entriesForMonth
+            .filter(e => e.type === 'bill')
+            .reduce((sum, e) => sum + e.amount, 0);
 
-      current = addMonths(current, 1);
+          const endOfMonthBalance =
+            income + (rollover === 'carryover' ? lastMonthLeftover : 0) - bills;
+
+          newLeftovers[monthKey] = endOfMonthBalance;
+          lastMonthLeftover = endOfMonthBalance;
+
+          current = addMonths(current, 1);
+        }
     }
     
+    // Only update state if the calculated object is different
     if (JSON.stringify(newLeftovers) !== JSON.stringify(monthlyLeftovers)) {
         setMonthlyLeftovers(newLeftovers);
     }
@@ -337,7 +337,11 @@ export default function FiscalFlowDashboard() {
       const initialWeeklyNet = weeklyIncome - weeklyBills;
       
       const prevMonthKey = format(subMonths(weekStart, 1), 'yyyy-MM');
-      const startOfWeekLeftover = (rollover === 'carryover' && monthlyLeftovers[prevMonthKey]) || 0;
+      // Only apply rollover if the week is starting in a new month (i.e. not the same month as the previous day)
+      // Or if the start of the week IS the start of the month
+      const startOfWeekLeftover = (rollover === 'carryover' && !isSameMonth(weekStart, subMonths(weekStart, 0))) || getDate(weekStart) === 1 
+        ? monthlyLeftovers[prevMonthKey] || 0
+        : 0;
 
       let rolloverApplied = 0;
       if (initialWeeklyNet < 0 && startOfWeekLeftover > 0) {
@@ -430,6 +434,14 @@ export default function FiscalFlowDashboard() {
               <Plus className="-ml-1 mr-2 h-4 w-4" /> Add Entry
             </Button>
           )}
+           <Button onClick={toggleSelectionMode} variant="ghost">
+             {isSelectionMode ? 'Cancel' : 'Select'}
+           </Button>
+           {isSelectionMode && selectedIds.length > 0 && (
+             <Button variant="destructive" size="sm" onClick={() => setBulkDeleteAlertOpen(true)}>
+               <Trash2 className="mr-2 h-4 w-4" /> Delete ({selectedIds.length})
+             </Button>
+           )}
           <Button onClick={() => setSettingsDialogOpen(true)} variant="ghost" size="icon">
             <Settings className="h-5 w-5" />
           </Button>
@@ -528,7 +540,8 @@ export default function FiscalFlowDashboard() {
         }}
         onEditEntry={(entry) => {
             setDayEntriesDialogOpen(false);
-            const originalEntry = entries.find(e => e.id.startsWith(entry.id.split('-')[0])) || entry;
+            const originalEntryId = entry.id.split('-')[0];
+            const originalEntry = entries.find(e => e.id === originalEntryId) || entry;
             setEditingEntry(originalEntry);
             setEntryDialogOpen(true);
         }}
@@ -537,7 +550,7 @@ export default function FiscalFlowDashboard() {
        <MonthlyBreakdownDialog
         isOpen={isBreakdownDialogOpen}
         onClose={() => setBreakdownDialogOpen(false)}
-        entries={entries}
+        entries={allGeneratedEntries}
         currentMonth={selectedDate}
         timezone={timezone}
       />
@@ -551,7 +564,6 @@ export default function FiscalFlowDashboard() {
         onTimezoneChange={setTimezone}
         onNotificationsToggle={handleNotificationsToggle}
         user={user}
-        setUser={setUser}
       />
 
        <AlertDialog open={isBulkDeleteAlertOpen} onOpenChange={setBulkDeleteAlertOpen}>
@@ -559,13 +571,13 @@ export default function FiscalFlowDashboard() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the selected {selectedIds.length} entries from your calendar.
+              This action cannot be undone. This will permanently delete the selected {selectedIds.length} entries from your calendar. This will remove the original entry and all of its future recurring instances.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBulkDelete}>
-              Continue
+            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive hover:bg-destructive/90">
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

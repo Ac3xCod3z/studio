@@ -19,7 +19,6 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TableFooter,
 } from '@/components/ui/table';
 import {
   Accordion,
@@ -27,17 +26,16 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { add, endOfMonth, format, getDay, isBefore, isSameMonth, setDate, startOfMonth, getDate, differenceInCalendarMonths, parseISO, isAfter } from 'date-fns';
+import { format, isSameMonth } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { type Entry, type BillCategory, BillCategories } from '@/lib/types';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import { PieChart, Pie, Cell, Tooltip } from 'recharts';
-import { recurrenceIntervalMonths } from '@/lib/constants';
 
 type MonthlyBreakdownDialogProps = {
   isOpen: boolean;
@@ -67,69 +65,10 @@ export function MonthlyBreakdownDialog({
   timezone,
 }: MonthlyBreakdownDialogProps) {
   const breakdownData = useMemo(() => {
-    const start = startOfMonth(currentMonth);
-    const end = endOfMonth(currentMonth);
-
-    const generateRecurringInstances = (entry: Entry): Entry[] => {
-        const instances: Entry[] = [];
-        const originalEntryDate = toZonedTime(parseISO(entry.date), timezone);
-
-        if (entry.recurrence === 'weekly') {
-            let currentDate = originalEntryDate;
-            // Move to the first occurrence that is on or after the start of the breakdown month
-            while (isBefore(currentDate, start)) {
-                currentDate = add(currentDate, { weeks: 1 });
-            }
-            // Add all occurrences within the breakdown month
-            while (isBefore(currentDate, end) || isSameMonth(currentDate, end)) {
-                instances.push({ ...entry, date: format(currentDate, 'yyyy-MM-dd') });
-                currentDate = add(currentDate, { weeks: 1 });
-            }
-            return instances;
-        }
-
-        const recurrenceInterval = entry.recurrence ? recurrenceIntervalMonths[entry.recurrence as keyof typeof recurrenceIntervalMonths] : 0;
-        if (entry.recurrence && entry.recurrence !== 'none' && recurrenceInterval > 0) {
-            let currentDate = originalEntryDate;
-            
-            // Fast-forward to the current month's potential start
-            if (isBefore(currentDate, start)) {
-                const monthsDiff = differenceInCalendarMonths(start, currentDate);
-                if (monthsDiff > 0) {
-                    const monthsToAdd = Math.floor(monthsDiff / recurrenceInterval) * recurrenceInterval;
-                    currentDate = add(currentDate, { months: monthsToAdd });
-                }
-            }
-
-            // Iterate through potential dates and add valid ones
-            while (isBefore(currentDate, end) || isSameMonth(currentDate, end)) {
-                if (isAfter(currentDate, originalEntryDate) || isSameMonth(currentDate, originalEntryDate)) {
-                    // Make sure we haven't overshot the month
-                    if (isSameMonth(currentDate, currentMonth)) {
-                        const lastDayOfMonth = endOfMonth(currentDate).getDate();
-                        const originalDay = getDate(originalEntryDate);
-                        const dayForMonth = Math.min(originalDay, lastDayOfMonth);
-                        const finalDate = setDate(currentDate, dayForMonth);
-                        instances.push({ ...entry, date: format(finalDate, 'yyyy-MM-dd') });
-                    }
-                }
-                currentDate = add(currentDate, { months: recurrenceInterval });
-            }
-
-            return instances;
-        }
-        return [];
-    };
-
-    const monthlyBills = entries
-        .filter(entry => entry.type === 'bill')
-        .flatMap(entry => {
-            if (entry.recurrence === 'none') {
-                const entryDate = toZonedTime(parseISO(entry.date), timezone);
-                return isSameMonth(entryDate, currentMonth) ? [entry] : [];
-            }
-            return generateRecurringInstances(entry);
-        });
+    const monthlyBills = entries.filter(entry => {
+        const entryDate = toZonedTime(entry.date, timezone);
+        return entry.type === 'bill' && isSameMonth(entryDate, currentMonth);
+    });
 
     const breakdown: Record<BillCategory, { total: number, entries: Entry[] }> = Object.fromEntries(
         BillCategories.map(cat => [cat, { total: 0, entries: [] }])
@@ -157,7 +96,7 @@ export function MonthlyBreakdownDialog({
 
   const chartData = useMemo(() => {
     return breakdownData.breakdown.map(({ category, total }) => ({
-      name: category,
+      name: category.charAt(0).toUpperCase() + category.slice(1),
       value: total,
     }));
   }, [breakdownData]);
@@ -175,7 +114,7 @@ export function MonthlyBreakdownDialog({
         </DialogHeader>
         <ScrollArea className="max-h-[60vh] pr-4">
           <div className="space-y-6">
-            {chartData.length > 0 && (
+            {chartData.length > 0 ? (
                  <div className="w-full h-[250px] flex items-center justify-center">
                     <ChartContainer config={{}} className="mx-auto aspect-square h-full">
                         <PieChart>
@@ -203,6 +142,10 @@ export function MonthlyBreakdownDialog({
                         </PieChart>
                     </ChartContainer>
                 </div>
+            ) : (
+                <div className="text-center text-muted-foreground py-8">
+                  No bills with categories found for this month.
+                </div>
             )}
             
             <Accordion type="single" collapsible className="w-full">
@@ -217,10 +160,18 @@ export function MonthlyBreakdownDialog({
                        </AccordionTrigger>
                        <AccordionContent>
                            <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead className="text-right">Amount</TableHead>
+                                  </TableRow>
+                                </TableHeader>
                                <TableBody>
-                                   {entries.sort((a,b) => a.name.localeCompare(b.name)).map((entry, idx) => (
+                                   {entries.sort((a,b) => a.date.localeCompare(b.date)).map((entry, idx) => (
                                        <TableRow key={`${entry.id}-${idx}`}>
                                            <TableCell>{entry.name}</TableCell>
+                                           <TableCell>{format(toZonedTime(entry.date, timezone), 'MMM d')}</TableCell>
                                            <TableCell className="text-right">{formatCurrency(entry.amount)}</TableCell>
                                        </TableRow>
                                    ))}

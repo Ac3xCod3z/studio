@@ -7,12 +7,12 @@ import { useMedia } from "react-use";
 
 import { Logo } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Entry, RolloverPreference } from "@/lib/types";
+import type { Entry, RolloverPreference, MonthlyLeftovers } from "@/lib/types";
 import { FiscalFlowCalendar, SidebarContent } from "@/components/fiscal-flow-calendar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
-import { format, subMonths, startOfMonth, endOfMonth, isBefore, getDay, add, setDate, getDate, startOfWeek, endOfWeek, isSameDay, addMonths, parseISO, isSameMonth } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, isBefore, getDay, add, setDate, getDate, startOfWeek, endOfWeek, isSameDay, addMonths, parseISO, isSameMonth, differenceInCalendarMonths, isAfter } from "date-fns";
 import { toZonedTime } from 'date-fns-tz';
 import { recurrenceIntervalMonths } from "@/lib/constants";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -29,23 +29,22 @@ type SharedData = {
 const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry[] => {
     const instances: Entry[] = [];
     if (!entry.date) return [];
-    // Treat as local to avoid timezone shifts from parseISO
-    const originalEntryDate = new Date(entry.date + 'T00:00:00'); 
     
-    if (isBefore(end, originalEntryDate)) return [];
+    const originalEntryDate = parseISO(entry.date);
+    
+    if (isAfter(originalEntryDate, end)) return [];
 
     if (entry.recurrence === 'weekly') {
-        let currentDate = startOfWeek(originalEntryDate);
-         while (isBefore(currentDate, start)) {
+        let currentDate = startOfWeek(originalEntryDate, { weekStartsOn: getDay(originalEntryDate) });
+        while (isBefore(currentDate, start)) {
             currentDate = add(currentDate, { weeks: 1 });
         }
-
-        while (isBefore(currentDate, end)) {
-            if (currentDate >= start) {
-                 instances.push({
+        while (isBefore(currentDate, end) || isSameDay(currentDate, end)) {
+            if (!isBefore(currentDate, start)) {
+                instances.push({
                     ...entry,
                     date: format(currentDate, 'yyyy-MM-dd'),
-                    id: `${entry.id}-${format(currentDate, 'yyyy-MM-dd')}` // Instance ID
+                    id: `${entry.id}-${format(currentDate, 'yyyy-MM-dd')}`
                 });
             }
             currentDate = add(currentDate, { weeks: 1 });
@@ -55,29 +54,29 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry
     
     const recurrenceInterval = entry.recurrence ? recurrenceIntervalMonths[entry.recurrence as keyof typeof recurrenceIntervalMonths] : 0;
     if (entry.recurrence && entry.recurrence !== 'none' && recurrenceInterval > 0) {
-        let recurringDate = originalEntryDate;
-        while(isBefore(recurringDate, end)) {
-             if (recurringDate >= start) {
-                const lastDayOfMonth = endOfMonth(recurringDate).getDate();
+        let currentDate = originalEntryDate;
+        
+        if (isBefore(currentDate, start)) {
+            const monthsDiff = differenceInCalendarMonths(start, currentDate);
+            currentDate = add(currentDate, { months: Math.floor(monthsDiff / recurrenceInterval) * recurrenceInterval });
+        }
+        
+        while (isBefore(currentDate, end) || isSameDay(currentDate, end)) {
+            if ((isAfter(currentDate, start) || isSameDay(currentDate, start)) && (isBefore(currentDate, end) || isSameDay(currentDate, end))) {
                 const originalDay = getDate(originalEntryDate);
+                const lastDayOfMonth = endOfMonth(currentDate).getDate();
                 const dayForMonth = Math.min(originalDay, lastDayOfMonth);
-                const finalDate = setDate(recurringDate, dayForMonth);
+                const finalDate = setDate(currentDate, dayForMonth);
 
-                if (isSameMonth(finalDate, recurringDate)) {
-                    instances.push({ 
+                if (isSameMonth(finalDate, currentDate)) {
+                     instances.push({ 
                         ...entry, 
                         date: format(finalDate, 'yyyy-MM-dd'), 
                         id: `${entry.id}-${format(finalDate, 'yyyy-MM-dd')}` 
                     });
                 }
-             }
-             
-             let nextDate = add(recurringDate, { months: recurrenceInterval });
-             // If the next date is the same month (e.g. jumping from Jan 31 to Feb 28), ensure we don't get stuck
-             if (isSameMonth(nextDate, recurringDate)) {
-                 nextDate = add(startOfMonth(recurringDate), { months: recurrenceInterval + 1 });
-             }
-             recurringDate = nextDate;
+            }
+            currentDate = add(currentDate, { months: recurrenceInterval });
         }
         return instances;
     }
@@ -118,7 +117,9 @@ const calculateMobileSummary = (
     
     // Determine the relevant previous month for rollover based on the week's start date
     const prevMonthKey = format(subMonths(weekStart, 1), 'yyyy-MM');
-    const startOfWeekLeftover = (rollover === 'carryover' && monthlyLeftovers[prevMonthKey]) || 0;
+    const startOfWeekLeftover = (rollover === 'carryover' && !isSameMonth(weekStart, subMonths(weekStart, 0))) || getDate(weekStart) === 1
+        ? monthlyLeftovers[prevMonthKey] || 0
+        : 0;
 
     let rolloverApplied = 0;
     if (initialWeeklyNet < 0 && startOfWeekLeftover > 0) {
@@ -144,7 +145,7 @@ export default function ViewOnlyCalendar() {
   
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isMobileSheetOpen, setMobileSheetOpen] = useState(false);
-  const [monthlyLeftovers, setMonthlyLeftovers] = useState<any>({});
+  const [monthlyLeftovers, setMonthlyLeftovers] = useState<MonthlyLeftovers>({});
 
   const isMobile = useMedia("(max-width: 1024px)", false);
 
@@ -170,19 +171,18 @@ export default function ViewOnlyCalendar() {
     const { entries } = data;
     if (entries.length === 0) return [];
     
-    const oldestEntry = entries.reduce((oldest, entry) => {
-      const entryDate = new Date(entry.date);
-      return entryDate < oldest ? entryDate : oldest;
-    }, new Date());
-    const start = startOfMonth(oldestEntry);
-    const end = endOfMonth(add(new Date(), { years: 2 })); // Project 2 years into the future
+    const viewStart = startOfMonth(subMonths(new Date(), 6));
+    const viewEnd = endOfMonth(addMonths(new Date(), 12));
 
     return entries.flatMap((e) => {
         const instances: Entry[] = [];
-        if (e.recurrence === 'none') {
-            instances.push(e);
+        if (e.recurrence === 'none' || !e.recurrence) {
+            const entryDate = parseISO(e.date);
+            if(entryDate >= viewStart && entryDate <= viewEnd) {
+                instances.push(e);
+            }
         } else {
-            instances.push(...generateRecurringInstances(e, start, end));
+            instances.push(...generateRecurringInstances(e, viewStart, viewEnd));
         }
         return instances;
     });
@@ -194,19 +194,21 @@ export default function ViewOnlyCalendar() {
         return;
     }
     const { rollover, timezone } = data;
-    const oldestEntry = allGeneratedEntries.reduce((oldest, entry) => {
+
+    const newLeftovers: MonthlyLeftovers = {};
+
+    const oldestEntryDate = allGeneratedEntries.reduce((oldest, entry) => {
         const entryDate = parseISO(entry.date);
         return entryDate < oldest ? entryDate : oldest;
     }, new Date());
 
-    const start = startOfMonth(oldestEntry);
+    const start = startOfMonth(oldestEntryDate);
     const end = new Date(); 
     
-    const newLeftovers: any = {};
     let current = start;
     let lastMonthLeftover = 0;
 
-    while(isBefore(current, end)) {
+    while(isBefore(current, end) || isSameMonth(current, end)) {
         const monthKey = format(current, 'yyyy-MM');
         
         const entriesForMonth = allGeneratedEntries.filter(e => isSameMonth(parseDateInTimezone(e.date, timezone), current));
@@ -295,6 +297,11 @@ export default function ViewOnlyCalendar() {
         monthlyLeftovers={monthlyLeftovers}
         weeklyTotals={weeklyTotals}
         onOpenBreakdown={() => {}} // No-op
+        isSelectionMode={false}
+        toggleSelectionMode={() => {}}
+        selectedIds={[]}
+        setSelectedIds={() => {}}
+        onBulkDelete={() => {}}
       />
     </div>
   );
