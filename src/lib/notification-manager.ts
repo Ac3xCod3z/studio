@@ -4,7 +4,7 @@ import { formatCurrency } from './utils';
 import { add, getDay, isAfter, isBefore, set } from 'date-fns';
 import { recurrenceIntervalMonths } from './constants';
 
-const NOTIFICATION_TAG_PREFIX = 'fiscalflow-bill-';
+const NOTIFICATION_TAG_PREFIX = 'centsi-bill-';
 const NOTIFICATION_WINDOW_DAYS = 90; // Schedule notifications for the next 90 days.
 
 async function getServiceWorkerRegistration() {

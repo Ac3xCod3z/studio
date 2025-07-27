@@ -1,5 +1,5 @@
-import FiscalFlowLoader from '@/components/fiscal-flow-loader';
+import CentsiLoader from '@/components/centsi-loader';
 
 export default function Home() {
-  return <FiscalFlowLoader />;
+  return <CentsiLoader />;
 }
