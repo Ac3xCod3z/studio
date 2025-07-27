@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import useLocalStorage from "@/hooks/use-local-storage";
 import { useMedia } from "react-use";
 import { auth } from "@/lib/firebase";
@@ -13,13 +13,23 @@ import { SettingsDialog } from "./settings-dialog";
 import { DayEntriesDialog } from "./day-entries-dialog";
 import { MonthlyBreakdownDialog } from "./monthly-breakdown-dialog";
 import { Logo } from "./icons";
-import { Settings, Menu, Plus, CalendarSync, Loader2, LogOut } from "lucide-react";
+import { Settings, Menu, Plus, CalendarSync, Loader2, LogOut, ShieldQuestion } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { Entry, RolloverPreference, MonthlyLeftovers } from "@/lib/types";
 import { FiscalFlowCalendar, SidebarContent } from "./fiscal-flow-calendar";
-import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths, parseISO } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths, parseISO, differenceInCalendarMonths, isAfter } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { recurrenceIntervalMonths } from "@/lib/constants";
 import { ScrollArea } from "./ui/scroll-area";
@@ -38,23 +48,24 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry[] => {
     const instances: Entry[] = [];
     if (!entry.date) return [];
-    // Treat as local to avoid timezone shifts from parseISO
-    const originalEntryDate = new Date(entry.date + 'T00:00:00'); 
     
-    if (isBefore(end, originalEntryDate)) return [];
+    // Use parseISO to correctly handle YYYY-MM-DD as a UTC date
+    // to prevent off-by-one day errors due to timezone conversion.
+    const originalEntryDate = parseISO(entry.date);
+    
+    if (isAfter(originalEntryDate, end)) return [];
 
     if (entry.recurrence === 'weekly') {
-        let currentDate = startOfWeek(originalEntryDate);
-         while (isBefore(currentDate, start)) {
+        let currentDate = startOfWeek(originalEntryDate, { weekStartsOn: getDay(originalEntryDate) });
+        while (isBefore(currentDate, start)) {
             currentDate = add(currentDate, { weeks: 1 });
         }
-
-        while (isBefore(currentDate, end)) {
-            if (currentDate >= start) {
-                 instances.push({
+        while (isBefore(currentDate, end) || isSameDay(currentDate, end)) {
+            if (!isBefore(currentDate, start)) {
+                instances.push({
                     ...entry,
                     date: format(currentDate, 'yyyy-MM-dd'),
-                    id: `${entry.id}-${format(currentDate, 'yyyy-MM-dd')}` // Instance ID
+                    id: `${entry.id}-${format(currentDate, 'yyyy-MM-dd')}`
                 });
             }
             currentDate = add(currentDate, { weeks: 1 });
@@ -64,29 +75,31 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry
     
     const recurrenceInterval = entry.recurrence ? recurrenceIntervalMonths[entry.recurrence as keyof typeof recurrenceIntervalMonths] : 0;
     if (entry.recurrence && entry.recurrence !== 'none' && recurrenceInterval > 0) {
-        let recurringDate = originalEntryDate;
-        while(isBefore(recurringDate, end)) {
-             if (recurringDate >= start) {
-                const lastDayOfMonth = endOfMonth(recurringDate).getDate();
+        let currentDate = originalEntryDate;
+        
+        // Fast-forward to the relevant period
+        if (isBefore(currentDate, start)) {
+            const monthsDiff = differenceInCalendarMonths(start, currentDate);
+            currentDate = add(currentDate, { months: Math.floor(monthsDiff / recurrenceInterval) * recurrenceInterval });
+        }
+        
+        while (isBefore(currentDate, end) || isSameDay(currentDate, end)) {
+            // Check if date is within the desired range [start, end]
+            if ((isAfter(currentDate, start) || isSameDay(currentDate, start)) && (isBefore(currentDate, end) || isSameDay(currentDate, end))) {
                 const originalDay = getDate(originalEntryDate);
+                const lastDayOfMonth = endOfMonth(currentDate).getDate();
                 const dayForMonth = Math.min(originalDay, lastDayOfMonth);
-                const finalDate = setDate(recurringDate, dayForMonth);
+                const finalDate = setDate(currentDate, dayForMonth);
 
-                if (isSameMonth(finalDate, recurringDate)) {
-                    instances.push({ 
+                if (isSameMonth(finalDate, currentDate)) {
+                     instances.push({ 
                         ...entry, 
                         date: format(finalDate, 'yyyy-MM-dd'), 
                         id: `${entry.id}-${format(finalDate, 'yyyy-MM-dd')}` 
                     });
                 }
-             }
-             
-             let nextDate = add(recurringDate, { months: recurrenceInterval });
-             // If the next date is the same month (e.g. jumping from Jan 31 to Feb 28), ensure we don't get stuck
-             if (isSameMonth(nextDate, recurringDate)) {
-                 nextDate = add(startOfMonth(recurringDate), { months: recurrenceInterval + 1 });
-             }
-             recurringDate = nextDate;
+            }
+            currentDate = add(currentDate, { months: recurrenceInterval });
         }
         return instances;
     }
@@ -123,6 +136,23 @@ export default function FiscalFlowDashboard() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isBulkDeleteAlertOpen, setBulkDeleteAlertOpen] = useState(false);
+
+  const toggleSelectionMode = useCallback(() => {
+    setIsSelectionMode(prev => !prev);
+    setSelectedIds([]);
+  }, []);
+
+  const handleBulkDelete = () => {
+    setEntries(prev => prev.filter(e => !selectedIds.includes(e.id)));
+    toggleSelectionMode();
+    setBulkDeleteAlertOpen(false);
+    toast({ title: `${selectedIds.length} entries deleted.` });
+  };
+
+
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
         setUser(user);
@@ -146,7 +176,6 @@ export default function FiscalFlowDashboard() {
               setIsAuthLoading(false);
           }
       };
-      // Only run this if not loading from onAuthStateChanged
       if(isAuthLoading) {
         handleRedirectResult();
       }
@@ -218,28 +247,27 @@ export default function FiscalFlowDashboard() {
   };
   
   const allGeneratedEntries = useMemo(() => {
-    if (entries.length === 0) return [];
+    if (!isMounted || entries.length === 0) return [];
     
-    const oldestEntry = entries.reduce((oldest, entry) => {
-      const entryDate = new Date(entry.date);
-      return entryDate < oldest ? entryDate : oldest;
-    }, new Date());
-    const start = startOfMonth(oldestEntry);
-    const end = endOfMonth(add(new Date(), { years: 2 })); // Project 2 years into the future
+    const viewStart = startOfMonth(subMonths(new Date(), 6));
+    const viewEnd = endOfMonth(addMonths(new Date(), 12));
 
     return entries.flatMap((e) => {
         const instances: Entry[] = [];
         if (e.recurrence === 'none') {
-            instances.push(e);
+            const entryDate = parseISO(e.date);
+            if (entryDate >= viewStart && entryDate <= viewEnd) {
+                instances.push(e);
+            }
         } else {
-            instances.push(...generateRecurringInstances(e, start, end));
+            instances.push(...generateRecurringInstances(e, viewStart, viewEnd));
         }
         return instances;
     });
-  }, [entries]);
+  }, [entries, isMounted]);
 
   useEffect(() => {
-    if (allGeneratedEntries.length === 0) {
+    if (!isMounted || allGeneratedEntries.length === 0) {
       if (Object.keys(monthlyLeftovers).length > 0) {
         setMonthlyLeftovers({});
       }
@@ -279,12 +307,12 @@ export default function FiscalFlowDashboard() {
 
       current = addMonths(current, 1);
     }
-
-    // Deep comparison to prevent infinite loops
+    
     if (JSON.stringify(newLeftovers) !== JSON.stringify(monthlyLeftovers)) {
-      setMonthlyLeftovers(newLeftovers);
+        setMonthlyLeftovers(newLeftovers);
     }
-  }, [allGeneratedEntries, rollover, timezone, monthlyLeftovers, setMonthlyLeftovers]);
+
+  }, [isMounted, allGeneratedEntries, rollover, timezone, setMonthlyLeftovers, monthlyLeftovers]);
 
 
   const { dayEntries, weeklyTotals} = useMemo(() => {
@@ -294,20 +322,12 @@ export default function FiscalFlowDashboard() {
           weeklyTotals: { income: 0, bills: 0, net: 0, rolloverApplied: 0 }
         };
       }
-      const currentMonth = selectedDate;
-      const calendarStart = startOfWeek(startOfMonth(currentMonth));
-      const calendarEnd = endOfWeek(endOfMonth(currentMonth));
 
-      const entriesForCurrentMonthView = allGeneratedEntries.filter(e => {
-        const entryDate = parseDateInTimezone(e.date, timezone);
-        return entryDate >= calendarStart && entryDate <= calendarEnd;
-      });
-
-      const dayEntries = entriesForCurrentMonthView.filter((e) => isSameDay(parseDateInTimezone(e.date, timezone), selectedDate));
+      const dayEntries = allGeneratedEntries.filter((e) => isSameDay(parseDateInTimezone(e.date, timezone), selectedDate));
 
       const weekStart = startOfWeek(selectedDate);
       const weekEnd = endOfWeek(selectedDate);
-      const weekEntries = entriesForCurrentMonthView.filter(e => {
+      const weekEntries = allGeneratedEntries.filter(e => {
           const entryDate = parseDateInTimezone(e.date, timezone);
           return entryDate >= weekStart && entryDate <= weekEnd;
       });
@@ -405,9 +425,11 @@ export default function FiscalFlowDashboard() {
             <span className="text-xl font-bold">FiscalFlow</span>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={() => openNewEntryDialog(new Date())} size="sm" className="hidden md:flex">
-            <Plus className="-ml-1 mr-2 h-4 w-4" /> Add Entry
-          </Button>
+          {!isSelectionMode && (
+            <Button onClick={() => openNewEntryDialog(new Date())} size="sm" className="hidden md:flex">
+              <Plus className="-ml-1 mr-2 h-4 w-4" /> Add Entry
+            </Button>
+          )}
           <Button onClick={() => setSettingsDialogOpen(true)} variant="ghost" size="icon">
             <Settings className="h-5 w-5" />
           </Button>
@@ -478,6 +500,11 @@ export default function FiscalFlowDashboard() {
         onOpenBreakdown={() => setBreakdownDialogOpen(true)}
         monthlyLeftovers={monthlyLeftovers}
         weeklyTotals={weeklyTotals}
+        isSelectionMode={isSelectionMode}
+        toggleSelectionMode={toggleSelectionMode}
+        selectedIds={selectedIds}
+        setSelectedIds={setSelectedIds}
+        onBulkDelete={() => setBulkDeleteAlertOpen(true)}
       />
       
       <EntryDialog 
@@ -526,6 +553,23 @@ export default function FiscalFlowDashboard() {
         user={user}
         setUser={setUser}
       />
+
+       <AlertDialog open={isBulkDeleteAlertOpen} onOpenChange={setBulkDeleteAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the selected {selectedIds.length} entries from your calendar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete}>
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
