@@ -27,9 +27,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { Entry, RolloverPreference, MonthlyLeftovers } from "@/lib/types";
+import type { Entry, RolloverPreference, WeeklyBalances } from "@/lib/types";
 import { FiscalFlowCalendar, SidebarContent } from "./fiscal-flow-calendar";
-import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths, parseISO, differenceInCalendarMonths, isAfter } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths, parseISO, differenceInCalendarMonths, isAfter, eachWeekOfInterval, getWeek } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { recurrenceIntervalMonths } from "@/lib/constants";
 import { ScrollArea } from "./ui/scroll-area";
@@ -118,7 +118,7 @@ export default function FiscalFlowDashboard() {
   const [entries, setEntries] = useLocalStorage<Entry[]>("fiscalFlowEntries", []);
   const [rollover, setRollover] = useLocalStorage<RolloverPreference>("fiscalFlowRollover", "carryover");
   const [timezone, setTimezone] = useLocalStorage<string>('fiscalFlowTimezone', 'UTC');
-  const [monthlyLeftovers, setMonthlyLeftovers] = useLocalStorage<MonthlyLeftovers>("fiscalFlowLeftovers", {});
+  const [weeklyBalances, setWeeklyBalances] = useLocalStorage<WeeklyBalances>("fiscalFlowWeeklyBalances", {});
   const [notificationsEnabled, setNotificationsEnabled] = useLocalStorage('fiscalFlowNotificationsEnabled', false);
   const [user, setUser] = useState<User | null>(null);
 
@@ -271,91 +271,77 @@ export default function FiscalFlowDashboard() {
   useEffect(() => {
     if (!isMounted) return;
 
-    const newLeftovers: MonthlyLeftovers = {};
+    const newWeeklyBalances: WeeklyBalances = {};
     if (allGeneratedEntries.length > 0) {
-        const oldestEntryDate = allGeneratedEntries.reduce((oldest, entry) => {
-          const entryDate = parseISO(entry.date);
-          return entryDate < oldest ? entryDate : oldest;
-        }, new Date());
+        const sortedEntries = allGeneratedEntries.sort((a,b) => a.date.localeCompare(b.date));
+        
+        const firstDate = parseISO(sortedEntries[0].date);
+        const lastDate = parseISO(sortedEntries[sortedEntries.length - 1].date);
+        
+        const weeks = eachWeekOfInterval({ start: firstDate, end: lastDate });
+        let lastWeekBalance = 0;
 
-        const start = startOfMonth(oldestEntryDate);
-        const end = new Date(); // Calculate up to the current date
+        weeks.forEach(weekStart => {
+            const weekEnd = endOfWeek(weekStart);
+            const weekKey = format(weekStart, 'yyyy-MM-dd');
 
-        let current = start;
-        let lastMonthLeftover = 0;
-
-        while (isBefore(current, end) || isSameMonth(current, end)) {
-          const monthKey = format(current, 'yyyy-MM');
-
-          const entriesForMonth = allGeneratedEntries.filter(e =>
-            isSameMonth(parseDateInTimezone(e.date, timezone), current)
-          );
-          const income = entriesForMonth
-            .filter(e => e.type === 'income')
-            .reduce((sum, e) => sum + e.amount, 0);
-          const bills = entriesForMonth
-            .filter(e => e.type === 'bill')
-            .reduce((sum, e) => sum + e.amount, 0);
-
-          const endOfMonthBalance =
-            income + (rollover === 'carryover' ? lastMonthLeftover : 0) - bills;
-
-          newLeftovers[monthKey] = endOfMonthBalance;
-          lastMonthLeftover = endOfMonthBalance;
-
-          current = addMonths(current, 1);
-        }
+            const entriesForWeek = allGeneratedEntries.filter(e => {
+                const entryDate = parseDateInTimezone(e.date, timezone);
+                return entryDate >= weekStart && entryDate <= weekEnd;
+            });
+            
+            const income = entriesForWeek.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
+            const bills = entriesForWeek.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
+            
+            const endOfWeekBalance = lastWeekBalance + income - bills;
+            newWeeklyBalances[weekKey] = { start: lastWeekBalance, end: endOfWeekBalance };
+            lastWeekBalance = endOfWeekBalance;
+        });
     }
     
     // Only update state if the calculated object is different
-    if (JSON.stringify(newLeftovers) !== JSON.stringify(monthlyLeftovers)) {
-        setMonthlyLeftovers(newLeftovers);
+    if (JSON.stringify(newWeeklyBalances) !== JSON.stringify(weeklyBalances)) {
+        setWeeklyBalances(newWeeklyBalances);
     }
 
-  }, [isMounted, allGeneratedEntries, rollover, timezone, setMonthlyLeftovers, monthlyLeftovers]);
+  }, [isMounted, allGeneratedEntries, timezone, setWeeklyBalances, weeklyBalances]);
 
 
   const { dayEntries, weeklyTotals} = useMemo(() => {
       if (!allGeneratedEntries.length) {
         return {
           dayEntries: [],
-          weeklyTotals: { income: 0, bills: 0, net: 0, rolloverApplied: 0 }
+          weeklyTotals: { income: 0, bills: 0, net: 0, startOfWeekBalance: 0 }
         };
       }
 
       const dayEntries = allGeneratedEntries.filter((e) => isSameDay(parseDateInTimezone(e.date, timezone), selectedDate));
-
+      
       const weekStart = startOfWeek(selectedDate);
-      const weekEnd = endOfWeek(selectedDate);
+      const weekKey = format(weekStart, 'yyyy-MM-dd');
+      
+      const weekBalanceInfo = weeklyBalances[weekKey];
+      const startOfWeekBalance = weekBalanceInfo ? weekBalanceInfo.start : 0;
+      const endOfWeekBalance = weekBalanceInfo ? weekBalanceInfo.end : 0;
+
       const weekEntries = allGeneratedEntries.filter(e => {
           const entryDate = parseDateInTimezone(e.date, timezone);
-          return entryDate >= weekStart && entryDate <= weekEnd;
+          return entryDate >= weekStart && entryDate <= endOfWeek(weekStart);
       });
 
       const weeklyIncome = weekEntries.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
       const weeklyBills = weekEntries.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
-      const initialWeeklyNet = weeklyIncome - weeklyBills;
-      
-      const prevMonthKey = format(subMonths(weekStart, 1), 'yyyy-MM');
-      const monthLeftover = (rollover === 'carryover' ? monthlyLeftovers[prevMonthKey] : 0) || 0;
-      
-      let rolloverApplied = 0;
-      if (initialWeeklyNet < 0 && monthLeftover > 0) {
-          rolloverApplied = Math.min(Math.abs(initialWeeklyNet), monthLeftover);
-      }
-      
-      const finalWeeklyNet = initialWeeklyNet + rolloverApplied;
 
       return {
         dayEntries,
         weeklyTotals: {
             income: weeklyIncome,
             bills: weeklyBills,
-            net: finalWeeklyNet,
-            rolloverApplied,
+            net: endOfWeekBalance,
+            startOfWeekBalance: startOfWeekBalance,
         }
       }
-  }, [selectedDate, allGeneratedEntries, timezone, rollover, monthlyLeftovers]);
+  }, [selectedDate, allGeneratedEntries, timezone, weeklyBalances]);
 
   const handleSyncCalendar = async () => {
     if (!user) {
@@ -497,7 +483,6 @@ export default function FiscalFlowDashboard() {
         entries={entries}
         setEntries={setEntries}
         generatedEntries={allGeneratedEntries}
-        rollover={rollover}
         timezone={timezone}
         openNewEntryDialog={openNewEntryDialog}
         setEditingEntry={setEditingEntry}
@@ -505,8 +490,7 @@ export default function FiscalFlowDashboard() {
         setEntryDialogOpen={setEntryDialogOpen}
         isMobile={isMobile}
         openDayEntriesDialog={() => setDayEntriesDialogOpen(true)}
-        onOpenBreakdown={() => setBreakdownDialogOpen(true)}
-        monthlyLeftovers={monthlyLeftovers}
+        weeklyBalances={weeklyBalances}
         weeklyTotals={weeklyTotals}
         isSelectionMode={isSelectionMode}
         toggleSelectionMode={toggleSelectionMode}

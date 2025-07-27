@@ -2,7 +2,7 @@
 // src/components/fiscal-flow-calendar.tsx
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import {
   addMonths,
   subMonths,
@@ -17,13 +17,13 @@ import {
   isSameDay,
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
-import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Repeat, PieChart, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Repeat, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn, formatCurrency } from "@/lib/utils";
-import type { Entry, RolloverPreference, MonthlyLeftovers } from "@/lib/types";
+import type { Entry, WeeklyBalances } from "@/lib/types";
 import { Checkbox } from "./ui/checkbox";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -37,7 +37,6 @@ type FiscalFlowCalendarProps = {
     entries: Entry[];
     generatedEntries: Entry[];
     setEntries: (value: Entry[] | ((val: Entry[]) => Entry[])) => void;
-    rollover: RolloverPreference;
     timezone: string;
     openNewEntryDialog: (date: Date) => void;
     setEditingEntry: (entry: Entry | null) => void;
@@ -46,9 +45,8 @@ type FiscalFlowCalendarProps = {
     isMobile: boolean;
     openDayEntriesDialog: () => void;
     isReadOnly?: boolean;
-    monthlyLeftovers: MonthlyLeftovers;
+    weeklyBalances: WeeklyBalances;
     weeklyTotals: any;
-    onOpenBreakdown: () => void;
     isSelectionMode: boolean;
     toggleSelectionMode: () => void;
     selectedIds: string[];
@@ -60,7 +58,6 @@ export function FiscalFlowCalendar({
     entries,
     generatedEntries,
     setEntries,
-    rollover,
     timezone,
     openNewEntryDialog,
     setEditingEntry,
@@ -69,9 +66,8 @@ export function FiscalFlowCalendar({
     isMobile,
     openDayEntriesDialog,
     isReadOnly = false,
-    monthlyLeftovers,
+    weeklyBalances,
     weeklyTotals,
-    onOpenBreakdown,
     isSelectionMode,
     toggleSelectionMode,
     selectedIds,
@@ -187,36 +183,13 @@ export function FiscalFlowCalendar({
       setEntries(prevEntries => 
         prevEntries.map(entry => 
           entry.id === draggingEntryId 
-            ? { ...entry, date: format(targetDate, 'yyyy-MM-dd'), recurrence: 'none' } // Dropping makes it non-recurring
+            ? { ...entry, date: format(targetDate, 'yyyy-M-dd'), recurrence: 'none' } // Dropping makes it non-recurring
             : entry
         )
       );
     }
     setDraggingEntryId(null);
   };
-
-  const monthlyTotals = useMemo(() => {
-    const monthKey = format(currentMonth, 'yyyy-MM');
-    const prevMonthKey = format(subMonths(currentMonth, 1), 'yyyy-MM');
-    const previousMonthLeftover = (rollover === 'carryover' && monthlyLeftovers[prevMonthKey]) || 0;
-    
-    const entriesForCurrentMonth = generatedEntries.filter(e => isSameMonth(parseDateInTimezone(e.date, timezone), currentMonth));
-    const monthlyBills = entriesForCurrentMonth.filter((e) => e.type === "bill").reduce((sum, e) => sum + e.amount, 0);
-    const currentMonthIncome = entriesForCurrentMonth.filter((e) => e.type === "income").reduce((sum, e) => sum + e.amount, 0);
-    
-    const monthlyNet = currentMonthIncome - monthlyBills;
-    const endOfMonthBalance = currentMonthIncome + previousMonthLeftover - monthlyBills;
-    
-    return {
-        bills: monthlyBills, 
-        income: currentMonthIncome, 
-        net: monthlyNet, 
-        endOfMonthBalance: endOfMonthBalance, 
-        rollover: previousMonthLeftover,
-        monthKey
-    };
-  }, [generatedEntries, currentMonth, rollover, monthlyLeftovers, timezone]);
-
 
   const Sidebar = () => (
     <SidebarContent 
@@ -311,47 +284,6 @@ export function FiscalFlowCalendar({
               );
             })}
           </div>
-          <div className="mt-6 border-t pt-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-center md:text-left">
-                {format(currentMonth, "MMMM")} Summary
-              </h2>
-              <Button onClick={onOpenBreakdown} variant="outline" size="sm">
-                <PieChart className="mr-2 h-4 w-4" /> View Breakdown
-              </Button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <SummaryCard
-                title="Total Income"
-                amount={monthlyTotals.income}
-                icon={<ArrowUp className="text-emerald-500" />}
-              />
-              <SummaryCard
-                title="Total Bills"
-                amount={monthlyTotals.bills}
-                icon={<ArrowDown className="text-destructive" />}
-              />
-               <SummaryCard
-                title="Rollover"
-                amount={monthlyTotals.rollover}
-                icon={<Repeat />}
-                description="From previous month"
-              />
-              <SummaryCard
-                title="Monthly Net"
-                amount={monthlyTotals.net}
-                variant={monthlyTotals.net >= 0 ? 'positive' : 'negative'}
-                description="Income - Bills"
-              />
-              <SummaryCard
-                title="End-of-Month Balance"
-                amount={monthlyTotals.endOfMonthBalance}
-                variant={monthlyTotals.endOfMonthBalance >= 0 ? 'positive' : 'negative'}
-                className="md:col-span-2 lg:col-span-4"
-                description="(Income + Rollover) - Bills"
-              />
-            </div>
-          </div>
         </main>
         {!isMobile && (
           <aside className="w-[350px] border-l overflow-y-auto hidden lg:block">
@@ -389,12 +321,10 @@ export const SidebarContent = ({
   <div className="flex flex-col gap-6 p-4 md:p-6">
       <div className="space-y-4">
           <h3 className="font-semibold text-lg">Week of {format(startOfWeek(selectedDate), "MMM d")}</h3>
+          <SummaryCard title="Starting Balance" amount={weeklyTotals.startOfWeekBalance} icon={<Repeat />} description="Rollover from previous week" />
           <SummaryCard title="Income" amount={weeklyTotals.income} icon={<ArrowUp className="text-emerald-500" />} />
           <SummaryCard title="Bills Due" amount={weeklyTotals.bills} icon={<ArrowDown className="text-destructive" />} />
-          {weeklyTotals.rolloverApplied > 0 && (
-              <SummaryCard title="Rollover Applied" amount={weeklyTotals.rolloverApplied} icon={<Repeat />} />
-          )}
-          <SummaryCard title="Weekly Net" amount={weeklyTotals.net} variant={weeklyTotals.net >= 0 ? 'positive' : 'negative'} />
+          <SummaryCard title="Weekly Net" amount={weeklyTotals.net} variant={weeklyTotals.net >= 0 ? 'positive' : 'negative'} description="End of week balance" />
       </div>
   </div>
 );
