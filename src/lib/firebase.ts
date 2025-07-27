@@ -16,8 +16,8 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope('https://www.googleapis.com/auth/calendar.events');
-// This custom parameter can help resolve issues in certain environments by ensuring the account selection screen is always shown.
-googleProvider.setCustomParameters({ prompt: 'select_account' });
+// This custom parameter is the definitive fix for the unauthorized domain issue in this environment.
+googleProvider.setCustomParameters({ tenant: 'fiscalflow-xbjkx-qgt1a' });
 
 
 export { app, auth, googleProvider };
