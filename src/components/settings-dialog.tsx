@@ -43,6 +43,8 @@ import { useToast } from "@/hooks/use-toast";
 import { timezones } from "@/lib/timezones";
 import { ScrollArea } from "./ui/scroll-area";
 import useLocalStorage from "@/hooks/use-local-storage";
+import { auth, googleProvider } from "@/lib/firebase";
+import { signInWithPopup, signOut, onAuthStateChanged, type User, type AuthProvider } from "firebase/auth";
 
 const formSchema = z.object({
   incomeLevel: z.coerce.number().positive({ message: "Income must be a positive number." }),
@@ -57,6 +59,8 @@ type SettingsDialogProps = {
   timezone: string;
   onTimezoneChange: (timezone: string) => void;
   onNotificationsToggle: (enabled: boolean) => void;
+  user: User | null;
+  setUser: (user: User | null) => void;
 };
 
 export function SettingsDialog({
@@ -67,6 +71,8 @@ export function SettingsDialog({
   timezone,
   onTimezoneChange,
   onNotificationsToggle,
+  user,
+  setUser
 }: SettingsDialogProps) {
   const [recommendation, setRecommendation] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -85,6 +91,21 @@ export function SettingsDialog({
     setShareLink('');
     setHasCopied(false);
   }, [isOpen]);
+
+  const handleGoogleSignIn = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+      toast({ title: "Signed in successfully!" });
+    } catch (error) {
+      console.error("Google Sign-In Error:", error);
+      toast({ title: "Sign-in failed", description: "Could not sign in with Google.", variant: "destructive" });
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOut(auth);
+    toast({ title: "Signed out." });
+  };
 
   const handleNotificationToggle = async () => {
     if (!("Notification" in window) || !("serviceWorker" in navigator)) {
@@ -162,12 +183,28 @@ export function SettingsDialog({
         <DialogHeader className="p-6 pb-2">
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
-            Manage your application preferences.
+            Manage your application preferences and integrations.
           </DialogDescription>
         </DialogHeader>
         
         <ScrollArea className="px-6">
           <div className="space-y-4 py-4">
+             <div className="space-y-2">
+                <h3 className="font-semibold">Google Calendar</h3>
+                <p className="text-sm text-muted-foreground">
+                    {user ? `Connected as ${user.displayName}.` : "Connect your account to sync your financial entries."}
+                </p>
+                {user ? (
+                    <Button onClick={handleSignOut} className="w-full" variant="secondary">Sign Out</Button>
+                ) : (
+                    <Button onClick={handleGoogleSignIn} className="w-full">
+                        Connect Google Calendar
+                    </Button>
+                )}
+            </div>
+
+            <Separator />
+
              <div className="space-y-2">
                 <h3 className="font-semibold">Share Calendar</h3>
                 <p className="text-sm text-muted-foreground">Generate a read-only link to share your calendar with others.</p>

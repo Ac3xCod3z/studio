@@ -4,13 +4,15 @@
 import React, { useState, useEffect, useMemo } from "react";
 import useLocalStorage from "@/hooks/use-local-storage";
 import { useMedia } from "react-use";
+import { auth } from "@/lib/firebase";
+import type { User } from "firebase/auth";
 
 import { EntryDialog } from "./entry-dialog";
 import { SettingsDialog } from "./settings-dialog";
 import { DayEntriesDialog } from "./day-entries-dialog";
 import { MonthlyBreakdownDialog } from "./monthly-breakdown-dialog";
 import { Logo } from "./icons";
-import { Settings, Menu, Plus } from "lucide-react";
+import { Settings, Menu, Plus, CalendarSync, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
@@ -22,6 +24,7 @@ import { recurrenceIntervalMonths } from "@/lib/constants";
 import { ScrollArea } from "./ui/scroll-area";
 import { scheduleNotifications, cancelAllNotifications } from "@/lib/notification-manager";
 import { useToast } from "@/hooks/use-toast";
+import { syncToGoogleCalendar } from "@/ai/flows/sync-to-google-calendar";
 
 const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry[] => {
     const instances: Entry[] = [];
@@ -95,6 +98,7 @@ export default function FiscalFlowDashboard() {
   const [timezone, setTimezone] = useLocalStorage<string>('fiscalFlowTimezone', 'UTC');
   const [monthlyLeftovers, setMonthlyLeftovers] = useLocalStorage<MonthlyLeftovers>("fiscalFlowLeftovers", {});
   const [notificationsEnabled, setNotificationsEnabled] = useLocalStorage('fiscalFlowNotificationsEnabled', false);
+  const [user, setUser] = useState<User | null>(null);
 
   const [isEntryDialogOpen, setEntryDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setSettingsDialogOpen] = useState(false);
@@ -107,6 +111,12 @@ export default function FiscalFlowDashboard() {
   const [isMounted, setIsMounted] = useState(false);
   const isMobile = useMedia("(max-width: 1024px)", false);
   const { toast } = useToast();
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(setUser);
+    return () => unsubscribe();
+  }, []);
 
   const handleNotificationsToggle = (enabled: boolean) => {
     setNotificationsEnabled(enabled);
@@ -223,7 +233,7 @@ export default function FiscalFlowDashboard() {
     if (JSON.stringify(newLeftovers) !== JSON.stringify(monthlyLeftovers)) {
         setMonthlyLeftovers(newLeftovers);
     }
-  }, [allGeneratedEntries, rollover, timezone, setMonthlyLeftovers]);
+  }, [allGeneratedEntries, rollover, timezone, setMonthlyLeftovers, monthlyLeftovers]);
 
 
   const { dayEntries, weeklyTotals} = useMemo(() => {
@@ -276,6 +286,33 @@ export default function FiscalFlowDashboard() {
       }
   }, [selectedDate, allGeneratedEntries, timezone, rollover, monthlyLeftovers]);
 
+  const handleSyncCalendar = async () => {
+    if (!user) {
+        toast({ title: "Not Signed In", description: "Please connect your Google Account in Settings first.", variant: "destructive" });
+        return;
+    }
+    setIsSyncing(true);
+    try {
+        const accessToken = await user.getIdToken(true);
+        const result = await syncToGoogleCalendar({
+            entries: allGeneratedEntries.filter(e => isSameMonth(parseDateInTimezone(e.date, timezone), selectedDate)),
+            timezone,
+            accessToken,
+        });
+
+        toast({
+            title: "Sync Complete!",
+            description: `${result.syncedCount} events were synced to your Google Calendar.`,
+        });
+
+    } catch (error) {
+        console.error("Google Calendar Sync Error:", error);
+        toast({ title: "Sync Failed", description: "Could not sync events to Google Calendar.", variant: "destructive" });
+    } finally {
+        setIsSyncing(false);
+    }
+  };
+
   if (!isMounted) {
     return (
       <div className="flex h-screen w-full flex-col bg-background">
@@ -317,6 +354,16 @@ export default function FiscalFlowDashboard() {
             <span className="text-xl font-bold">FiscalFlow</span>
         </div>
         <div className="flex items-center gap-2">
+           {user && (
+             <Button onClick={handleSyncCalendar} size="sm" className="hidden md:flex" disabled={isSyncing}>
+                {isSyncing ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                    <CalendarSync className="mr-2 h-4 w-4" />
+                )}
+                Sync Calendar
+             </Button>
+           )}
           <Button onClick={() => openNewEntryDialog(new Date())} size="sm" className="hidden md:flex">
             <Plus className="-ml-1 mr-2 h-4 w-4" /> Add Entry
           </Button>
@@ -340,6 +387,18 @@ export default function FiscalFlowDashboard() {
                     weeklyTotals={weeklyTotals}
                     selectedDate={selectedDate}
                   />
+                   {user && (
+                     <div className="p-4 md:p-6">
+                        <Button onClick={handleSyncCalendar} className="w-full" disabled={isSyncing}>
+                            {isSyncing ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <CalendarSync className="mr-2 h-4 w-4" />
+                            )}
+                            Sync Calendar
+                        </Button>
+                    </div>
+                    )}
                 </ScrollArea>
               </SheetContent>
             </Sheet>
@@ -407,11 +466,9 @@ export default function FiscalFlowDashboard() {
         timezone={timezone}
         onTimezoneChange={setTimezone}
         onNotificationsToggle={handleNotificationsToggle}
+        user={user}
+        setUser={setUser}
       />
     </div>
   );
 }
-
-    
-
-    

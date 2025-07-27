@@ -1,3 +1,6 @@
+// src/lib/types.ts
+import { z } from 'zod';
+
 export type EntryType = 'bill' | 'income';
 
 export const BillCategories = [
@@ -23,15 +26,17 @@ export type RecurrenceInterval =
   | '6months'
   | '12months';
 
-export type Entry = {
-  id: string;
-  date: string; // YYYY-MM-DD
-  name: string;
-  amount: number;
-  type: EntryType;
-  recurrence?: RecurrenceInterval;
-  category?: BillCategory;
-};
+export const EntrySchema = z.object({
+  id: z.string(),
+  date: z.string(), // YYYY-MM-DD
+  name: z.string(),
+  amount: z.number(),
+  type: z.enum(['bill', 'income']),
+  recurrence: z.enum(["none", "weekly", "monthly", "bimonthly", "3months", "6months", "12months"]).optional(),
+  category: z.enum(BillCategories).optional(),
+});
+
+export type Entry = z.infer<typeof EntrySchema>;
 
 export type RolloverPreference = 'carryover' | 'reset';
 
