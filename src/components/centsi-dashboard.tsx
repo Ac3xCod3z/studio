@@ -57,10 +57,11 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry
     
     if (isAfter(originalEntryDate, end)) return [];
 
-    if (entry.recurrence === 'weekly') {
+    if (entry.recurrence === 'weekly' || entry.recurrence === 'bi-weekly') {
+        const weeksToAdd = entry.recurrence === 'weekly' ? 1 : 2;
         let currentDate = startOfWeek(originalEntryDate, { weekStartsOn: getDay(originalEntryDate) });
         while (isBefore(currentDate, start)) {
-            currentDate = add(currentDate, { weeks: 1 });
+            currentDate = add(currentDate, { weeks: weeksToAdd });
         }
         while (isBefore(currentDate, end) || isSameDay(currentDate, end)) {
             if (!isBefore(currentDate, start)) {
@@ -70,7 +71,7 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry
                     id: `${entry.id}-${format(currentDate, 'yyyy-MM-dd')}`
                 });
             }
-            currentDate = add(currentDate, { weeks: 1 });
+            currentDate = add(currentDate, { weeks: weeksToAdd });
         }
         return instances;
     }
@@ -106,7 +107,14 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry
         return instances;
     }
 
-    return [];
+    // Handle non-recurring entries
+    if (entry.recurrence === 'none' || !entry.recurrence) {
+        const entryDate = parseISO(entry.date);
+        if (entryDate >= start && entryDate <= end) {
+            instances.push(entry);
+        }
+    }
+    return instances;
 };
 
 
@@ -114,6 +122,14 @@ const parseDateInTimezone = (dateString: string, timeZone: string) => {
     const [year, month, day] = dateString.split('-').map(Number);
     return toZonedTime(new Date(year, month - 1, day), timeZone);
 };
+
+const getOriginalIdFromInstance = (instanceId: string) => {
+  const parts = instanceId.split('-');
+  if (parts.length > 5) { // Assuming UUID is 5 parts
+      return parts.slice(0, 5).join('-');
+  }
+  return instanceId;
+}
 
 
 export default function CentsiDashboard() {
@@ -256,18 +272,7 @@ export default function CentsiDashboard() {
     const viewEnd = endOfMonth(addMonths(new Date(), 12));
 
     return entries.flatMap((e) => {
-        const instances: Entry[] = [];
-        // Handle non-recurring entries
-        if (e.recurrence === 'none' || !e.recurrence) {
-            const entryDate = parseISO(e.date);
-            if (entryDate >= viewStart && entryDate <= viewEnd) {
-                instances.push(e);
-            }
-        } else {
-            // Handle recurring entries
-            instances.push(...generateRecurringInstances(e, viewStart, viewEnd));
-        }
-        return instances;
+        return generateRecurringInstances(e, viewStart, viewEnd);
     });
   }, [entries, isMounted]);
 
@@ -565,7 +570,7 @@ export default function CentsiDashboard() {
         }}
         onEditEntry={(entry) => {
             setDayEntriesDialogOpen(false);
-            const originalEntryId = entry.id.split('-')[0];
+            const originalEntryId = getOriginalIdFromInstance(entry.id);
             const originalEntry = entries.find(e => e.id === originalEntryId) || entry;
             setEditingEntry(originalEntry);
             setEntryDialogOpen(true);

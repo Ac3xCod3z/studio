@@ -168,6 +168,7 @@ export default function FiscalFlowDashboard() {
     console.log('[AUTH_DEBUG] Component mounted. Starting auth check.');
     setIsAuthLoading(true);
 
+    // First, check for the redirect result
     getRedirectResult(auth)
       .then((result) => {
         if (result) {
@@ -183,7 +184,8 @@ export default function FiscalFlowDashboard() {
         toast({ title: "Sign-in failed on redirect", description: error.message, variant: "destructive" });
       })
       .finally(() => {
-        console.log('[AUTH_DEBUG] getRedirectResult finished. Setting up onAuthStateChanged listener.');
+        // After checking for redirect, set up the state change listener
+        console.log('[AUTH_DEBUG] Setting up onAuthStateChanged listener.');
         const unsubscribe = auth.onAuthStateChanged((currentUser) => {
           console.log('[AUTH_DEBUG] onAuthStateChanged triggered.', { currentUser });
           if (currentUser) {
@@ -417,7 +419,7 @@ export default function FiscalFlowDashboard() {
         <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
             <div className="flex items-center gap-2">
                 <Logo className="h-8 w-8 text-primary" />
-                <span className="text-xl font-bold">Centsei</span>
+                <span className="text-xl font-bold">FiscalFlow</span>
             </div>
             <div className="flex items-center gap-2">
                 <Skeleton className="h-9 w-28 hidden md:flex" />
@@ -449,7 +451,7 @@ export default function FiscalFlowDashboard() {
       <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
         <div className="flex items-center gap-2">
             <Logo className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold">Centsei</span>
+            <span className="text-xl font-bold">FiscalFlow</span>
         </div>
         <div className="flex items-center gap-2">
           {!isSelectionMode && (
@@ -640,3 +642,4 @@ export default function FiscalFlowDashboard() {
     
 
     
+

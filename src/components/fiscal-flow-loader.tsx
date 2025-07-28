@@ -20,7 +20,7 @@ function DashboardSkeleton() {
       <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
         <div className="flex items-center gap-2">
           <Logo className="h-8 w-8 text-primary" />
-          <span className="text-xl font-bold">Centsei</span>
+          <span className="text-xl font-bold">FiscalFlow</span>
         </div>
         <div className="flex items-center gap-2">
           <Skeleton className="h-9 w-28 hidden md:flex" />
@@ -104,9 +104,10 @@ export default function FiscalFlowLoader() {
         <Logo className="h-20 w-20 text-primary" />
       </div>
       <div ref={nameRef}>
-        <h1 className="text-4xl font-bold tracking-tight">Centsei</h1>
+        <h1 className="text-4xl font-bold tracking-tight">FiscalFlow</h1>
       </div>
     </div>
   );
 }
+
 
