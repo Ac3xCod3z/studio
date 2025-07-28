@@ -123,6 +123,14 @@ const parseDateInTimezone = (dateString: string, timeZone: string) => {
     return toZonedTime(new Date(year, month - 1, day), timeZone);
 };
 
+const getOriginalIdFromInstance = (instanceId: string) => {
+  const parts = instanceId.split('-');
+  if (parts.length > 5) { // Assuming UUID is 5 parts
+      return parts.slice(0, 5).join('-');
+  }
+  return instanceId;
+}
+
 
 export default function FiscalFlowDashboard() {
   const [entries, setEntries] = useLocalStorage<Entry[]>("fiscalFlowEntries", []);
@@ -168,7 +176,6 @@ export default function FiscalFlowDashboard() {
     console.log('[AUTH_DEBUG] Component mounted. Starting auth check.');
     setIsAuthLoading(true);
 
-    // First, check for the redirect result
     getRedirectResult(auth)
       .then((result) => {
         if (result) {
@@ -184,22 +191,17 @@ export default function FiscalFlowDashboard() {
         toast({ title: "Sign-in failed on redirect", description: error.message, variant: "destructive" });
       })
       .finally(() => {
-        // After checking for redirect, set up the state change listener
-        console.log('[AUTH_DEBUG] Setting up onAuthStateChanged listener.');
         const unsubscribe = auth.onAuthStateChanged((currentUser) => {
           console.log('[AUTH_DEBUG] onAuthStateChanged triggered.', { currentUser });
           if (currentUser) {
             setUser(currentUser);
+          } else {
+            setUser(null);
           }
           setIsAuthLoading(false);
           console.log('[AUTH_DEBUG] Auth loading finished.');
         });
-
-        // Cleanup subscription on component unmount
-        return () => {
-            console.log('[AUTH_DEBUG] Cleaning up onAuthStateChanged listener.');
-            unsubscribe();
-        }
+        return () => unsubscribe();
       });
   }, [toast]);
   
@@ -635,11 +637,3 @@ export default function FiscalFlowDashboard() {
     </div>
   );
 }
-    
-
-    
-
-    
-
-    
-
