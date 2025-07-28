@@ -132,7 +132,7 @@ export function FiscalFlowCalendar({
       setSelectedDate(day);
       setGlobalSelectedDate(day);
       
-      if (isMobile && dayEntries.length > 0 && !isSelectionMode) {
+      if (dayEntries.length > 0 && !isSelectionMode) {
         openDayEntriesDialog();
         return;
       }
