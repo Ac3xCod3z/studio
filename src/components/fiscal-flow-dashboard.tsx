@@ -165,45 +165,42 @@ export default function FiscalFlowDashboard() {
 
 
   useEffect(() => {
-    console.log('[AUTH_DEBUG] Component mounted. Kicking off auth check effect.');
-    setIsAuthLoading(true);
+    // This effect should only run once on component mount.
+    let isSubscribed = true;
 
+    // First, check for the result of a redirect operation.
     getRedirectResult(auth)
       .then((result) => {
-        console.log('[AUTH_DEBUG] getRedirectResult promise resolved.');
-        if (result) {
-          console.log('[AUTH_DEBUG] Redirect result is TRUTHY. User signed in.', result.user);
+        if (isSubscribed && result) {
+          // User successfully signed in via redirect.
           setUser(result.user);
           toast({ title: "Signed in successfully!" });
-        } else {
-            console.log('[AUTH_DEBUG] Redirect result is NULL or UNDEFINED. No user from redirect.');
         }
       })
       .catch((error) => {
-        console.error("[AUTH_DEBUG] Error during getRedirectResult:", error);
+        // Handle Errors here.
+        console.error("Error during getRedirectResult:", error);
         toast({ title: "Sign-in failed", description: error.message, variant: "destructive" });
       })
       .finally(() => {
-        console.log('[AUTH_DEBUG] getRedirectResult finally block. Setting up onAuthStateChanged listener.');
+        // After checking for redirect, set up the onAuthStateChanged listener.
+        // This will handle the initial auth state and any subsequent changes.
         const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-          console.log('[AUTH_DEBUG] onAuthStateChanged fired. currentUser:', currentUser);
-          if (currentUser && !user) {
-             console.log('[AUTH_DEBUG] Setting user from onAuthStateChanged.');
-             setUser(currentUser);
-          } else if (!currentUser) {
-             console.log('[AUTH_DEBUG] User is logged out.');
-             setUser(null);
+          if (isSubscribed) {
+            setUser(currentUser);
+            setIsAuthLoading(false); // Auth state is now definitive.
           }
-          console.log('[AUTH_DEBUG] Auth loading finished.');
-          setIsAuthLoading(false);
         });
-        
+
+        // Cleanup subscription on component unmount
         return () => {
-            console.log('[AUTH_DEBUG] Cleaning up onAuthStateChanged listener.');
-            unsubscribe();
-        }
+          unsubscribe();
+          isSubscribed = false;
+        };
       });
-  }, [toast, user]);
+  // The empty dependency array ensures this effect runs only once on mount.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toast]);
   
 
   const handleNotificationsToggle = (enabled: boolean) => {
@@ -637,6 +634,8 @@ export default function FiscalFlowDashboard() {
     </div>
   );
 }
+    
+
     
 
     

@@ -97,10 +97,9 @@ export function SettingsDialog({
 
   const handleGoogleSignIn = async () => {
     try {
-      console.log("[AUTH_DEBUG] handleGoogleSignIn: Initiating sign-in with redirect.");
       await signInWithRedirect(auth, googleProvider);
     } catch (error) {
-      console.error("[AUTH_DEBUG] Google Sign-In Error in handleGoogleSignIn:", error);
+      console.error("Google Sign-In Error in handleGoogleSignIn:", error);
       toast({ title: "Sign-in failed", description: "Could not sign in with Google.", variant: "destructive" });
     }
   };
@@ -363,6 +362,8 @@ export function SettingsDialog({
     </Dialog>
   );
 }
+
+    
 
     
 
