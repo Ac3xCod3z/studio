@@ -132,6 +132,11 @@ export function FiscalFlowCalendar({
       setSelectedDate(day);
       setGlobalSelectedDate(day);
       
+      if (isMobile && dayEntries.length > 0 && !isSelectionMode) {
+        openDayEntriesDialog();
+        return;
+      }
+      
       if (isSelectionMode) {
           const entryIdsOnDay = dayEntries.map(e => getOriginalIdFromInstance(e.id));
           const uniqueEntryIds = [...new Set(entryIdsOnDay)];
@@ -146,13 +151,6 @@ export function FiscalFlowCalendar({
             }
           });
           return;
-      }
-
-
-      if (isMobile) {
-        if (dayEntries.length > 0) {
-            openDayEntriesDialog();
-        }
       }
   }
 
