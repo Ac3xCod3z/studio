@@ -165,41 +165,40 @@ export default function FiscalFlowDashboard() {
 
 
   useEffect(() => {
-    // This effect should only run once on component mount.
-    let isSubscribed = true;
+    console.log('[AUTH_DEBUG] Component mounted. Starting auth check.');
+    setIsAuthLoading(true);
 
-    // First, check for the result of a redirect operation.
     getRedirectResult(auth)
       .then((result) => {
-        if (isSubscribed && result) {
-          // User successfully signed in via redirect.
+        if (result) {
+          console.log('[AUTH_DEBUG] getRedirectResult SUCCESS.', { user: result.user });
           setUser(result.user);
           toast({ title: "Signed in successfully!" });
+        } else {
+           console.log('[AUTH_DEBUG] getRedirectResult returned null, no redirect operation detected.');
         }
       })
       .catch((error) => {
-        // Handle Errors here.
-        console.error("Error during getRedirectResult:", error);
-        toast({ title: "Sign-in failed", description: error.message, variant: "destructive" });
+        console.error("[AUTH_DEBUG] getRedirectResult ERROR:", error);
+        toast({ title: "Sign-in failed on redirect", description: error.message, variant: "destructive" });
       })
       .finally(() => {
-        // After checking for redirect, set up the onAuthStateChanged listener.
-        // This will handle the initial auth state and any subsequent changes.
+        console.log('[AUTH_DEBUG] getRedirectResult finished. Setting up onAuthStateChanged listener.');
         const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-          if (isSubscribed) {
+          console.log('[AUTH_DEBUG] onAuthStateChanged triggered.', { currentUser });
+          if (currentUser) {
             setUser(currentUser);
-            setIsAuthLoading(false); // Auth state is now definitive.
           }
+          setIsAuthLoading(false);
+          console.log('[AUTH_DEBUG] Auth loading finished.');
         });
 
         // Cleanup subscription on component unmount
         return () => {
-          unsubscribe();
-          isSubscribed = false;
-        };
+            console.log('[AUTH_DEBUG] Cleaning up onAuthStateChanged listener.');
+            unsubscribe();
+        }
       });
-  // The empty dependency array ensures this effect runs only once on mount.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast]);
   
 

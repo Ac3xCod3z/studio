@@ -97,6 +97,7 @@ export function SettingsDialog({
 
   const handleGoogleSignIn = async () => {
     try {
+      console.log("[AUTH_DEBUG] handleGoogleSignIn called. Initiating redirect.");
       await signInWithRedirect(auth, googleProvider);
     } catch (error) {
       console.error("Google Sign-In Error in handleGoogleSignIn:", error);
