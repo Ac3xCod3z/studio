@@ -179,21 +179,20 @@ export default function FiscalFlowDashboard() {
         } catch (error: any) {
             console.error("Google Sign-In Redirect Error:", error);
             toast({ title: "Sign-in failed", description: error.message, variant: "destructive" });
-        } finally {
-            // After processing the redirect, set up the state listener.
-            // This is the single source of truth for the user's auth state.
-            const unsubscribe = auth.onAuthStateChanged(currentUser => {
-                if(!user) { // Prevent re-setting user if already set by redirect
-                    setUser(currentUser);
-                }
-                setIsAuthLoading(false); // Stop loading once we have the auth state.
-            });
-            // Cleanup the listener on unmount.
-            return () => unsubscribe();
         }
+        
+        // This is the single source of truth for the user's auth state.
+        const unsubscribe = auth.onAuthStateChanged(currentUser => {
+            if(!user) { // Prevent re-setting user if already set by redirect
+                setUser(currentUser);
+            }
+            setIsAuthLoading(false); // Stop loading once we have the auth state.
+        });
+        // Cleanup the listener on unmount.
+        return () => unsubscribe();
     };
     processAuth();
-  }, [toast, user]);
+  }, [toast]);
   
 
   const handleNotificationsToggle = (enabled: boolean) => {
