@@ -1,20 +1,27 @@
 
 
 // src/lib/firebase.ts
-import { initializeApp, getApps, getApp } from "firebase/app";
+import { initializeApp, getApps, getApp, type FirebaseOptions } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
-const firebaseConfig = {
-  "projectId": "fiscalflow-xbjkx",
-  "appId": "1:988219596746:web:aabca84ab7b409cba03933",
-  "storageBucket": "fiscalflow-xbjkx.firebasestorage.app",
-  "apiKey": "AIzaSyCHSnFE6N8V8tcXCYDx1Y45E7oOcFK4mT4",
-  "authDomain": "fiscalflow-xbjkx.firebaseapp.com",
-  "messagingSenderId": "988219596746"
-};
+let app;
 
-// Initialize Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+// Check if we are in the browser and Firebase has not been initialized.
+if (typeof window !== "undefined" && !getApps().length) {
+  // This is the recommended way for Firebase Hosting.
+  // It fetches the config from a reserved URL and initializes Firebase.
+  fetch('/__/firebase/init.json').then(async response => {
+    if (response.ok) {
+      const config = await response.json();
+      app = initializeApp(config);
+    } else {
+      console.error("Could not load Firebase config. Is this app hosted on Firebase?");
+    }
+  });
+} else if (getApps().length) {
+  app = getApp();
+}
+
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope('https://www.googleapis.com/auth/calendar.events');
