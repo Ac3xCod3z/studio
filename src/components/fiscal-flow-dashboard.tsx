@@ -165,34 +165,45 @@ export default function FiscalFlowDashboard() {
 
 
   useEffect(() => {
-    // This effect should only run once on mount to handle the initial auth state.
-    const processAuth = async () => {
-        setIsAuthLoading(true);
-        try {
-            const result = await getRedirectResult(auth);
-            if (result) {
-                // User has just signed in via redirect.
-                // The onAuthStateChanged listener below will handle setting the user.
-                setUser(result.user);
-                toast({ title: "Signed in successfully!" });
-            }
-        } catch (error: any) {
-            console.error("Google Sign-In Redirect Error:", error);
-            toast({ title: "Sign-in failed", description: error.message, variant: "destructive" });
+    console.log('[AUTH_DEBUG] Component mounted. Kicking off auth check effect.');
+    setIsAuthLoading(true);
+
+    getRedirectResult(auth)
+      .then((result) => {
+        console.log('[AUTH_DEBUG] getRedirectResult promise resolved.');
+        if (result) {
+          console.log('[AUTH_DEBUG] Redirect result is TRUTHY. User signed in.', result.user);
+          setUser(result.user);
+          toast({ title: "Signed in successfully!" });
+        } else {
+            console.log('[AUTH_DEBUG] Redirect result is NULL or UNDEFINED. No user from redirect.');
         }
-        
-        // This is the single source of truth for the user's auth state.
-        const unsubscribe = auth.onAuthStateChanged(currentUser => {
-            if(!user) { // Prevent re-setting user if already set by redirect
-                setUser(currentUser);
-            }
-            setIsAuthLoading(false); // Stop loading once we have the auth state.
+      })
+      .catch((error) => {
+        console.error("[AUTH_DEBUG] Error during getRedirectResult:", error);
+        toast({ title: "Sign-in failed", description: error.message, variant: "destructive" });
+      })
+      .finally(() => {
+        console.log('[AUTH_DEBUG] getRedirectResult finally block. Setting up onAuthStateChanged listener.');
+        const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+          console.log('[AUTH_DEBUG] onAuthStateChanged fired. currentUser:', currentUser);
+          if (currentUser && !user) {
+             console.log('[AUTH_DEBUG] Setting user from onAuthStateChanged.');
+             setUser(currentUser);
+          } else if (!currentUser) {
+             console.log('[AUTH_DEBUG] User is logged out.');
+             setUser(null);
+          }
+          console.log('[AUTH_DEBUG] Auth loading finished.');
+          setIsAuthLoading(false);
         });
-        // Cleanup the listener on unmount.
-        return () => unsubscribe();
-    };
-    processAuth();
-  }, [toast]);
+        
+        return () => {
+            console.log('[AUTH_DEBUG] Cleaning up onAuthStateChanged listener.');
+            unsubscribe();
+        }
+      });
+  }, [toast, user]);
   
 
   const handleNotificationsToggle = (enabled: boolean) => {
@@ -626,6 +637,8 @@ export default function FiscalFlowDashboard() {
     </div>
   );
 }
+    
+
     
 
     
