@@ -328,7 +328,7 @@ export function FiscalFlowCalendar({
                   onDrop={(e) => handleDrop(e, day)}
                 >
                   <div className="flex justify-between items-start">
-                    <span className={cn("font-bold text-xs sm:text-base", isToday(day) && "text-primary")}>{format(day, "d")}</span>
+                    <span className={cn("font-bold text-xs sm:text-base", isToday(day) && !isCorner && "text-primary")}>{format(day, "d")}</span>
                     {!isReadOnly && !isSelectionMode && (
                         <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-foreground/50 hover:text-foreground" onClick={(e) => { e.stopPropagation(); openNewEntryDialog(day); }}>
                             <Plus className="h-4 w-4" />
