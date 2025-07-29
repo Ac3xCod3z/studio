@@ -210,16 +210,18 @@ export default function FiscalFlowDashboard() {
   };
 
   useEffect(() => {
+    if (!isMounted) return;
     if (notificationsEnabled) {
       if ('Notification' in window && Notification.permission === 'granted') {
         scheduleNotifications(entries, timezone, toast);
       } else {
+        // This case might happen if permissions are revoked after being enabled.
         setNotificationsEnabled(false);
       }
     } else {
       cancelAllNotifications(toast);
     }
-  }, [entries, timezone, notificationsEnabled, setNotificationsEnabled, toast]);
+  }, [entries, timezone, notificationsEnabled, setNotificationsEnabled, toast, isMounted]);
 
 
   useEffect(() => {
