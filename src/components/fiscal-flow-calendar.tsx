@@ -317,8 +317,8 @@ export function FiscalFlowCalendar({
                     !isReadOnly && "cursor-pointer",
                     !isSameMonth(day, currentMonth) ? "bg-muted/50 text-muted-foreground" : "bg-card",
                     !isReadOnly && isSameMonth(day, currentMonth) && !isSelectionMode && "hover:bg-accent hover:shadow-md hover:-translate-y-1",
-                    isCorner && "ring-2 ring-primary",
-                    isSameDay(day, selectedDate) && !isSelectionMode && !isCorner && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                    isCorner && "border-primary/50",
+                    isSameDay(day, selectedDate) && !isSelectionMode && "ring-2 ring-primary ring-offset-2 ring-offset-background",
                     isSelectionMode && "hover:bg-primary/10",
                     isSelectionMode && dayHasSelectedEntry && "ring-2 ring-primary bg-primary/20",
 
