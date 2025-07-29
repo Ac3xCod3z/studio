@@ -134,6 +134,11 @@ export function CentsiCalendar({
       setSelectedDate(day);
       setGlobalSelectedDate(day);
       
+      if (dayEntries.length > 0 && !isSelectionMode) {
+          openDayEntriesDialog();
+          return;
+      }
+      
       if (isSelectionMode) {
           const entryIdsOnDay = dayEntries.map(e => getOriginalIdFromInstance(e.id));
           const uniqueEntryIds = [...new Set(entryIdsOnDay)];
@@ -148,13 +153,6 @@ export function CentsiCalendar({
             }
           });
           return;
-      }
-
-
-      if (isMobile) {
-        if (dayEntries.length > 0) {
-            openDayEntriesDialog();
-        }
       }
   }
 
@@ -306,9 +304,11 @@ export function CentsiCalendar({
             {WEEKDAYS.map((day) => (<div key={day} className="py-2">{day}</div>))}
           </div>
           <div className="grid grid-cols-7 grid-rows-5 gap-1.5 md:gap-2">
-            {daysWithEntries.map(({ day, entries: dayEntries }) => {
+            {daysWithEntries.map(({ day, entries: dayEntries }, index) => {
               const dayHasSelectedEntry = dayEntries.some(e => selectedIds.includes(getOriginalIdFromInstance(e.id)))
               const dayStr = format(day, 'yyyy-MM-dd');
+              const isCorner = index === 0 || index === 6 || index === 28 || index === 34;
+
               return (
                 <div
                   key={dayStr}
@@ -319,7 +319,7 @@ export function CentsiCalendar({
                     !isReadOnly && "cursor-pointer",
                     !isSameMonth(day, currentMonth) ? "bg-muted/50 text-muted-foreground" : "bg-card",
                     !isReadOnly && isSameMonth(day, currentMonth) && !isSelectionMode && "hover:bg-accent hover:shadow-md hover:-translate-y-1",
-                    isToday(day) && "border-primary/50",
+                    isCorner && "border-primary/50",
                     isSameDay(day, selectedDate) && !isSelectionMode && "ring-2 ring-primary ring-offset-2 ring-offset-background",
                     isSelectionMode && "hover:bg-primary/10",
                     isSelectionMode && dayHasSelectedEntry && "ring-2 ring-primary bg-primary/20",
