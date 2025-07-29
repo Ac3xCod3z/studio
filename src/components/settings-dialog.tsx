@@ -2,11 +2,11 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { Sparkles, Loader2, Bell, BellOff, Share2, Check, Copy, Moon, Sun, Repeat } from "lucide-react";
+import { Sparkles, Loader2, Bell, BellOff, Share2, Check, Copy, Moon, Sun, Repeat, Download, Upload } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { Button } from "@/components/ui/button";
@@ -80,10 +80,11 @@ export function SettingsDialog({
   const { toast } = useToast();
   const [notificationStatus, setNotificationStatus] = useState("default");
   const [notificationsEnabled, setNotificationsEnabled] = useLocalStorage('centseiNotificationsEnabled', false);
-  const [entries] = useLocalStorage<Entry[]>("centseiEntries", []);
+  const [entries, setEntries] = useLocalStorage<Entry[]>("centseiEntries", []);
   const [shareLink, setShareLink] = useState('');
   const [hasCopied, setHasCopied] = useState(false);
   const { setTheme, theme } = useTheme();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -97,11 +98,71 @@ export function SettingsDialog({
 
   const handleGoogleSignIn = async () => {
     try {
-      console.log("[AUTH_DEBUG] handleGoogleSignIn called. Initiating redirect.");
       await signInWithRedirect(auth, googleProvider);
     } catch (error) {
-      console.error("Google Sign-In Error in handleGoogleSignIn:", error);
+      console.error("Google Sign-In Error:", error);
       toast({ title: "Sign-in failed", description: "Could not sign in with Google.", variant: "destructive" });
+    }
+  };
+  
+  const handleExportData = () => {
+    try {
+      const dataToExport = {
+        entries,
+        rolloverPreference,
+        timezone
+      };
+      const jsonString = JSON.stringify(dataToExport, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `centsei_backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "Export Successful", description: "Your data has been downloaded." });
+    } catch (error) {
+       toast({ title: "Export Failed", description: "Could not export your data.", variant: "destructive" });
+    }
+  };
+
+  const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const text = e.target?.result;
+            if (typeof text !== 'string') {
+                throw new Error("File is not readable");
+            }
+            const importedData = JSON.parse(text);
+
+            // Basic validation
+            if (importedData && Array.isArray(importedData.entries) && importedData.rolloverPreference && importedData.timezone) {
+                setEntries(importedData.entries);
+                onRolloverPreferenceChange(importedData.rolloverPreference);
+                onTimezoneChange(importedData.timezone);
+                toast({ title: "Import Successful!", description: "Your data has been loaded. The app will now reload." });
+                
+                setTimeout(() => {
+                  window.location.reload();
+                }, 1500);
+
+            } else {
+                throw new Error("Invalid or corrupted data file.");
+            }
+        } catch (error: any) {
+            toast({ title: "Import Failed", description: error.message || "Could not import data from the selected file.", variant: "destructive" });
+        }
+    };
+    reader.readAsText(file);
+    // Reset file input
+    if(fileInputRef.current) {
+        fileInputRef.current.value = "";
     }
   };
 
@@ -208,6 +269,28 @@ export function SettingsDialog({
                   </Tabs>
               </div>
 
+              <Separator />
+              
+              <div className="space-y-2">
+                  <h3 className="font-semibold">Data Management</h3>
+                   <p className="text-sm text-muted-foreground">Export your data to a file or import it to sync across devices.</p>
+                   <div className="grid grid-cols-2 gap-2">
+                        <Button onClick={handleExportData} variant="outline">
+                            <Download className="mr-2 h-4 w-4" /> Export Data
+                        </Button>
+                        <Button onClick={() => fileInputRef.current?.click()} variant="outline">
+                           <Upload className="mr-2 h-4 w-4" /> Import Data
+                        </Button>
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleImportData}
+                            className="hidden"
+                            accept="application/json"
+                        />
+                   </div>
+              </div>
+              
               <Separator />
               
               <div className="space-y-2">
@@ -363,11 +446,3 @@ export function SettingsDialog({
     </Dialog>
   );
 }
-
-    
-
-    
-
-    
-
-    
