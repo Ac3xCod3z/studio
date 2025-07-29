@@ -79,8 +79,8 @@ export function SettingsDialog({
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const [notificationStatus, setNotificationStatus] = useState("default");
-  const [notificationsEnabled, setNotificationsEnabled] = useLocalStorage('centsiNotificationsEnabled', false);
-  const [entries] = useLocalStorage<Entry[]>("centsiEntries", []);
+  const [notificationsEnabled, setNotificationsEnabled] = useLocalStorage('centseiNotificationsEnabled', false);
+  const [entries] = useLocalStorage<Entry[]>("centseiEntries", []);
   const [shareLink, setShareLink] = useState('');
   const [hasCopied, setHasCopied] = useState(false);
   const { setTheme, theme } = useTheme();
@@ -371,4 +371,3 @@ export function SettingsDialog({
     
 
     
-

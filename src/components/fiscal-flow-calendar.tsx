@@ -1,5 +1,5 @@
 
-// src/components/centsi-calendar.tsx
+// src/components/fiscal-flow-calendar.tsx
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from "react";
@@ -40,7 +40,7 @@ const parseDateInTimezone = (dateString: string, timeZone: string) => {
   return toZonedTime(new Date(year, month - 1, day), timeZone);
 };
 
-type CentsiCalendarProps = {
+type FiscalFlowCalendarProps = {
     entries: Entry[];
     generatedEntries: Entry[];
     setEntries: (value: Entry[] | ((val: Entry[]) => Entry[])) => void;
@@ -61,7 +61,7 @@ type CentsiCalendarProps = {
     onBulkDelete: () => void;
 }
 
-export function CentsiCalendar({
+export function FiscalFlowCalendar({
     entries,
     generatedEntries,
     setEntries,
@@ -80,7 +80,7 @@ export function CentsiCalendar({
     selectedIds,
     setSelectedIds,
     onBulkDelete,
-}: CentsiCalendarProps) {
+}: FiscalFlowCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -134,8 +134,8 @@ export function CentsiCalendar({
       setGlobalSelectedDate(day);
       
       if (dayEntries.length > 0 && !isSelectionMode) {
-        openDayEntriesDialog();
-        return;
+          openDayEntriesDialog();
+          return;
       }
       
       if (isSelectionMode) {
@@ -151,8 +151,11 @@ export function CentsiCalendar({
               return [...otherIds, ...uniqueEntryIds];
             }
           });
-          return;
       }
+  }
+
+  const entryIsRecurringInstance = (entryId: string) => {
+      return entryId.match(/.*-\d{4}-\d{2}-\d{2}$/);
   }
 
   const openEditEntryDialog = (entry: Entry) => {
@@ -166,13 +169,12 @@ export function CentsiCalendar({
   }
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, entry: Entry) => {
-    if (isReadOnly || isSelectionMode) {
+    if (isReadOnly || isSelectionMode || entryIsRecurringInstance(entry.id)) {
         e.preventDefault();
         return;
     }
     e.dataTransfer.effectAllowed = 'move';
-    const originalEntryId = getOriginalIdFromInstance(entry.id);
-    setDraggingEntryId(originalEntryId);
+    setDraggingEntryId(entry.id);
   };
   
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -208,11 +210,8 @@ export function CentsiCalendar({
 
   // Touch handlers for mobile drag-and-drop
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>, entry: Entry) => {
-    if (isReadOnly || isSelectionMode) return;
-    const originalEntry = entries.find(e => e.id === getOriginalIdFromInstance(entry.id));
-    if (originalEntry) {
-      setTouchDraggingEntry(originalEntry);
-    }
+    if (isReadOnly || isSelectionMode || entryIsRecurringInstance(entry.id)) return;
+    setTouchDraggingEntry(entry);
   };
   
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
@@ -303,9 +302,11 @@ export function CentsiCalendar({
             {WEEKDAYS.map((day) => (<div key={day} className="py-2">{day}</div>))}
           </div>
           <div className="grid grid-cols-7 grid-rows-5 gap-1.5 md:gap-2">
-            {daysWithEntries.map(({ day, entries: dayEntries }) => {
+            {daysWithEntries.map(({ day, entries: dayEntries }, index) => {
               const dayHasSelectedEntry = dayEntries.some(e => selectedIds.includes(getOriginalIdFromInstance(e.id)))
               const dayStr = format(day, 'yyyy-MM-dd');
+              const isCorner = index === 0 || index === 6 || index === 28 || index === 34;
+
               return (
                 <div
                   key={dayStr}
@@ -316,8 +317,8 @@ export function CentsiCalendar({
                     !isReadOnly && "cursor-pointer",
                     !isSameMonth(day, currentMonth) ? "bg-muted/50 text-muted-foreground" : "bg-card",
                     !isReadOnly && isSameMonth(day, currentMonth) && !isSelectionMode && "hover:bg-accent hover:shadow-md hover:-translate-y-1",
-                    isToday(day) && "border-primary/50",
-                    isSameDay(day, selectedDate) && !isSelectionMode && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                    isCorner && "ring-2 ring-primary",
+                    isSameDay(day, selectedDate) && !isSelectionMode && !isCorner && "ring-2 ring-primary ring-offset-2 ring-offset-background",
                     isSelectionMode && "hover:bg-primary/10",
                     isSelectionMode && dayHasSelectedEntry && "ring-2 ring-primary bg-primary/20",
 
@@ -348,12 +349,12 @@ export function CentsiCalendar({
                               onClick={(e) => { e.stopPropagation(); openEditEntryDialog(entry); }}
                               onDragStart={(e) => handleDragStart(e, entry)}
                               onTouchStart={(e) => handleTouchStart(e, entry)}
-                              draggable={!isReadOnly && !isSelectionMode}
+                              draggable={!isReadOnly && !isSelectionMode && !entryIsRecurringInstance(entry.id)}
                               className={cn(
                                   "px-2 py-1 rounded-full text-left flex items-center gap-2 transition-all duration-200",
                                   isMobile && 'touch-none',
-                                  !isReadOnly && !isSelectionMode && "cursor-grab active:cursor-grabbing hover:shadow-lg",
-                                  (draggingEntryId === getOriginalIdFromInstance(entry.id) || touchDraggingEntry?.id === getOriginalIdFromInstance(entry.id)) && 'opacity-50 scale-105 shadow-xl',
+                                  !entryIsRecurringInstance(entry.id) && !isReadOnly && !isSelectionMode && "cursor-grab active:cursor-grabbing hover:shadow-lg",
+                                  (draggingEntryId === entry.id || touchDraggingEntry?.id === entry.id) && 'opacity-50 scale-105 shadow-xl',
                                   isSelectionMode && selectedIds.includes(getOriginalIdFromInstance(entry.id)) && "opacity-60",
                                   "bg-secondary/50 hover:bg-secondary",
                               )}

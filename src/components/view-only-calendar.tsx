@@ -9,7 +9,7 @@ import { useMedia } from "react-use";
 import { Logo } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Entry, RolloverPreference, WeeklyBalances } from "@/lib/types";
-import { CentsiCalendar, SidebarContent } from "@/components/centsi-calendar";
+import { FiscalFlowCalendar, SidebarContent } from "@/components/fiscal-flow-calendar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
@@ -263,7 +263,7 @@ export default function ViewOnlyCalendar() {
         )}
       </header>
 
-      <CentsiCalendar
+      <FiscalFlowCalendar
         entries={data.entries}
         generatedEntries={allGeneratedEntries}
         setEntries={() => {}} // No-op
@@ -286,3 +286,5 @@ export default function ViewOnlyCalendar() {
     </div>
   );
 }
+
+    

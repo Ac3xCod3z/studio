@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
@@ -30,7 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { Entry, RolloverPreference, WeeklyBalances } from "@/lib/types";
-import { CentsiCalendar, SidebarContent } from "./centsi-calendar";
+import { FiscalFlowCalendar, SidebarContent } from "./fiscal-flow-calendar";
 import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths, parseISO, differenceInCalendarMonths, isAfter, eachWeekOfInterval, getWeek, lastDayOfMonth } from "date-fns";
 import { toZonedTime } from 'date-fns-tz';
 import { recurrenceIntervalMonths } from "@/lib/constants";
@@ -133,11 +132,11 @@ const getOriginalIdFromInstance = (instanceId: string) => {
 
 
 export default function FiscalFlowDashboard() {
-  const [entries, setEntries] = useLocalStorage<Entry[]>("centsiEntries", []);
-  const [rollover, setRollover] = useLocalStorage<RolloverPreference>("centsiRollover", "carryover");
-  const [timezone, setTimezone] = useLocalStorage<string>('centsiTimezone', 'UTC');
-  const [weeklyBalances, setWeeklyBalances] = useLocalStorage<WeeklyBalances>("centsiWeeklyBalances", {});
-  const [notificationsEnabled, setNotificationsEnabled] = useLocalStorage('centsiNotificationsEnabled', false);
+  const [entries, setEntries] = useLocalStorage<Entry[]>("centseiEntries", []);
+  const [rollover, setRollover] = useLocalStorage<RolloverPreference>("centseiRollover", "carryover");
+  const [timezone, setTimezone] = useLocalStorage<string>('centseiTimezone', 'UTC');
+  const [weeklyBalances, setWeeklyBalances] = useLocalStorage<WeeklyBalances>("centseiWeeklyBalances", {});
+  const [notificationsEnabled, setNotificationsEnabled] = useLocalStorage('centseiNotificationsEnabled', false);
   const [user, setUser] = useState<User | null>(null);
 
   const [isEntryDialogOpen, setEntryDialogOpen] = useState(false);
@@ -173,34 +172,32 @@ export default function FiscalFlowDashboard() {
 
 
   useEffect(() => {
-    console.log('[AUTH_DEBUG] Attempting to get redirect result...');
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result) {
-          console.log('[AUTH_DEBUG] getRedirectResult SUCCESS.', { user: result.user });
-          setUser(result.user);
-          toast({ title: "Signed in successfully!" });
-        } else {
-           console.log('[AUTH_DEBUG] getRedirectResult returned null, no redirect operation detected.');
-        }
-      })
-      .catch((error) => {
-        console.error("[AUTH_DEBUG] getRedirectResult ERROR:", error);
-        toast({ title: "Sign-in failed on redirect", description: error.message, variant: "destructive" });
-      })
-      .finally(() => {
-        const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-          console.log('[AUTH_DEBUG] onAuthStateChanged triggered.', { currentUser });
-          if (currentUser) {
-            setUser(currentUser);
-          }
-          setIsAuthLoading(false);
-           console.log('[AUTH_DEBUG] Auth loading finished.');
-        });
-        return () => unsubscribe();
-      });
-  }, [toast]);
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+        setUser(user);
+        setIsAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
   
+  useEffect(() => {
+      const handleRedirectResult = async () => {
+          try {
+              const result = await getRedirectResult(auth);
+              if (result) {
+                  setUser(result.user);
+                  toast({ title: "Signed in successfully!" });
+              }
+          } catch (error: any) {
+              console.error("Google Sign-In Redirect Error:", error);
+              toast({ title: "Sign-in failed", description: error.message, variant: "destructive" });
+          } finally {
+              setIsAuthLoading(false);
+          }
+      };
+      if(isAuthLoading) {
+        handleRedirectResult();
+      }
+  }, [toast, isAuthLoading]);
 
   const handleNotificationsToggle = (enabled: boolean) => {
     setNotificationsEnabled(enabled);
@@ -231,7 +228,7 @@ export default function FiscalFlowDashboard() {
 
   useEffect(() => {
       const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        if (!localStorage.getItem('centsiTimezone') && detectedTimezone) {
+        if (!localStorage.getItem('centseiTimezone') && detectedTimezone) {
             setTimezone(detectedTimezone);
         }
         if ('serviceWorker' in navigator) {
@@ -417,7 +414,7 @@ export default function FiscalFlowDashboard() {
         <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
             <div className="flex items-center gap-2">
                 <Logo className="h-8 w-8 text-primary" />
-                <span className="text-xl font-bold">Centsi</span>
+                <span className="text-xl font-bold">Centsei</span>
             </div>
             <div className="flex items-center gap-2">
                 <Skeleton className="h-9 w-28 hidden md:flex" />
@@ -449,11 +446,11 @@ export default function FiscalFlowDashboard() {
       <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
         <div className="flex items-center gap-2">
             <Logo className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold">Centsi</span>
+            <span className="text-xl font-bold">Centsei</span>
         </div>
         <div className="flex items-center gap-2">
           {!isSelectionMode && (
-            <Button onClick={() => openNewEntryDialog(new Date())} size="sm" className="hidden md:flex btn-primary-hover">
+            <Button onClick={() => openNewEntryDialog(new Date())} size="sm" className="hidden md:flex">
               <Plus className="-ml-1 mr-2 h-4 w-4" /> Add Entry
             </Button>
           )}
@@ -468,16 +465,6 @@ export default function FiscalFlowDashboard() {
                <Trash2 className="mr-2 h-4 w-4" /> Delete ({selectedIds.length})
              </Button>
            )}
-          {user && (
-            <Button onClick={handleSyncCalendar} disabled={isSyncing} variant="outline" size="sm" className="hidden md:flex">
-              {isSyncing ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                  <CalendarSync className="mr-2 h-4 w-4" />
-              )}
-              <span>Sync Calendar</span>
-            </Button>
-          )}
           <Button onClick={() => setSettingsDialogOpen(true)} variant="ghost" size="icon">
             <Settings className="h-5 w-5" />
           </Button>
@@ -493,6 +480,14 @@ export default function FiscalFlowDashboard() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuItem onClick={handleSyncCalendar} disabled={isSyncing}>
+                  {isSyncing ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                      <CalendarSync className="mr-2 h-4 w-4" />
+                  )}
+                  <span>Sync Calendar</span>
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleSignOut}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
@@ -519,12 +514,6 @@ export default function FiscalFlowDashboard() {
                     selectedDate={selectedDate}
                   />
                    <div className="p-4 flex flex-col gap-2 border-t">
-                    {user && (
-                      <Button onClick={handleSyncCalendar} disabled={isSyncing} variant="outline" className="w-full">
-                        {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarSync className="mr-2 h-4 w-4" />}
-                        Sync Calendar
-                      </Button>
-                    )}
                      <Button onClick={() => { setSummaryDialogOpen(true); setMobileSheetOpen(false); }} variant="outline" className="w-full">
                         <BarChartBig className="mr-2 h-4 w-4" /> Monthly Summary
                     </Button>
@@ -539,7 +528,7 @@ export default function FiscalFlowDashboard() {
         </div>
       </header>
       
-      <CentsiCalendar 
+      <FiscalFlowCalendar 
         entries={entries}
         setEntries={setEntries}
         generatedEntries={allGeneratedEntries}
@@ -633,3 +622,5 @@ export default function FiscalFlowDashboard() {
     </div>
   );
 }
+
+    
