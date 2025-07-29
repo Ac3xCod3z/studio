@@ -1,4 +1,3 @@
-
 // src/lib/types.ts
 import { z } from 'zod';
 
@@ -36,6 +35,7 @@ export const EntrySchema = z.object({
   type: z.enum(['bill', 'income']),
   recurrence: z.enum(["none", "weekly", "bi-weekly", "monthly", "bimonthly", "3months", "6months", "12months"]).optional(),
   category: z.enum(BillCategories).optional(),
+  order: z.number().optional(),
 });
 
 export type Entry = z.infer<typeof EntrySchema>;

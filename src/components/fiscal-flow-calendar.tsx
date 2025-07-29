@@ -1,4 +1,3 @@
-
 // src/components/fiscal-flow-calendar.tsx
 "use client";
 
@@ -84,8 +83,7 @@ export function FiscalFlowCalendar({
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  const [draggingEntryId, setDraggingEntryId] = useState<string | null>(null);
-  const [touchDraggingEntry, setTouchDraggingEntry] = useState<Entry | null>(null);
+  const [draggingEntry, setDraggingEntry] = useState<Entry | null>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
 
 
@@ -110,6 +108,9 @@ export function FiscalFlowCalendar({
 
     daysMap.forEach(dayData => {
         dayData.entries.sort((a, b) => {
+            if (a.order !== undefined && b.order !== undefined) {
+              return a.order - b.order;
+            }
             if (a.type === 'income' && b.type === 'bill') return -1;
             if (a.type === 'bill' && b.type === 'income') return 1;
             return a.name.localeCompare(b.name);
@@ -154,12 +155,6 @@ export function FiscalFlowCalendar({
       }
   }
 
-  const entryIsRecurringInstance = (entryId: string) => {
-      const originalId = getOriginalIdFromInstance(entryId);
-      const originalEntry = entries.find(e => e.id === originalId);
-      return originalEntry?.recurrence !== 'none';
-  }
-
   const openEditEntryDialog = (entry: Entry) => {
     if (isReadOnly || isSelectionMode) return;
     const originalEntryId = getOriginalIdFromInstance(entry.id);
@@ -176,92 +171,154 @@ export function FiscalFlowCalendar({
         return;
     }
     e.dataTransfer.effectAllowed = 'move';
-    setDraggingEntryId(getOriginalIdFromInstance(entry.id));
+    setDraggingEntry(entry);
   };
-  
+
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     if (isReadOnly || isSelectionMode) return;
     e.preventDefault();
-    const target = e.currentTarget as HTMLDivElement;
-    if (!target.classList.contains('ring-2')) {
-        // Debounce or check before adding class
-        calendarRef.current?.querySelectorAll('[data-day-cell]').forEach(cell => {
-            cell.classList.remove('ring-2', 'ring-primary');
-        });
-        target.classList.add('ring-2', 'ring-primary');
+    const target = e.currentTarget;
+    if (target.closest('[data-day-cell]')) {
+        calendarRef.current?.querySelectorAll('.drop-indicator').forEach(el => el.remove());
+        
+        const dropTarget = target.closest('[data-entry-id]') as HTMLElement;
+        const dayCell = target.closest('[data-day-cell]') as HTMLElement;
+
+        if (dropTarget) {
+            const indicator = document.createElement('div');
+            indicator.className = 'drop-indicator h-1 bg-primary rounded-full my-1';
+            const rect = dropTarget.getBoundingClientRect();
+            const isAfter = e.clientY > rect.top + rect.height / 2;
+            if (isAfter) {
+                dropTarget.parentNode?.insertBefore(indicator, dropTarget.nextSibling);
+            } else {
+                dropTarget.parentNode?.insertBefore(indicator, dropTarget);
+            }
+        } else if (dayCell && !dayCell.querySelector('[data-entry-id]')) {
+            const indicator = document.createElement('div');
+            indicator.className = 'drop-indicator h-1 bg-primary rounded-full my-1';
+            dayCell.querySelector('.space-y-1\\.5')?.appendChild(indicator);
+        }
     }
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetDate: Date) => {
-    if (isReadOnly || isSelectionMode) return;
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+     if (e.relatedTarget && (e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) {
+        return;
+    }
+    calendarRef.current?.querySelectorAll('.drop-indicator').forEach(el => el.remove());
+  }
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    if (isReadOnly || isSelectionMode || !draggingEntry) return;
     e.preventDefault();
-    if (draggingEntryId) {
-      setEntries(prevEntries => 
-        prevEntries.map(entry => 
-          entry.id === draggingEntryId 
-            ? { ...entry, date: format(targetDate, 'yyyy-MM-dd'), recurrence: 'none' } 
-            : entry
-        )
-      );
-    }
-    setDraggingEntryId(null);
-     calendarRef.current?.querySelectorAll('[data-day-cell]').forEach(cell => {
-       cell.classList.remove('ring-2', 'ring-primary');
-    });
-  };
+    calendarRef.current?.querySelectorAll('.drop-indicator').forEach(el => el.remove());
 
-  // Touch handlers for mobile drag-and-drop
+    const targetElement = e.target as HTMLElement;
+    const dayCell = targetElement.closest('[data-day-cell]') as HTMLElement;
+    const dropTargetEntryEl = targetElement.closest('[data-entry-id]') as HTMLElement;
+
+    if (!dayCell) {
+        setDraggingEntry(null);
+        return;
+    }
+
+    const targetDateStr = dayCell.dataset.date;
+    if (!targetDateStr) {
+        setDraggingEntry(null);
+        return;
+    }
+
+    const originalEntryId = getOriginalIdFromInstance(draggingEntry.id);
+    const dropTargetId = dropTargetEntryEl ? getOriginalIdFromInstance(dropTargetEntryEl.dataset.entryId!) : null;
+
+    setEntries(prevEntries => {
+        let allEntries = [...prevEntries];
+        const updatedEntry = { ...allEntries.find(e => e.id === originalEntryId)! };
+        updatedEntry.date = targetDateStr;
+
+        const entriesOnTargetDay = allEntries
+            .filter(e => e.date === targetDateStr && e.id !== originalEntryId)
+            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+        let newOrder: number;
+        if (dropTargetId) {
+            const dropIndex = entriesOnTargetDay.findIndex(e => e.id === dropTargetId);
+            const rect = dropTargetEntryEl.getBoundingClientRect();
+            const isAfter = e.clientY > rect.top + rect.height / 2;
+            newOrder = isAfter ? dropIndex + 1 : dropIndex;
+        } else {
+            newOrder = entriesOnTargetDay.length;
+        }
+
+        updatedEntry.order = newOrder;
+
+        // Remove the old entry
+        allEntries = allEntries.filter(e => e.id !== originalEntryId);
+        
+        // Add the updated entry
+        allEntries.push(updatedEntry);
+
+        // Re-order the entries on the target day
+        const finalEntriesForDay = allEntries
+            .filter(e => e.date === targetDateStr)
+            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        
+        finalEntriesForDay.forEach((entry, index) => {
+            const originalIndexInAll = allEntries.findIndex(e => e.id === entry.id);
+            if (originalIndexInAll !== -1) {
+                allEntries[originalIndexInAll].order = index;
+            }
+        });
+        
+        return allEntries;
+    });
+
+    setDraggingEntry(null);
+  };
+  
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>, entry: Entry) => {
     if (isReadOnly || isSelectionMode) return;
-    setTouchDraggingEntry(entry);
+    setDraggingEntry(entry);
   };
   
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!touchDraggingEntry || !calendarRef.current) return;
+    if (!draggingEntry || !calendarRef.current) return;
     e.preventDefault();
     const touch = e.touches[0];
     const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
     
-    // Visually highlight the day cell being hovered over
+    calendarRef.current.querySelectorAll('.drop-indicator').forEach(el => el.remove());
+
     if (targetElement) {
         const dayCell = targetElement.closest('[data-day-cell]');
-        calendarRef.current.querySelectorAll('[data-day-cell]').forEach(cell => {
-            cell.classList.remove('bg-primary/20', 'ring-2', 'ring-primary');
-        });
-        if (dayCell) {
-            dayCell.classList.add('bg-primary/20', 'ring-2', 'ring-primary');
+        const dropTarget = targetElement.closest('[data-entry-id]') as HTMLElement;
+        if (dropTarget && dayCell) {
+            const indicator = document.createElement('div');
+            indicator.className = 'drop-indicator h-1 bg-primary rounded-full my-1';
+            const rect = dropTarget.getBoundingClientRect();
+            const isAfter = touch.clientY > rect.top + rect.height / 2;
+             if (isAfter) {
+                dropTarget.parentNode?.insertBefore(indicator, dropTarget.nextSibling);
+            } else {
+                dropTarget.parentNode?.insertBefore(indicator, dropTarget);
+            }
         }
     }
   };
   
   const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!touchDraggingEntry || !calendarRef.current) return;
+    if (!draggingEntry || !calendarRef.current) return;
     
-    // Find the drop target
+    calendarRef.current.querySelectorAll('.drop-indicator').forEach(el => el.remove());
     const touch = e.changedTouches[0];
     const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
     
     if (targetElement) {
-        const dayCell = targetElement.closest('[data-day-cell]');
-        if (dayCell) {
-            const targetDateStr = dayCell.getAttribute('data-date');
-            if (targetDateStr) {
-                 setEntries(prevEntries => 
-                    prevEntries.map(entry => 
-                        entry.id === getOriginalIdFromInstance(touchDraggingEntry.id)
-                        ? { ...entry, date: targetDateStr, recurrence: 'none' }
-                        : entry
-                    )
-                );
-            }
-        }
+        handleDrop({ clientY: touch.clientY, target: targetElement, preventDefault: () => {} } as unknown as React.DragEvent<HTMLDivElement>);
     }
     
-    // Cleanup
-    calendarRef.current.querySelectorAll('[data-day-cell]').forEach(cell => {
-       cell.classList.remove('bg-primary/20', 'ring-2', 'ring-primary');
-    });
-    setTouchDraggingEntry(null);
+    setDraggingEntry(null);
   };
 
 
@@ -277,6 +334,7 @@ export function FiscalFlowCalendar({
         <main 
             ref={calendarRef}
             className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-6"
+            onDragLeave={handleDragLeave}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
         >
@@ -327,7 +385,7 @@ export function FiscalFlowCalendar({
                   )}
                   onClick={() => handleDayClick(day, dayEntries)}
                   onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, day)}
+                  onDrop={handleDrop}
                 >
                   <div className="flex justify-between items-start">
                     <span className={cn("font-bold text-xs sm:text-base", isToday(day) && !isCorner && "text-primary")}>{format(day, "d")}</span>
@@ -348,6 +406,7 @@ export function FiscalFlowCalendar({
                       {dayEntries.map(entry => (
                           <div 
                               key={entry.id}
+                              data-entry-id={getOriginalIdFromInstance(entry.id)}
                               onClick={(e) => { e.stopPropagation(); openEditEntryDialog(entry); }}
                               onDragStart={(e) => handleDragStart(e, entry)}
                               onTouchStart={(e) => handleTouchStart(e, entry)}
@@ -356,7 +415,7 @@ export function FiscalFlowCalendar({
                                   "px-2 py-1 rounded-full text-left flex items-center gap-2 transition-all duration-200",
                                   isMobile && 'touch-none',
                                   !isReadOnly && !isSelectionMode && "cursor-grab active:cursor-grabbing hover:shadow-lg",
-                                  (draggingEntryId === getOriginalIdFromInstance(entry.id) || touchDraggingEntry?.id === entry.id) && 'opacity-50 scale-105 shadow-xl',
+                                  (draggingEntry?.id === entry.id) && 'opacity-50 scale-105 shadow-xl',
                                   isSelectionMode && selectedIds.includes(getOriginalIdFromInstance(entry.id)) && "opacity-60",
                                   "bg-secondary/50 hover:bg-secondary",
                               )}

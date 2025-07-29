@@ -248,7 +248,15 @@ export default function FiscalFlowDashboard() {
       if (entryData.id) {
         return prev.map((e) => (e.id === entryData.id ? { ...e, ...entryData } as Entry : e));
       }
-      return [...prev, { ...entryData, id: crypto.randomUUID() } as Entry];
+      
+      const entriesForDate = prev.filter(e => e.date === entryData.date);
+      const newEntry = { 
+          ...entryData, 
+          id: crypto.randomUUID(),
+          order: entriesForDate.length
+      } as Entry;
+      
+      return [...prev, newEntry];
     });
   };
 
