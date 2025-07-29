@@ -5,9 +5,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import useLocalStorage from "@/hooks/use-local-storage";
 import { useMedia } from "react-use";
-import { auth } from "@/lib/firebase";
+import { auth, googleProvider } from "@/lib/firebase";
 import type { User } from "firebase/auth";
-import { getRedirectResult, signOut } from "firebase/auth";
+import { getRedirectResult, signInWithRedirect, signOut } from "firebase/auth";
 
 import { EntryDialog } from "./entry-dialog";
 import { SettingsDialog } from "./settings-dialog";
@@ -30,7 +30,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { Entry, RolloverPreference, WeeklyBalances } from "@/lib/types";
-import { FiscalFlowCalendar, SidebarContent } from "./fiscal-flow-calendar";
+import { CentsiCalendar, SidebarContent } from "./centsi-calendar";
 import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths, parseISO, differenceInCalendarMonths, isAfter, eachWeekOfInterval, getWeek, lastDayOfMonth } from "date-fns";
 import { toZonedTime } from 'date-fns-tz';
 import { recurrenceIntervalMonths } from "@/lib/constants";
@@ -133,11 +133,11 @@ const getOriginalIdFromInstance = (instanceId: string) => {
 
 
 export default function FiscalFlowDashboard() {
-  const [entries, setEntries] = useLocalStorage<Entry[]>("fiscalFlowEntries", []);
-  const [rollover, setRollover] = useLocalStorage<RolloverPreference>("fiscalFlowRollover", "carryover");
-  const [timezone, setTimezone] = useLocalStorage<string>('fiscalFlowTimezone', 'UTC');
-  const [weeklyBalances, setWeeklyBalances] = useLocalStorage<WeeklyBalances>("fiscalFlowWeeklyBalances", {});
-  const [notificationsEnabled, setNotificationsEnabled] = useLocalStorage('fiscalFlowNotificationsEnabled', false);
+  const [entries, setEntries] = useLocalStorage<Entry[]>("centsiEntries", []);
+  const [rollover, setRollover] = useLocalStorage<RolloverPreference>("centsiRollover", "carryover");
+  const [timezone, setTimezone] = useLocalStorage<string>('centsiTimezone', 'UTC');
+  const [weeklyBalances, setWeeklyBalances] = useLocalStorage<WeeklyBalances>("centsiWeeklyBalances", {});
+  const [notificationsEnabled, setNotificationsEnabled] = useLocalStorage('centsiNotificationsEnabled', false);
   const [user, setUser] = useState<User | null>(null);
 
   const [isEntryDialogOpen, setEntryDialogOpen] = useState(false);
@@ -173,9 +173,7 @@ export default function FiscalFlowDashboard() {
 
 
   useEffect(() => {
-    console.log('[AUTH_DEBUG] Component mounted. Starting auth check.');
-    setIsAuthLoading(true);
-
+    console.log('[AUTH_DEBUG] Attempting to get redirect result...');
     getRedirectResult(auth)
       .then((result) => {
         if (result) {
@@ -195,11 +193,9 @@ export default function FiscalFlowDashboard() {
           console.log('[AUTH_DEBUG] onAuthStateChanged triggered.', { currentUser });
           if (currentUser) {
             setUser(currentUser);
-          } else {
-            setUser(null);
           }
           setIsAuthLoading(false);
-          console.log('[AUTH_DEBUG] Auth loading finished.');
+           console.log('[AUTH_DEBUG] Auth loading finished.');
         });
         return () => unsubscribe();
       });
@@ -235,7 +231,7 @@ export default function FiscalFlowDashboard() {
 
   useEffect(() => {
       const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        if (!localStorage.getItem('fiscalFlowTimezone') && detectedTimezone) {
+        if (!localStorage.getItem('centsiTimezone') && detectedTimezone) {
             setTimezone(detectedTimezone);
         }
         if ('serviceWorker' in navigator) {
@@ -421,7 +417,7 @@ export default function FiscalFlowDashboard() {
         <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
             <div className="flex items-center gap-2">
                 <Logo className="h-8 w-8 text-primary" />
-                <span className="text-xl font-bold">FiscalFlow</span>
+                <span className="text-xl font-bold">Centsi</span>
             </div>
             <div className="flex items-center gap-2">
                 <Skeleton className="h-9 w-28 hidden md:flex" />
@@ -453,7 +449,7 @@ export default function FiscalFlowDashboard() {
       <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
         <div className="flex items-center gap-2">
             <Logo className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold">FiscalFlow</span>
+            <span className="text-xl font-bold">Centsi</span>
         </div>
         <div className="flex items-center gap-2">
           {!isSelectionMode && (
@@ -543,7 +539,7 @@ export default function FiscalFlowDashboard() {
         </div>
       </header>
       
-      <FiscalFlowCalendar 
+      <CentsiCalendar 
         entries={entries}
         setEntries={setEntries}
         generatedEntries={allGeneratedEntries}

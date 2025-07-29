@@ -1,4 +1,5 @@
-// src/components/fiscal-flow-calendar.tsx
+
+// src/components/centsi-calendar.tsx
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from "react";
@@ -39,7 +40,7 @@ const parseDateInTimezone = (dateString: string, timeZone: string) => {
   return toZonedTime(new Date(year, month - 1, day), timeZone);
 };
 
-type FiscalFlowCalendarProps = {
+type CentsiCalendarProps = {
     entries: Entry[];
     generatedEntries: Entry[];
     setEntries: (value: Entry[] | ((val: Entry[]) => Entry[])) => void;
@@ -60,7 +61,7 @@ type FiscalFlowCalendarProps = {
     onBulkDelete: () => void;
 }
 
-export function FiscalFlowCalendar({
+export function CentsiCalendar({
     entries,
     generatedEntries,
     setEntries,
@@ -79,7 +80,7 @@ export function FiscalFlowCalendar({
     selectedIds,
     setSelectedIds,
     onBulkDelete,
-}: FiscalFlowCalendarProps) {
+}: CentsiCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
 
