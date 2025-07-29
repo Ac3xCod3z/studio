@@ -229,19 +229,22 @@ export default function FiscalFlowDashboard() {
   }, []);
 
   useEffect(() => {
-      const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        if (!localStorage.getItem('centseiTimezone') && detectedTimezone) {
-            setTimezone(detectedTimezone);
+    const registerServiceWorker = async () => {
+      if ('serviceWorker' in navigator) {
+        try {
+          const registration = await navigator.serviceWorker.register('/sw.js');
+          console.log('Service Worker registered with scope:', registration.scope);
+        } catch (error) {
+          console.error('Service Worker registration failed:', error);
         }
-        if ('serviceWorker' in navigator) {
-          window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js').then(registration => {
-              console.log('SW registered: ', registration);
-            }).catch(registrationError => {
-              console.log('SW registration failed: ', registrationError);
-            });
-          });
-        }
+      }
+    };
+    registerServiceWorker();
+
+    const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!localStorage.getItem('centseiTimezone') && detectedTimezone) {
+        setTimezone(detectedTimezone);
+    }
   }, [setTimezone]);
 
 

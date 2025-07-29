@@ -1,10 +1,10 @@
 import { toZonedTime } from 'date-fns-tz';
 import { Entry } from './types';
 import { formatCurrency } from './utils';
-import { add, getDay, isAfter, isBefore, set } from 'date-fns';
+import { add, isAfter, isBefore, set, parseISO } from 'date-fns';
 import { recurrenceIntervalMonths } from './constants';
 
-const NOTIFICATION_TAG_PREFIX = 'fiscalflow-bill-';
+const NOTIFICATION_TAG_PREFIX = 'centsei-bill-';
 const NOTIFICATION_WINDOW_DAYS = 90; // Schedule notifications for the next 90 days.
 
 async function getServiceWorkerRegistration() {
@@ -20,12 +20,21 @@ export async function cancelAllNotifications(toast: any) {
 
   try {
     const notifications = await registration.getNotifications({
-      tag: NOTIFICATION_TAG_PREFIX,
-      includeTriggered: true,
+      // An empty tag will match all notifications from this origin.
+      // This is a more robust way to clear all notifications from this app.
+      // includeTriggered: true, // This is not needed for clearing
     });
-    notifications.forEach((notification) => notification.close());
-    if (notifications.length > 0) {
-       console.log(`${notifications.length} notifications cancelled.`);
+    
+    let cancelledCount = 0;
+    for (const notification of notifications) {
+        if (notification.tag.startsWith(NOTIFICATION_TAG_PREFIX)) {
+            notification.close();
+            cancelledCount++;
+        }
+    }
+    
+    if (cancelledCount > 0) {
+       console.log(`${cancelledCount} notifications cancelled.`);
     }
   } catch (e) {
     console.error('Error cancelling notifications:', e);
@@ -37,31 +46,33 @@ function getNextBillOccurrences(entry: Entry, timezone: string): Date[] {
   const now = new Date();
   const scheduleUntil = add(now, { days: NOTIFICATION_WINDOW_DAYS });
 
-  const [year, month, day] = entry.date.split('-').map(Number);
-  const baseDate = toZonedTime(new Date(year, month - 1, day), timezone);
-
-  // Set the notification time to 8 AM for all occurrences
+  const baseDate = parseISO(entry.date);
+  
+  // Set the notification time to 8 AM in the user's local timezone for all occurrences
   const notificationTime = { hours: 8, minutes: 0, seconds: 0, milliseconds: 0 };
 
   if (entry.recurrence === 'none') {
-    const occurrence = set(baseDate, notificationTime);
+    const occurrence = toZonedTime(set(baseDate, notificationTime), timezone);
     if (isAfter(occurrence, now) && isBefore(occurrence, scheduleUntil)) {
       occurrences.push(occurrence);
     }
-  } else if (entry.recurrence === 'weekly') {
-    let nextOccurrence = set(baseDate, notificationTime);
+  } else if (entry.recurrence === 'weekly' || entry.recurrence === 'bi-weekly') {
+    let nextOccurrence = toZonedTime(set(baseDate, notificationTime), timezone);
+    const weeksToAdd = entry.recurrence === 'weekly' ? 1 : 2;
     
     while(isBefore(nextOccurrence, now)){
-      nextOccurrence = add(nextOccurrence, { weeks: 1 });
+      nextOccurrence = add(nextOccurrence, { weeks: weeksToAdd });
     }
 
     while (isBefore(nextOccurrence, scheduleUntil)) {
       occurrences.push(nextOccurrence);
-      nextOccurrence = add(nextOccurrence, { weeks: 1 });
+      nextOccurrence = add(nextOccurrence, { weeks: weeksToAdd });
     }
-  } else {
+  } else if (entry.recurrence && entry.recurrence !== 'none') {
     const interval = recurrenceIntervalMonths[entry.recurrence as keyof typeof recurrenceIntervalMonths];
-    let nextOccurrence = set(baseDate, notificationTime);
+    if (!interval) return [];
+
+    let nextOccurrence = toZonedTime(set(baseDate, notificationTime), timezone);
 
     while(isBefore(nextOccurrence, now)){
       nextOccurrence = add(nextOccurrence, { months: interval });
@@ -79,16 +90,11 @@ function getNextBillOccurrences(entry: Entry, timezone: string): Date[] {
 
 export async function scheduleNotifications(entries: Entry[], timezone: string, toast: any) {
   const registration = await getServiceWorkerRegistration();
-  if (!registration || !('showNotification' in registration)) {
-    toast({
-      title: 'Notification Scheduling Error',
-      description: 'Could not access service worker for notifications.',
-      variant: 'destructive',
-    });
+  if (!registration || !('showNotification' in registration) || !(window as any).TimestampTrigger) {
+    console.error('Notification scheduling prerequisites not met.');
     return;
   }
   
-  // First, cancel all previously scheduled notifications
   await cancelAllNotifications(toast);
 
   const billEntries = entries.filter((entry) => entry.type === 'bill');
@@ -109,8 +115,8 @@ export async function scheduleNotifications(entries: Entry[], timezone: string, 
         });
         scheduledCount++;
       } catch (e) {
-        console.error('Error scheduling notification:', e);
-        // This can fail if the timestamp is in the past, which is expected for some logic.
+        // This can fail if the timestamp is in the past, which is expected during logic checks.
+        // It's safe to ignore these errors.
       }
     }
   }

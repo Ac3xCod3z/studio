@@ -78,7 +78,7 @@ export function SettingsDialog({
   const [recommendation, setRecommendation] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const [notificationStatus, setNotificationStatus] = useState("default");
+  const [notificationPermission, setNotificationPermission] = useState("default");
   const [notificationsEnabled, setNotificationsEnabled] = useLocalStorage('centseiNotificationsEnabled', false);
   const [entries, setEntries] = useLocalStorage<Entry[]>("centseiEntries", []);
   const [shareLink, setShareLink] = useState('');
@@ -89,7 +89,7 @@ export function SettingsDialog({
   useEffect(() => {
     if (isOpen) {
         if ("Notification" in window) {
-            setNotificationStatus(Notification.permission);
+            setNotificationPermission(Notification.permission);
         }
         setShareLink('');
         setHasCopied(false);
@@ -167,26 +167,36 @@ export function SettingsDialog({
   };
 
   const handleNotificationToggle = async () => {
-    if (!("Notification" in window) || !("serviceWorker" in navigator)) {
-        toast({ title: "Notifications not supported", description: "Your browser does not support notifications.", variant: "destructive" });
-        return;
-    }
+      if (!("Notification" in window) || !("serviceWorker" in navigator)) {
+          toast({ title: "Notifications not supported", description: "Your browser does not support this feature.", variant: "destructive" });
+          return;
+      }
 
-    if (notificationStatus === 'granted') {
-        setNotificationsEnabled(false);
-        onNotificationsToggle(false);
-        toast({ title: "Notifications Disabled", description: "You will no longer receive bill reminders." });
-    } else {
-        const permission = await Notification.requestPermission();
-        setNotificationStatus(permission);
-        if (permission === 'granted') {
-            setNotificationsEnabled(true);
-            onNotificationsToggle(true);
-            toast({ title: "Notifications Enabled!", description: "You'll receive reminders for upcoming bills." });
-        } else {
-            toast({ title: "Notifications Blocked", description: "You need to enable notifications in your browser settings.", variant: "destructive" });
-        }
-    }
+      if (notificationsEnabled) {
+          // If currently enabled, the user wants to disable them.
+          setNotificationsEnabled(false);
+          onNotificationsToggle(false);
+          toast({ title: "Notifications Disabled", description: "You will no longer receive bill reminders." });
+      } else {
+          // If currently disabled, the user wants to enable them.
+          if (notificationPermission === 'granted') {
+              setNotificationsEnabled(true);
+              onNotificationsToggle(true);
+              toast({ title: "Notifications Enabled!", description: "You'll receive reminders for upcoming bills." });
+          } else if (notificationPermission === 'denied') {
+              toast({ title: "Notifications Blocked", description: "You need to enable notifications in your browser settings.", variant: "destructive" });
+          } else {
+              const permission = await Notification.requestPermission();
+              setNotificationPermission(permission);
+              if (permission === 'granted') {
+                  setNotificationsEnabled(true);
+                  onNotificationsToggle(true);
+                  toast({ title: "Notifications Enabled!", description: "You'll receive reminders for upcoming bills." });
+              } else {
+                  toast({ title: "Notifications Blocked", description: "You did not grant permission for notifications.", variant: "destructive" });
+              }
+          }
+      }
   };
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -332,13 +342,13 @@ export function SettingsDialog({
                   <Button 
                       onClick={handleNotificationToggle} 
                       className="w-full btn-primary-hover"
-                      variant={notificationsEnabled && notificationStatus === 'granted' ? 'secondary' : 'default'}
-                      disabled={notificationStatus === 'denied'}
+                      variant={notificationsEnabled ? 'secondary' : 'default'}
+                      disabled={notificationPermission === 'denied'}
                   >
-                      {notificationsEnabled && notificationStatus === 'granted' ? <BellOff className="mr-2 h-4 w-4" /> : <Bell className="mr-2 h-4 w-4" />}
-                      {notificationsEnabled && notificationStatus === 'granted' ? 'Disable Notifications' : 'Enable Notifications'}
+                      {notificationsEnabled ? <BellOff className="mr-2 h-4 w-4" /> : <Bell className="mr-2 h-4 w-4" />}
+                      {notificationsEnabled ? 'Disable Notifications' : 'Enable Notifications'}
                   </Button>
-                  {notificationStatus === 'denied' && (
+                  {notificationPermission === 'denied' && (
                       <p className="text-xs text-destructive text-center">You have blocked notifications. Please enable them in your browser settings.</p>
                   )}
               </div>
