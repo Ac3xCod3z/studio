@@ -155,7 +155,9 @@ export function FiscalFlowCalendar({
   }
 
   const entryIsRecurringInstance = (entryId: string) => {
-      return entryId.match(/.*-\d{4}-\d{2}-\d{2}$/);
+      const originalId = getOriginalIdFromInstance(entryId);
+      const originalEntry = entries.find(e => e.id === originalId);
+      return originalEntry?.recurrence !== 'none';
   }
 
   const openEditEntryDialog = (entry: Entry) => {
@@ -169,12 +171,12 @@ export function FiscalFlowCalendar({
   }
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, entry: Entry) => {
-    if (isReadOnly || isSelectionMode || entryIsRecurringInstance(entry.id)) {
+    if (isReadOnly || isSelectionMode) {
         e.preventDefault();
         return;
     }
     e.dataTransfer.effectAllowed = 'move';
-    setDraggingEntryId(entry.id);
+    setDraggingEntryId(getOriginalIdFromInstance(entry.id));
   };
   
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -210,7 +212,7 @@ export function FiscalFlowCalendar({
 
   // Touch handlers for mobile drag-and-drop
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>, entry: Entry) => {
-    if (isReadOnly || isSelectionMode || entryIsRecurringInstance(entry.id)) return;
+    if (isReadOnly || isSelectionMode) return;
     setTouchDraggingEntry(entry);
   };
   
@@ -349,12 +351,12 @@ export function FiscalFlowCalendar({
                               onClick={(e) => { e.stopPropagation(); openEditEntryDialog(entry); }}
                               onDragStart={(e) => handleDragStart(e, entry)}
                               onTouchStart={(e) => handleTouchStart(e, entry)}
-                              draggable={!isReadOnly && !isSelectionMode && !entryIsRecurringInstance(entry.id)}
+                              draggable={!isReadOnly && !isSelectionMode}
                               className={cn(
                                   "px-2 py-1 rounded-full text-left flex items-center gap-2 transition-all duration-200",
                                   isMobile && 'touch-none',
-                                  !entryIsRecurringInstance(entry.id) && !isReadOnly && !isSelectionMode && "cursor-grab active:cursor-grabbing hover:shadow-lg",
-                                  (draggingEntryId === entry.id || touchDraggingEntry?.id === entry.id) && 'opacity-50 scale-105 shadow-xl',
+                                  !isReadOnly && !isSelectionMode && "cursor-grab active:cursor-grabbing hover:shadow-lg",
+                                  (draggingEntryId === getOriginalIdFromInstance(entry.id) || touchDraggingEntry?.id === entry.id) && 'opacity-50 scale-105 shadow-xl',
                                   isSelectionMode && selectedIds.includes(getOriginalIdFromInstance(entry.id)) && "opacity-60",
                                   "bg-secondary/50 hover:bg-secondary",
                               )}
