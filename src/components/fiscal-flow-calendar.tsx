@@ -15,9 +15,13 @@ import {
   isToday,
   isSameMonth,
   isSameDay,
+  getYear,
+  setYear,
+  setMonth,
+  getMonth,
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
-import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Trash2, TrendingUp, TrendingDown, Repeat } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Trash2, TrendingUp, TrendingDown, Repeat, CalendarIcon } from "lucide-react";
 import { gsap } from "gsap";
 import { MotionPathPlugin } from "gsap/MotionPathPlugin";
 
@@ -28,12 +32,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { Entry, WeeklyBalances } from "@/lib/types";
 import { Checkbox } from "./ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
 if (typeof window !== "undefined") {
     gsap.registerPlugin(MotionPathPlugin);
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const parseDateInTimezone = (dateString: string, timeZone: string) => {
   const [year, month, day] = dateString.split('-').map(Number);
@@ -83,6 +90,7 @@ export function FiscalFlowCalendar({
 }: FiscalFlowCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [isMonthPickerOpen, setMonthPickerOpen] = useState(false);
 
   const [draggingEntry, setDraggingEntry] = useState<Entry | null>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
@@ -377,13 +385,14 @@ export function FiscalFlowCalendar({
     handleDragEnd();
   };
 
-
   const Sidebar = () => (
     <SidebarContent 
       weeklyTotals={weeklyTotals}
       selectedDate={selectedDate}
     />
   )
+
+  const years = Array.from({length: 21}, (_, i) => getYear(new Date()) - 10 + i);
 
   return (
     <div className="flex flex-1 overflow-hidden bg-background">
@@ -393,7 +402,45 @@ export function FiscalFlowCalendar({
             onDragLeave={handleDragLeave}
         >
           <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{format(currentMonth, "MMMM yyyy")}</h1>
+            <Popover open={isMonthPickerOpen} onOpenChange={setMonthPickerOpen}>
+                <PopoverTrigger asChild>
+                    <button className="text-2xl sm:text-3xl font-bold tracking-tight text-left hover:text-primary transition-colors focus:outline-none rounded-md px-2 -mx-2 py-1">
+                        {format(currentMonth, "MMMM yyyy")}
+                    </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                    <div className="p-4">
+                        <Select
+                            value={String(getYear(currentMonth))}
+                            onValueChange={(year) => setCurrentMonth(setYear(currentMonth, parseInt(year)))}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select year" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {years.map(year => (
+                                    <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 p-4 pt-0">
+                        {MONTHS.map((month, index) => (
+                            <Button
+                                key={month}
+                                variant={getMonth(currentMonth) === index ? "default" : "ghost"}
+                                onClick={() => {
+                                    setCurrentMonth(setMonth(currentMonth, index));
+                                    setMonthPickerOpen(false);
+                                }}
+                            >
+                                {month}
+                            </Button>
+                        ))}
+                    </div>
+                </PopoverContent>
+            </Popover>
+
             <div className="flex items-center gap-1 sm:gap-2">
               <Button variant="outline" onClick={toggleSelectionMode}>
                 {isSelectionMode ? 'Cancel' : 'Select'}
