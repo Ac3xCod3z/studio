@@ -1,3 +1,4 @@
+
 // src/lib/types.ts
 import { z } from 'zod';
 
@@ -5,12 +6,15 @@ export type EntryType = 'bill' | 'income';
 
 export const BillCategories = [
   "rent",
-  "vehicles",
   "utilities",
-  "groceries",
-  "credit cards",
-  "subscriptions",
+  "phone bill",
+  "vehicles",
   "loans",
+  "credit cards",
+  "groceries",
+  "day care",
+  "subscriptions",
+  "recreations",
   "necessities",
   "other",
 ] as const;
