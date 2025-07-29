@@ -427,7 +427,7 @@ export function FiscalFlowCalendar({
                   data-day-cell
                   data-date={dayStr}
                   className={cn(
-                    "relative flex flex-col h-28 sm:h-36 rounded-xl p-2 border transition-all duration-300 ease-in-out transform group",
+                    "relative flex flex-col h-36 md:h-44 rounded-xl p-2 border transition-all duration-300 ease-in-out transform group",
                     !isReadOnly && "cursor-pointer",
                     !isSameMonth(day, currentMonth) ? "bg-muted/50 text-muted-foreground" : "bg-card",
                     !isReadOnly && isSameMonth(day, currentMonth) && !isSelectionMode && "hover:bg-accent hover:shadow-md hover:-translate-y-1",
