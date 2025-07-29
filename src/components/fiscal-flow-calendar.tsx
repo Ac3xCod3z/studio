@@ -1,7 +1,7 @@
 // src/components/fiscal-flow-calendar.tsx
 "use client";
 
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import {
   addMonths,
   subMonths,
@@ -85,6 +85,8 @@ export function FiscalFlowCalendar({
 
   const [draggingEntry, setDraggingEntry] = useState<Entry | null>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
+  const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isDraggingRef = useRef(false);
 
 
   const { daysWithEntries } = useMemo(() => {
@@ -171,11 +173,17 @@ export function FiscalFlowCalendar({
         return;
     }
     e.dataTransfer.effectAllowed = 'move';
+    isDraggingRef.current = true;
     setDraggingEntry(entry);
   };
+  
+  const handleDragEnd = () => {
+    isDraggingRef.current = false;
+    setDraggingEntry(null);
+  }
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    if (isReadOnly || isSelectionMode) return;
+    if (isReadOnly || isSelectionMode || !isDraggingRef.current) return;
     e.preventDefault();
     const target = e.currentTarget;
     if (target.closest('[data-day-cell]')) {
@@ -195,8 +203,6 @@ export function FiscalFlowCalendar({
                 dropTarget.parentNode?.insertBefore(indicator, dropTarget);
             }
         } else if (dayCell && !dayCell.querySelector('[data-entry-id]')) {
-            const indicator = document.createElement('div');
-            indicator.className = 'drop-indicator h-1 bg-primary rounded-full my-1';
             dayCell.querySelector('.space-y-1\\.5')?.appendChild(indicator);
         }
     }
@@ -209,7 +215,7 @@ export function FiscalFlowCalendar({
     calendarRef.current?.querySelectorAll('.drop-indicator').forEach(el => el.remove());
   }
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = (e: React.DragEvent<HTMLDivElement> | { clientY: number, target: EventTarget }) => {
     if (isReadOnly || isSelectionMode || !draggingEntry) return;
     e.preventDefault();
     calendarRef.current?.querySelectorAll('.drop-indicator').forEach(el => el.remove());
@@ -245,7 +251,7 @@ export function FiscalFlowCalendar({
         if (dropTargetId) {
             const dropIndex = entriesOnTargetDay.findIndex(e => e.id === dropTargetId);
             const rect = dropTargetEntryEl.getBoundingClientRect();
-            const isAfter = e.clientY > rect.top + rect.height / 2;
+            const isAfter = 'clientY' in e ? e.clientY > rect.top + rect.height / 2 : false;
             newOrder = isAfter ? dropIndex + 1 : dropIndex;
         } else {
             newOrder = entriesOnTargetDay.length;
@@ -274,17 +280,39 @@ export function FiscalFlowCalendar({
         return allEntries;
     });
 
-    setDraggingEntry(null);
+    handleDragEnd();
   };
+  
+  const cancelDragTimeout = useCallback(() => {
+    if (dragTimeoutRef.current) {
+        clearTimeout(dragTimeoutRef.current);
+        dragTimeoutRef.current = null;
+    }
+  }, []);
   
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>, entry: Entry) => {
     if (isReadOnly || isSelectionMode) return;
-    setDraggingEntry(entry);
+    
+    cancelDragTimeout(); // Cancel any existing timer
+    
+    dragTimeoutRef.current = setTimeout(() => {
+        setDraggingEntry(entry);
+        isDraggingRef.current = true;
+        // Optional: vibrate to indicate drag has started
+        if (navigator.vibrate) {
+            navigator.vibrate(50);
+        }
+    }, 1000); // 1 second hold
   };
   
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!draggingEntry || !calendarRef.current) return;
-    e.preventDefault();
+    // If we move our finger, it's a scroll, not a drag.
+    cancelDragTimeout();
+    
+    if (!isDraggingRef.current || !calendarRef.current) return;
+
+    document.body.style.overflow = 'hidden'; // Prevent page scroll while dragging
+
     const touch = e.touches[0];
     const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
     
@@ -308,7 +336,10 @@ export function FiscalFlowCalendar({
   };
   
   const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!draggingEntry || !calendarRef.current) return;
+    cancelDragTimeout();
+    document.body.style.overflow = ''; // Re-enable page scroll
+
+    if (!isDraggingRef.current || !calendarRef.current) return;
     
     calendarRef.current.querySelectorAll('.drop-indicator').forEach(el => el.remove());
     const touch = e.changedTouches[0];
@@ -318,7 +349,7 @@ export function FiscalFlowCalendar({
         handleDrop({ clientY: touch.clientY, target: targetElement, preventDefault: () => {} } as unknown as React.DragEvent<HTMLDivElement>);
     }
     
-    setDraggingEntry(null);
+    handleDragEnd();
   };
 
 
@@ -335,8 +366,6 @@ export function FiscalFlowCalendar({
             ref={calendarRef}
             className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-6"
             onDragLeave={handleDragLeave}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
         >
           <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{format(currentMonth, "MMMM yyyy")}</h1>
@@ -401,19 +430,33 @@ export function FiscalFlowCalendar({
                         />
                     )}
                   </div>
-                  <ScrollArea className="flex-1 mt-1 -mx-2 px-2">
-                    <div className="space-y-1.5 text-xs sm:text-sm">
+                  <ScrollArea 
+                    className="flex-1 mt-1 -mx-2 px-2"
+                    onTouchStart={(e) => {
+                      if (isDraggingRef.current) e.stopPropagation();
+                    }}
+                    onTouchMove={(e) => {
+                      if (isDraggingRef.current) e.stopPropagation();
+                    }}
+                  >
+                    <div 
+                      className="space-y-1.5 text-xs sm:text-sm"
+                      onTouchStart={handleTouchStart}
+                      onTouchMove={handleTouchMove}
+                      onTouchEnd={handleTouchEnd}
+                    >
                       {dayEntries.map(entry => (
                           <div 
                               key={entry.id}
                               data-entry-id={getOriginalIdFromInstance(entry.id)}
                               onClick={(e) => { e.stopPropagation(); openEditEntryDialog(entry); }}
                               onDragStart={(e) => handleDragStart(e, entry)}
-                              onTouchStart={(e) => handleTouchStart(e, entry)}
+                              onDragEnd={handleDragEnd}
                               draggable={!isReadOnly && !isSelectionMode}
                               className={cn(
                                   "px-2 py-1 rounded-full text-left flex items-center gap-2 transition-all duration-200",
-                                  isMobile && 'touch-none',
+                                  isMobile && !isDraggingRef.current && 'touch-action-pan-y', // Allow vertical scroll
+                                  isMobile && isDraggingRef.current && 'touch-action-none', // Disable scroll when dragging
                                   !isReadOnly && !isSelectionMode && "cursor-grab active:cursor-grabbing hover:shadow-lg",
                                   (draggingEntry?.id === entry.id) && 'opacity-50 scale-105 shadow-xl',
                                   isSelectionMode && selectedIds.includes(getOriginalIdFromInstance(entry.id)) && "opacity-60",
