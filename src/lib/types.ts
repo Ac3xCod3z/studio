@@ -16,6 +16,8 @@ export const BillCategories = [
   "subscriptions",
   "recreations",
   "necessities",
+  "vices",
+  "personal maintenance",
   "other",
 ] as const;
 
