@@ -1,3 +1,4 @@
+
 // src/components/fiscal-flow-calendar.tsx
 "use client";
 
@@ -186,15 +187,15 @@ export function FiscalFlowCalendar({
     if (isReadOnly || isSelectionMode || !isDraggingRef.current) return;
     e.preventDefault();
     const target = e.currentTarget;
-    if (target.closest('[data-day-cell]')) {
-        calendarRef.current?.querySelectorAll('.drop-indicator').forEach(el => el.remove());
-        
+    calendarRef.current?.querySelectorAll('.drop-indicator').forEach(el => el.remove());
+    
+    const dayCell = target.closest('[data-day-cell]') as HTMLElement;
+    if (dayCell) {
         const dropTarget = target.closest('[data-entry-id]') as HTMLElement;
-        const dayCell = target.closest('[data-day-cell]') as HTMLElement;
+        const indicator = document.createElement('div');
+        indicator.className = 'drop-indicator h-1 bg-primary rounded-full my-1';
 
         if (dropTarget) {
-            const indicator = document.createElement('div');
-            indicator.className = 'drop-indicator h-1 bg-primary rounded-full my-1';
             const rect = dropTarget.getBoundingClientRect();
             const isAfter = e.clientY > rect.top + rect.height / 2;
             if (isAfter) {
@@ -202,8 +203,15 @@ export function FiscalFlowCalendar({
             } else {
                 dropTarget.parentNode?.insertBefore(indicator, dropTarget);
             }
-        } else if (dayCell && !dayCell.querySelector('[data-entry-id]')) {
-            dayCell.querySelector('.space-y-1\\.5')?.appendChild(indicator);
+        } else {
+            // If dragging over a day cell but not a specific entry
+            const entryContainer = dayCell.querySelector('.space-y-1\\.5');
+            if (entryContainer && entryContainer.children.length > 0) {
+                 // default to end of list if not over anything specific
+                 entryContainer.appendChild(indicator);
+            } else if (entryContainer) {
+                entryContainer.appendChild(indicator);
+            }
         }
     }
   };
@@ -217,7 +225,10 @@ export function FiscalFlowCalendar({
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement> | { clientY: number, target: EventTarget }) => {
     if (isReadOnly || isSelectionMode || !draggingEntry) return;
-    e.preventDefault();
+    
+    if ('preventDefault' in e) {
+        e.preventDefault();
+    }
     calendarRef.current?.querySelectorAll('.drop-indicator').forEach(el => el.remove());
 
     const targetElement = e.target as HTMLElement;
@@ -225,47 +236,56 @@ export function FiscalFlowCalendar({
     const dropTargetEntryEl = targetElement.closest('[data-entry-id]') as HTMLElement;
 
     if (!dayCell) {
-        setDraggingEntry(null);
+        handleDragEnd();
         return;
     }
 
     const targetDateStr = dayCell.dataset.date;
     if (!targetDateStr) {
-        setDraggingEntry(null);
+        handleDragEnd();
         return;
     }
 
     const originalEntryId = getOriginalIdFromInstance(draggingEntry.id);
-    const dropTargetId = dropTargetEntryEl ? getOriginalIdFromInstance(dropTargetEntryEl.dataset.entryId!) : null;
+    const dropTargetInstanceId = dropTargetEntryEl?.dataset.entryId ? getOriginalIdFromInstance(dropTargetEntryEl.dataset.entryId) : null;
 
     setEntries(prevEntries => {
         let allEntries = [...prevEntries];
-        const updatedEntry = { ...allEntries.find(e => e.id === originalEntryId)! };
+        const updatedEntryIndex = allEntries.findIndex(e => e.id === originalEntryId);
+        if (updatedEntryIndex === -1) return prevEntries;
+        
+        const updatedEntry = { ...allEntries[updatedEntryIndex] };
         updatedEntry.date = targetDateStr;
+        
+        // Remove the entry to be re-inserted later
+        allEntries.splice(updatedEntryIndex, 1);
 
         const entriesOnTargetDay = allEntries
-            .filter(e => e.date === targetDateStr && e.id !== originalEntryId)
+            .filter(e => e.date === targetDateStr)
             .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
         let newOrder: number;
-        if (dropTargetId) {
-            const dropIndex = entriesOnTargetDay.findIndex(e => e.id === dropTargetId);
-            const rect = dropTargetEntryEl.getBoundingClientRect();
-            const isAfter = 'clientY' in e ? e.clientY > rect.top + rect.height / 2 : false;
-            newOrder = isAfter ? dropIndex + 1 : dropIndex;
+        if (dropTargetEntryEl && dropTargetInstanceId) {
+            const dropTargetOriginalEntry = entriesOnTargetDay.find(e => e.id === dropTargetInstanceId);
+            const dropIndex = dropTargetOriginalEntry ? entriesOnTargetDay.indexOf(dropTargetOriginalEntry) : -1;
+            
+            if (dropIndex !== -1) {
+                const rect = dropTargetEntryEl.getBoundingClientRect();
+                const isAfter = 'clientY' in e ? e.clientY > rect.top + rect.height / 2 : false;
+                newOrder = isAfter ? dropIndex + 0.5 : dropIndex - 0.5;
+            } else {
+                 newOrder = entriesOnTargetDay.length;
+            }
         } else {
             newOrder = entriesOnTargetDay.length;
         }
-
-        updatedEntry.order = newOrder;
-
-        // Remove the old entry
-        allEntries = allEntries.filter(e => e.id !== originalEntryId);
         
-        // Add the updated entry
+        updatedEntry.order = newOrder;
+        
+        // Add the updated entry back
         allEntries.push(updatedEntry);
 
-        // Re-order the entries on the target day
+        // Re-order all entries on the target day to have integer order values
         const finalEntriesForDay = allEntries
             .filter(e => e.date === targetDateStr)
             .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -293,25 +313,23 @@ export function FiscalFlowCalendar({
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>, entry: Entry) => {
     if (isReadOnly || isSelectionMode) return;
     
-    cancelDragTimeout(); // Cancel any existing timer
+    cancelDragTimeout();
     
     dragTimeoutRef.current = setTimeout(() => {
         setDraggingEntry(entry);
         isDraggingRef.current = true;
-        // Optional: vibrate to indicate drag has started
         if (navigator.vibrate) {
             navigator.vibrate(50);
         }
-    }, 1000); // 1 second hold
+    }, 1000);
   };
   
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    // If we move our finger, it's a scroll, not a drag.
     cancelDragTimeout();
     
     if (!isDraggingRef.current || !calendarRef.current) return;
 
-    document.body.style.overflow = 'hidden'; // Prevent page scroll while dragging
+    document.body.style.overflow = 'hidden';
 
     const touch = e.touches[0];
     const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -321,15 +339,23 @@ export function FiscalFlowCalendar({
     if (targetElement) {
         const dayCell = targetElement.closest('[data-day-cell]');
         const dropTarget = targetElement.closest('[data-entry-id]') as HTMLElement;
-        if (dropTarget && dayCell) {
+        if (dayCell) {
             const indicator = document.createElement('div');
             indicator.className = 'drop-indicator h-1 bg-primary rounded-full my-1';
-            const rect = dropTarget.getBoundingClientRect();
-            const isAfter = touch.clientY > rect.top + rect.height / 2;
-             if (isAfter) {
-                dropTarget.parentNode?.insertBefore(indicator, dropTarget.nextSibling);
+            
+            if(dropTarget) {
+                const rect = dropTarget.getBoundingClientRect();
+                const isAfter = touch.clientY > rect.top + rect.height / 2;
+                 if (isAfter) {
+                    dropTarget.parentNode?.insertBefore(indicator, dropTarget.nextSibling);
+                } else {
+                    dropTarget.parentNode?.insertBefore(indicator, dropTarget);
+                }
             } else {
-                dropTarget.parentNode?.insertBefore(indicator, dropTarget);
+                 const entryContainer = dayCell.querySelector('.space-y-1\\.5');
+                 if (entryContainer) {
+                    entryContainer.appendChild(indicator);
+                 }
             }
         }
     }
@@ -337,11 +363,10 @@ export function FiscalFlowCalendar({
   
   const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
     cancelDragTimeout();
-    document.body.style.overflow = ''; // Re-enable page scroll
+    document.body.style.overflow = '';
 
     if (!isDraggingRef.current || !calendarRef.current) return;
     
-    calendarRef.current.querySelectorAll('.drop-indicator').forEach(el => el.remove());
     const touch = e.changedTouches[0];
     const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
     
@@ -417,7 +442,7 @@ export function FiscalFlowCalendar({
                   onDrop={handleDrop}
                 >
                   <div className="flex justify-between items-start">
-                    <span className={cn("font-bold text-xs sm:text-base", isToday(day) && !isCorner && "text-primary")}>{format(day, "d")}</span>
+                    <span className={cn("font-bold text-xs sm:text-base", isToday(day) && "text-primary")}>{format(day, "d")}</span>
                     {!isReadOnly && !isSelectionMode && (
                         <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-foreground/50 hover:text-foreground" onClick={(e) => { e.stopPropagation(); openNewEntryDialog(day); }}>
                             <Plus className="h-4 w-4" />
@@ -439,24 +464,21 @@ export function FiscalFlowCalendar({
                       if (isDraggingRef.current) e.stopPropagation();
                     }}
                   >
-                    <div 
-                      className="space-y-1.5 text-xs sm:text-sm"
-                      onTouchStart={handleTouchStart}
-                      onTouchMove={handleTouchMove}
-                      onTouchEnd={handleTouchEnd}
-                    >
+                    <div className="space-y-1.5 text-xs sm:text-sm">
                       {dayEntries.map(entry => (
                           <div 
                               key={entry.id}
-                              data-entry-id={getOriginalIdFromInstance(entry.id)}
+                              data-entry-id={entry.id}
                               onClick={(e) => { e.stopPropagation(); openEditEntryDialog(entry); }}
                               onDragStart={(e) => handleDragStart(e, entry)}
                               onDragEnd={handleDragEnd}
+                              onTouchStart={(e) => handleTouchStart(e, entry)}
+                              onTouchMove={handleTouchMove}
+                              onTouchEnd={handleTouchEnd}
                               draggable={!isReadOnly && !isSelectionMode}
                               className={cn(
                                   "px-2 py-1 rounded-full text-left flex items-center gap-2 transition-all duration-200",
-                                  isMobile && !isDraggingRef.current && 'touch-action-pan-y', // Allow vertical scroll
-                                  isMobile && isDraggingRef.current && 'touch-action-none', // Disable scroll when dragging
+                                  isMobile ? 'touch-action-pan-y' : '',
                                   !isReadOnly && !isSelectionMode && "cursor-grab active:cursor-grabbing hover:shadow-lg",
                                   (draggingEntry?.id === entry.id) && 'opacity-50 scale-105 shadow-xl',
                                   isSelectionMode && selectedIds.includes(getOriginalIdFromInstance(entry.id)) && "opacity-60",
