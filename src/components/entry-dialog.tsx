@@ -49,7 +49,7 @@ const formSchema = z.object({
 type EntryFormProps = {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (entry: Omit<Entry, "id"> & { id?: string }) => void;
+  onSave: (entry: Omit<Entry, "id" | 'date'> & { id?: string; date: Date; originalDate?: string }) => void;
   onDelete?: (id: string) => void;
   entry: Entry | null;
   selectedDate: Date;
@@ -73,6 +73,10 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
    React.useEffect(() => {
     if (isOpen) {
       const resetDate = entry ? parseDateInTimezone(entry.date, timezone) : selectedDate;
+      const isInstancePaid = entry?.recurrence !== 'none' 
+        ? entry?.exceptions?.[entry.date]?.isPaid ?? false
+        : entry?.isPaid ?? false;
+
       form.reset({
         type: entry?.type || "bill",
         name: entry?.name || "",
@@ -80,16 +84,16 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
         date: resetDate,
         recurrence: entry?.recurrence || 'none',
         category: entry?.category,
-        isPaid: entry?.isPaid || false,
+        isPaid: isInstancePaid,
       });
     }
-  }, [isOpen, selectedDate, entry, timezone, form.reset, form]);
+  }, [isOpen, selectedDate, entry, timezone, form]);
 
 
   function onSubmit(values: z.infer<typeof formSchema>) {
-    const dataToSave: Omit<Entry, 'id'> & {id?: string} = {
+    const dataToSave = {
       ...values,
-      date: format(values.date, "yyyy-MM-dd"),
+      originalDate: entry?.date, // Pass the specific date of the instance being edited
     };
     
     if (values.type !== 'bill') {
@@ -97,7 +101,9 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
     }
 
     if (entry) {
-      onSave({ ...dataToSave, id: entry.id });
+      // The ID passed back is the ID of the original master entry
+      const originalId = entry.id.includes('-') ? entry.id.split('-').slice(0, 5).join('-') : entry.id;
+      onSave({ ...dataToSave, id: originalId });
     } else {
       onSave(dataToSave);
     }
@@ -106,8 +112,9 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
   
   const handleDelete = () => {
     if (entry && onDelete) {
-      onDelete(entry.id);
-      onClose();
+        const originalId = entry.id.includes('-') ? entry.id.split('-').slice(0, 5).join('-') : entry.id;
+        onDelete(originalId);
+        onClose();
     }
   }
 

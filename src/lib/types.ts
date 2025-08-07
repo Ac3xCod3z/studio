@@ -43,6 +43,8 @@ export const EntrySchema = z.object({
   category: z.enum(BillCategories).optional(),
   order: z.number().optional(),
   isPaid: z.boolean().optional(),
+  // New field to track exceptions for recurring entries, e.g., which dates are paid
+  exceptions: z.record(z.object({ isPaid: z.boolean() })).optional(), 
 });
 
 export type Entry = z.infer<typeof EntrySchema>;

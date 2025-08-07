@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Entry, RolloverPreference, WeeklyBalances } from "@/lib/types";
 import { FiscalFlowCalendar, SidebarContent } from "./fiscal-flow-calendar";
-import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths, parseISO, differenceInCalendarMonths, isAfter, eachWeekOfInterval, getWeek, lastDayOfMonth } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths, parseISO, differenceInCalendarMonths, isAfter, eachWeekOfInterval, lastDayOfMonth } from "date-fns";
 import { toZonedTime } from 'date-fns-tz';
 import { recurrenceIntervalMonths } from "@/lib/constants";
 import { ScrollArea } from "./ui/scroll-area";
@@ -56,6 +56,17 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry
     
     if (isAfter(originalEntryDate, end)) return [];
 
+    const createInstance = (date: Date): Entry => {
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const isPaid = entry.exceptions?.[dateStr]?.isPaid ?? entry.isPaid ?? false;
+        return {
+            ...entry,
+            date: dateStr,
+            id: `${entry.id}-${dateStr}`,
+            isPaid,
+        };
+    };
+    
     if (entry.recurrence === 'weekly' || entry.recurrence === 'bi-weekly') {
         const weeksToAdd = entry.recurrence === 'weekly' ? 1 : 2;
         let currentDate = startOfWeek(originalEntryDate, { weekStartsOn: getDay(originalEntryDate) });
@@ -64,11 +75,7 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry
         }
         while (isBefore(currentDate, end) || isSameDay(currentDate, end)) {
             if (!isBefore(currentDate, start)) {
-                instances.push({
-                    ...entry,
-                    date: format(currentDate, 'yyyy-MM-dd'),
-                    id: `${entry.id}-${format(currentDate, 'yyyy-MM-dd')}`
-                });
+                instances.push(createInstance(currentDate));
             }
             currentDate = add(currentDate, { weeks: weeksToAdd });
         }
@@ -82,25 +89,26 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry
         // Fast-forward to the relevant period
         if (isBefore(currentDate, start)) {
             const monthsDiff = differenceInCalendarMonths(start, currentDate);
-            currentDate = add(currentDate, { months: Math.floor(monthsDiff / recurrenceInterval) * recurrenceInterval });
+            const numIntervals = Math.floor(monthsDiff / recurrenceInterval);
+            if (numIntervals > 0) {
+              currentDate = add(currentDate, { months: numIntervals * recurrenceInterval });
+            }
+        }
+
+        while(isBefore(currentDate, start)) {
+            currentDate = add(currentDate, { months: recurrenceInterval });
         }
         
         while (isBefore(currentDate, end) || isSameDay(currentDate, end)) {
-            // Check if date is within the desired range [start, end]
-            if ((isAfter(currentDate, start) || isSameDay(currentDate, start)) && (isBefore(currentDate, end) || isSameDay(currentDate, end))) {
-                const originalDay = getDate(originalEntryDate);
-                const lastDayOfMonth = endOfMonth(currentDate).getDate();
-                const dayForMonth = Math.min(originalDay, lastDayOfMonth);
-                const finalDate = setDate(currentDate, dayForMonth);
+            const originalDay = getDate(originalEntryDate);
+            const lastDayInCurrentMonth = lastDayOfMonth(currentDate).getDate();
+            const dayForMonth = Math.min(originalDay, lastDayInCurrentMonth);
+            const finalDate = setDate(currentDate, dayForMonth);
 
-                if (isSameMonth(finalDate, currentDate)) {
-                     instances.push({ 
-                        ...entry, 
-                        date: format(finalDate, 'yyyy-MM-dd'), 
-                        id: `${entry.id}-${format(finalDate, 'yyyy-MM-dd')}` 
-                    });
-                }
+            if ((isAfter(finalDate, start) || isSameDay(finalDate, start)) && (isBefore(finalDate, end) || isSameDay(finalDate, end))) {
+                instances.push(createInstance(finalDate));
             }
+
             currentDate = add(currentDate, { months: recurrenceInterval });
         }
         return instances;
@@ -248,20 +256,54 @@ export default function FiscalFlowDashboard() {
   }, [setTimezone]);
 
 
-  const handleEntrySave = (entryData: Omit<Entry, "id"> & { id?: string }) => {
-    setEntries((prev) => {
-      if (entryData.id) {
-        return prev.map((e) => (e.id === entryData.id ? { ...e, ...entryData } as Entry : e));
-      }
-      
-      const entriesForDate = prev.filter(e => e.date === entryData.date);
-      const newEntry = { 
-          ...entryData, 
-          id: crypto.randomUUID(),
-          order: entriesForDate.length
-      } as Entry;
-      
-      return [...prev, newEntry];
+  const handleEntrySave = (entryData: Omit<Entry, "id" | 'date'> & { id?: string; date: Date, originalDate?: string }) => {
+    const formattedDate = format(entryData.date, 'yyyy-MM-dd');
+    
+    setEntries(prev => {
+        if (entryData.id) {
+            // This is an existing entry, find it
+            const entryIndex = prev.findIndex(e => e.id === entryData.id);
+            if (entryIndex === -1) return prev;
+
+            const updatedEntries = [...prev];
+            const originalEntry = updatedEntries[entryIndex];
+            
+            const isRecurring = originalEntry.recurrence && originalEntry.recurrence !== 'none';
+            
+            // If it's a recurring entry and we are changing its paid status
+            if (isRecurring && typeof entryData.isPaid === 'boolean' && entryData.originalDate) {
+                const updatedExceptions = { ...originalEntry.exceptions };
+                updatedExceptions[entryData.originalDate] = { isPaid: entryData.isPaid };
+                
+                updatedEntries[entryIndex] = {
+                    ...originalEntry,
+                    ...entryData,
+                    date: formattedDate, // The master date might change
+                    exceptions: updatedExceptions,
+                    isPaid: originalEntry.isPaid, // Keep master isPaid unchanged
+                };
+
+            } else {
+                 // For non-recurring entries or other property changes
+                updatedEntries[entryIndex] = {
+                    ...originalEntry,
+                    ...entryData,
+                    date: formattedDate,
+                };
+            }
+            return updatedEntries;
+        }
+        
+        // This is a new entry
+        const entriesForDate = prev.filter(e => e.date === formattedDate);
+        const newEntry: Entry = {
+            ...entryData,
+            id: crypto.randomUUID(),
+            order: entriesForDate.length,
+            date: formattedDate,
+        };
+        
+        return [...prev, newEntry];
     });
   };
 
@@ -311,8 +353,8 @@ export default function FiscalFlowDashboard() {
                 return entryDate >= weekStart && entryDate <= weekEnd;
             });
             
-            const income = entriesForWeek.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
-            const bills = entriesForWeek.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
+            const income = entriesForWeek.filter(e => e.type === 'income' && !e.isPaid).reduce((sum, e) => sum + e.amount, 0);
+            const bills = entriesForWeek.filter(e => e.type === 'bill' && !e.isPaid).reduce((sum, e) => sum + e.amount, 0);
             
             let currentWeekStartBalance = lastWeekBalance;
             if (rollover === 'reset' && getDay(weekStart) === startOfWeek(new Date()).getDay() && weekStart.getDate() <= 7) {
@@ -356,8 +398,8 @@ export default function FiscalFlowDashboard() {
           return entryDate >= weekStart && entryDate <= endOfWeek(weekStart);
       });
 
-      const weeklyIncome = weekEntries.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
-      const weeklyBills = weekEntries.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
+      const weeklyIncome = weekEntries.filter(e => e.type === 'income' && !e.isPaid).reduce((sum, e) => sum + e.amount, 0);
+      const weeklyBills = weekEntries.filter(e => e.type === 'bill' && !e.isPaid).reduce((sum, e) => sum + e.amount, 0);
       const weeklyStatus = weeklyIncome - weeklyBills;
 
       // Monthly Summary Calculation
@@ -365,8 +407,8 @@ export default function FiscalFlowDashboard() {
       const monthEnd = endOfMonth(selectedDate);
       
       const monthEntries = allGeneratedEntries.filter(e => isSameMonth(parseDateInTimezone(e.date, timezone), selectedDate));
-      const monthlyIncome = monthEntries.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0);
-      const monthlyBills = monthEntries.filter(e => e.type === 'bill').reduce((s, e) => s + e.amount, 0);
+      const monthlyIncome = monthEntries.filter(e => e.type === 'income' && !e.isPaid).reduce((s, e) => s + e.amount, 0);
+      const monthlyBills = monthEntries.filter(e => e.type === 'bill' && !e.isPaid).reduce((s, e) => s + e.amount, 0);
 
       const firstWeekOfMonthKey = format(startOfWeek(monthStart), 'yyyy-MM-dd');
       const startOfMonthBalance = weeklyBalances[firstWeekOfMonthKey]?.start || 0;
@@ -582,9 +624,8 @@ export default function FiscalFlowDashboard() {
         }}
         onEditEntry={(entry) => {
             setDayEntriesDialogOpen(false);
-            const originalEntryId = getOriginalIdFromInstance(entry.id);
-            const originalEntry = entries.find(e => e.id === originalEntryId) || entry;
-            setEditingEntry(originalEntry);
+            // We pass the instance itself to the edit dialog
+            setEditingEntry(entry);
             setEntryDialogOpen(true);
         }}
       />
