@@ -431,7 +431,6 @@ export default function FiscalFlowDashboard() {
 
       // Monthly Summary Calculation
       const monthStart = startOfMonth(selectedDate);
-      const monthEnd = endOfMonth(selectedDate);
       
       const monthEntries = allGeneratedEntries.filter(e => isSameMonth(parseDateInTimezone(e.date, timezone), selectedDate));
       const monthlyIncome = monthEntries.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0);
@@ -440,9 +439,7 @@ export default function FiscalFlowDashboard() {
       const firstWeekOfMonthKey = format(startOfWeek(monthStart), 'yyyy-MM-dd');
       const startOfMonthBalance = weeklyBalances[firstWeekOfMonthKey]?.start || 0;
       
-      const lastWeekOfMonthKey = format(startOfWeek(monthEnd), 'yyyy-MM-dd');
-      const endOfMonthBalance = weeklyBalances[lastWeekOfMonthKey]?.end || 0;
-
+      const endOfMonthBalance = startOfMonthBalance + monthlyIncome - monthlyBills;
 
       return {
         dayEntries,
