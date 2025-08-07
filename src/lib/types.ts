@@ -49,10 +49,16 @@ export const EntrySchema = z.object({
 
 export type Entry = z.infer<typeof EntrySchema>;
 
+export type SelectedInstance = {
+  instanceId: string;
+  masterId: string;
+  date: string;
+}
+
 export type RolloverPreference = 'carryover' | 'reset';
 
 export type MonthlyLeftovers = {
-  [key: string]: number; // e.g. '2024-07': 250.75
+  [key: string]: number; // e.g., '2024-07': 250.75
 };
 
 export type WeeklyBalances = {

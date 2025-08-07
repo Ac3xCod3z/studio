@@ -14,7 +14,7 @@ import { DayEntriesDialog } from "./day-entries-dialog";
 import { MonthlyBreakdownDialog } from "./monthly-breakdown-dialog";
 import { MonthlySummaryDialog } from "./monthly-summary-dialog";
 import { Logo } from "./icons";
-import { Settings, Menu, Plus, CalendarSync, Loader2, LogOut, Trash2, BarChartBig, PieChart, Repeat } from "lucide-react";
+import { Settings, Menu, Plus, CalendarSync, Loader2, LogOut, Trash2, BarChartBig, PieChart, Repeat, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
@@ -28,7 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { Entry, RolloverPreference, WeeklyBalances } from "@/lib/types";
+import type { Entry, RolloverPreference, WeeklyBalances, SelectedInstance } from "@/lib/types";
 import { FiscalFlowCalendar, SidebarContent } from "./fiscal-flow-calendar";
 import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths, parseISO, differenceInCalendarMonths, isAfter, eachWeekOfInterval, lastDayOfMonth } from "date-fns";
 import { toZonedTime } from 'date-fns-tz';
@@ -163,19 +163,46 @@ export default function FiscalFlowDashboard() {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   const [isSelectionMode, setIsSelectionMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedInstances, setSelectedInstances] = useState<SelectedInstance[]>([]);
   const [isBulkDeleteAlertOpen, setBulkDeleteAlertOpen] = useState(false);
+  const [isBulkCompleteAlertOpen, setBulkCompleteAlertOpen] = useState(false);
+
 
   const toggleSelectionMode = useCallback(() => {
     setIsSelectionMode(prev => !prev);
-    setSelectedIds([]);
+    setSelectedInstances([]);
   }, []);
 
   const handleBulkDelete = () => {
-    setEntries(prev => prev.filter(e => !selectedIds.includes(e.id)));
+    const masterIdsToDelete = [...new Set(selectedInstances.map(i => i.masterId))];
+    setEntries(prev => prev.filter(e => !masterIdsToDelete.includes(e.id)));
     toggleSelectionMode();
     setBulkDeleteAlertOpen(false);
-    toast({ title: `${selectedIds.length} entries deleted.` });
+    toast({ title: `${selectedInstances.length} entries deleted.` });
+  };
+  
+  const handleBulkMarkAsComplete = () => {
+    setEntries(prev => {
+        const updatedEntries = [...prev];
+        selectedInstances.forEach(instance => {
+            const masterEntryIndex = updatedEntries.findIndex(e => e.id === instance.masterId);
+            if (masterEntryIndex !== -1) {
+                const masterEntry = updatedEntries[masterEntryIndex];
+                if (masterEntry.recurrence && masterEntry.recurrence !== 'none') {
+                    // It's a recurring entry, add an exception
+                    const updatedExceptions = { ...masterEntry.exceptions, [instance.date]: { isPaid: true } };
+                    updatedEntries[masterEntryIndex] = { ...masterEntry, exceptions: updatedExceptions };
+                } else {
+                    // It's a non-recurring entry
+                    updatedEntries[masterEntryIndex] = { ...masterEntry, isPaid: true };
+                }
+            }
+        });
+        return updatedEntries;
+    });
+    setBulkCompleteAlertOpen(false);
+    toast({ title: `${selectedInstances.length} entries marked as complete.`});
+    toggleSelectionMode();
   };
 
 
@@ -515,10 +542,15 @@ export default function FiscalFlowDashboard() {
             <Button onClick={() => setBreakdownDialogOpen(true)} variant="outline" size="sm" className="hidden md:flex">
               <PieChart className="mr-2 h-4 w-4" /> Category Breakdown
             </Button>
-           {isSelectionMode && selectedIds.length > 0 && (
-             <Button variant="destructive" size="sm" onClick={() => setBulkDeleteAlertOpen(true)}>
-               <Trash2 className="mr-2 h-4 w-4" /> Delete ({selectedIds.length})
-             </Button>
+           {isSelectionMode && selectedInstances.length > 0 && (
+            <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setBulkCompleteAlertOpen(true)}>
+                    <CheckCircle2 className="mr-2 h-4 w-4" /> Mark as Complete ({selectedInstances.length})
+                </Button>
+                <Button variant="destructive" size="sm" onClick={() => setBulkDeleteAlertOpen(true)}>
+                    <Trash2 className="mr-2 h-4 w-4" /> Delete ({selectedInstances.length})
+                </Button>
+            </div>
            )}
           <Button onClick={() => setSettingsDialogOpen(true)} variant="ghost" size="icon">
             <Settings className="h-5 w-5" />
@@ -598,8 +630,8 @@ export default function FiscalFlowDashboard() {
         weeklyTotals={weeklyTotals}
         isSelectionMode={isSelectionMode}
         toggleSelectionMode={toggleSelectionMode}
-        selectedIds={selectedIds}
-        setSelectedIds={setSelectedIds}
+        selectedInstances={selectedInstances}
+        setSelectedInstances={setSelectedInstances}
         onBulkDelete={() => setBulkDeleteAlertOpen(true)}
       />
       
@@ -662,13 +694,30 @@ export default function FiscalFlowDashboard() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the selected {selectedIds.length} entries from your calendar. This will remove the original entry and all of its future recurring instances.
+              This action cannot be undone. This will permanently delete the selected {selectedInstances.length} entries from your calendar. This will remove the original entry and all of its future recurring instances.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive hover:bg-destructive/90">
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      <AlertDialog open={isBulkCompleteAlertOpen} onOpenChange={setBulkCompleteAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mark as Complete</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will mark the {selectedInstances.length} selected entries as complete. Are you sure?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkMarkAsComplete}>
+              Mark as Complete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -30,7 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn, formatCurrency } from "@/lib/utils";
-import type { Entry, WeeklyBalances } from "@/lib/types";
+import type { Entry, WeeklyBalances, SelectedInstance } from "@/lib/types";
 import { Checkbox } from "./ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -63,8 +63,8 @@ type FiscalFlowCalendarProps = {
     weeklyTotals: any;
     isSelectionMode: boolean;
     toggleSelectionMode: () => void;
-    selectedIds: string[];
-    setSelectedIds: (ids: string[] | ((current: string[]) => string[])) => void;
+    selectedInstances: SelectedInstance[];
+    setSelectedInstances: (instances: SelectedInstance[] | ((current: SelectedInstance[]) => SelectedInstance[])) => void;
     onBulkDelete: () => void;
 }
 
@@ -84,8 +84,8 @@ export function FiscalFlowCalendar({
     weeklyTotals,
     isSelectionMode,
     toggleSelectionMode,
-    selectedIds,
-    setSelectedIds,
+    selectedInstances,
+    setSelectedInstances,
     onBulkDelete,
 }: FiscalFlowCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -97,6 +97,7 @@ export function FiscalFlowCalendar({
   const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isDraggingRef = useRef(false);
 
+  const selectedInstanceIds = useMemo(() => selectedInstances.map(i => i.instanceId), [selectedInstances]);
 
   const { daysWithEntries } = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth));
@@ -151,16 +152,21 @@ export function FiscalFlowCalendar({
       }
       
       if (isSelectionMode) {
-          const entryIdsOnDay = dayEntries.map(e => getOriginalIdFromInstance(e.id));
-          const uniqueEntryIds = [...new Set(entryIdsOnDay)];
-          const areAllSelected = uniqueEntryIds.every(id => selectedIds.includes(id));
+          const instancesOnDay: SelectedInstance[] = dayEntries.map(e => ({
+            instanceId: e.id,
+            masterId: getOriginalIdFromInstance(e.id),
+            date: e.date,
+          }));
+          const instanceIdsOnDay = instancesOnDay.map(i => i.instanceId);
+
+          const areAllSelected = instanceIdsOnDay.every(id => selectedInstanceIds.includes(id));
           
-          setSelectedIds(currentSelectedIds => {
-            const otherIds = currentSelectedIds.filter(id => !uniqueEntryIds.includes(id));
+          setSelectedInstances(currentSelected => {
+            const otherInstances = currentSelected.filter(i => !instanceIdsOnDay.includes(i.instanceId));
             if (areAllSelected) {
-              return otherIds;
+              return otherInstances;
             } else {
-              return [...otherIds, ...uniqueEntryIds];
+              return [...otherInstances, ...instancesOnDay];
             }
           });
       }
@@ -442,12 +448,12 @@ export function FiscalFlowCalendar({
             </Popover>
 
             <div className="flex items-center gap-1 sm:gap-2">
-              <Button variant="outline" onClick={toggleSelectionMode}>
+              <Button variant="outline" size="sm" onClick={toggleSelectionMode}>
                 {isSelectionMode ? 'Cancel' : 'Select'}
               </Button>
-               {isSelectionMode && selectedIds.length > 0 && (
-                 <Button variant="destructive" onClick={onBulkDelete}>
-                   <Trash2 className="mr-2 h-4 w-4" /> Delete ({selectedIds.length})
+               {isSelectionMode && selectedInstances.length > 0 && (
+                 <Button variant="destructive" size="sm" onClick={onBulkDelete}>
+                   <Trash2 className="mr-2 h-4 w-4" /> Delete ({selectedInstances.length})
                  </Button>
                 )}
               <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
@@ -464,7 +470,7 @@ export function FiscalFlowCalendar({
           </div>
           <div className="grid grid-cols-7 grid-rows-5 gap-1.5 md:gap-2">
             {daysWithEntries.map(({ day, entries: dayEntries }, index) => {
-              const dayHasSelectedEntry = dayEntries.some(e => selectedIds.includes(getOriginalIdFromInstance(e.id)))
+              const dayHasSelectedEntry = dayEntries.some(e => selectedInstanceIds.includes(e.id))
               const dayStr = format(day, 'yyyy-MM-dd');
               const isCorner = index === 0 || index === 6 || index === 28 || index === 34;
 
@@ -498,7 +504,7 @@ export function FiscalFlowCalendar({
                     {isSelectionMode && dayEntries.length > 0 && (
                         <Checkbox 
                             className="h-5 w-5"
-                            checked={dayEntries.every(e => selectedIds.includes(getOriginalIdFromInstance(e.id)))}
+                            checked={dayEntries.every(e => selectedInstanceIds.includes(e.id))}
                         />
                     )}
                   </div>
@@ -528,7 +534,7 @@ export function FiscalFlowCalendar({
                                   isMobile ? 'touch-action-pan-y' : '',
                                   !isReadOnly && !isSelectionMode && "cursor-grab active:cursor-grabbing hover:shadow-lg",
                                   (draggingEntry?.id === entry.id) && 'opacity-50 scale-105 shadow-xl',
-                                  isSelectionMode && selectedIds.includes(getOriginalIdFromInstance(entry.id)) && "opacity-60",
+                                  isSelectionMode && selectedInstanceIds.includes(entry.id) && "opacity-60",
                                   "bg-secondary/50 hover:bg-secondary",
                                   entry.isPaid && "opacity-50 bg-secondary/30",
                               )}
