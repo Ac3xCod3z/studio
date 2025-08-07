@@ -34,6 +34,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import type { Entry } from "@/lib/types";
 import { BillCategories } from "@/lib/types";
+import { Checkbox } from "./ui/checkbox";
 
 const formSchema = z.object({
   type: z.enum(["bill", "income"], { required_error: "You need to select an entry type." }),
@@ -42,6 +43,7 @@ const formSchema = z.object({
   date: z.date({ required_error: "A date is required." }),
   recurrence: z.enum(["none", "weekly", "bi-weekly", "monthly", "bimonthly", "3months", "6months", "12months"]).default("none"),
   category: z.enum(BillCategories).optional(),
+  isPaid: z.boolean().optional(),
 });
 
 type EntryFormProps = {
@@ -78,6 +80,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
         date: resetDate,
         recurrence: entry?.recurrence || 'none',
         category: entry?.category,
+        isPaid: entry?.isPaid || false,
       });
     }
   }, [isOpen, selectedDate, entry, timezone, form.reset, form]);
@@ -269,6 +272,25 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
                     <FormMessage />
                     </FormItem>
                 )}
+                />
+                <FormField
+                  control={form.control}
+                  name="isPaid"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>
+                          Mark as Paid
+                        </FormLabel>
+                      </div>
+                    </FormItem>
+                  )}
                 />
                 <DialogFooter className="pt-4 sm:justify-between">
                 {entry && onDelete && (

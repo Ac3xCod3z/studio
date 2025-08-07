@@ -42,6 +42,7 @@ export const EntrySchema = z.object({
   recurrence: z.enum(["none", "weekly", "bi-weekly", "monthly", "bimonthly", "3months", "6months", "12months"]).optional(),
   category: z.enum(BillCategories).optional(),
   order: z.number().optional(),
+  isPaid: z.boolean().optional(),
 });
 
 export type Entry = z.infer<typeof EntrySchema>;

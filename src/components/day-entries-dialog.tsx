@@ -2,7 +2,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { ArrowDown, ArrowUp, Plus } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -61,20 +61,32 @@ export function DayEntriesDialog({
                       {sortedEntries.map((entry) => (
                           <div
                               key={entry.id}
-                              className="flex items-center justify-between p-3 rounded-lg bg-card border cursor-pointer hover:bg-muted/50"
+                              className={cn(
+                                "flex items-center justify-between p-3 rounded-lg bg-card border cursor-pointer hover:bg-muted/50",
+                                entry.isPaid && "opacity-60"
+                              )}
                               onClick={() => onEditEntry(entry)}
                           >
                               <div className="flex items-center gap-3">
-                                  <div className={cn("p-2 rounded-full", entry.type === 'bill' ? 'bg-destructive/20' : 'bg-accent/20')}>
-                                      {entry.type === 'bill' ? (
+                                  <div className={cn(
+                                      "p-2 rounded-full", 
+                                      entry.isPaid ? 'bg-muted-foreground/20' : entry.type === 'bill' ? 'bg-destructive/20' : 'bg-accent/20'
+                                  )}>
+                                      {entry.isPaid ? (
+                                        <Check className="h-5 w-5 text-muted-foreground" />
+                                      ) : entry.type === 'bill' ? (
                                           <ArrowDown className="h-5 w-5 text-destructive" />
                                       ) : (
                                           <ArrowUp className="h-5 w-5 text-emerald-500" />
                                       )}
                                   </div>
                                   <div className="flex flex-col">
-                                      <span className="font-semibold">{entry.name}</span>
-                                      <span className={cn("text-lg font-bold", entry.type === 'bill' ? 'text-destructive' : 'text-emerald-600')}>
+                                      <span className={cn("font-semibold", entry.isPaid && "line-through")}>{entry.name}</span>
+                                      <span className={cn(
+                                          "text-lg font-bold", 
+                                          entry.isPaid ? 'text-muted-foreground' : entry.type === 'bill' ? 'text-destructive' : 'text-emerald-600',
+                                          entry.isPaid && "line-through"
+                                      )}>
                                           {formatCurrency(entry.amount)}
                                       </span>
                                   </div>

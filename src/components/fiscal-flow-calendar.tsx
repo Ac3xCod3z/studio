@@ -21,7 +21,7 @@ import {
   getMonth,
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
-import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Trash2, TrendingUp, TrendingDown, Repeat, CalendarIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Trash2, TrendingUp, TrendingDown, Repeat, CalendarIcon, Check } from "lucide-react";
 import { gsap } from "gsap";
 import { MotionPathPlugin } from "gsap/MotionPathPlugin";
 
@@ -530,13 +530,17 @@ export function FiscalFlowCalendar({
                                   (draggingEntry?.id === entry.id) && 'opacity-50 scale-105 shadow-xl',
                                   isSelectionMode && selectedIds.includes(getOriginalIdFromInstance(entry.id)) && "opacity-60",
                                   "bg-secondary/50 hover:bg-secondary",
+                                  entry.isPaid && "opacity-50 bg-secondary/30",
                               )}
                           >
-                            <div className={cn("p-1.5 rounded-full", entry.type === 'bill' ? 'bg-destructive/20 text-destructive' : 'bg-emerald-500/20 text-emerald-500')}>
-                               {entry.type === 'bill' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />}
+                            <div className={cn(
+                                "p-1.5 rounded-full",
+                                entry.isPaid ? 'bg-muted-foreground/20 text-muted-foreground' : entry.type === 'bill' ? 'bg-destructive/20 text-destructive' : 'bg-emerald-500/20 text-emerald-500'
+                            )}>
+                               {entry.isPaid ? <Check className="h-3 w-3" /> : entry.type === 'bill' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />}
                             </div>
-                            <span className="flex-1 truncate font-medium">{entry.name}</span>
-                            <span className="font-semibold">{formatCurrency(entry.amount)}</span>
+                            <span className={cn("flex-1 truncate font-medium", entry.isPaid && "line-through")}>{entry.name}</span>
+                            <span className={cn("font-semibold", entry.isPaid && "line-through")}>{formatCurrency(entry.amount)}</span>
                           </div>
                       ))}
                     </div>
