@@ -380,8 +380,8 @@ export default function FiscalFlowDashboard() {
                 return entryDate >= weekStart && entryDate <= weekEnd;
             });
             
-            const income = entriesForWeek.filter(e => e.type === 'income' && !e.isPaid).reduce((sum, e) => sum + e.amount, 0);
-            const bills = entriesForWeek.filter(e => e.type === 'bill' && !e.isPaid).reduce((sum, e) => sum + e.amount, 0);
+            const income = entriesForWeek.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
+            const bills = entriesForWeek.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
             
             let currentWeekStartBalance = lastWeekBalance;
             if (rollover === 'reset' && getDay(weekStart) === startOfWeek(new Date()).getDay() && weekStart.getDate() <= 7) {
@@ -425,8 +425,8 @@ export default function FiscalFlowDashboard() {
           return entryDate >= weekStart && entryDate <= endOfWeek(weekStart);
       });
 
-      const weeklyIncome = weekEntries.filter(e => e.type === 'income' && !e.isPaid).reduce((sum, e) => sum + e.amount, 0);
-      const weeklyBills = weekEntries.filter(e => e.type === 'bill' && !e.isPaid).reduce((sum, e) => sum + e.amount, 0);
+      const weeklyIncome = weekEntries.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
+      const weeklyBills = weekEntries.filter(e => e.type === 'bill').reduce((sum, e) => sum + e.amount, 0);
       const weeklyStatus = weeklyIncome - weeklyBills;
 
       // Monthly Summary Calculation
@@ -434,8 +434,8 @@ export default function FiscalFlowDashboard() {
       const monthEnd = endOfMonth(selectedDate);
       
       const monthEntries = allGeneratedEntries.filter(e => isSameMonth(parseDateInTimezone(e.date, timezone), selectedDate));
-      const monthlyIncome = monthEntries.filter(e => e.type === 'income' && !e.isPaid).reduce((s, e) => s + e.amount, 0);
-      const monthlyBills = monthEntries.filter(e => e.type === 'bill' && !e.isPaid).reduce((s, e) => s + e.amount, 0);
+      const monthlyIncome = monthEntries.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0);
+      const monthlyBills = monthEntries.filter(e => e.type === 'bill').reduce((s, e) => s + e.amount, 0);
 
       const firstWeekOfMonthKey = format(startOfWeek(monthStart), 'yyyy-MM-dd');
       const startOfMonthBalance = weeklyBalances[firstWeekOfMonthKey]?.start || 0;
