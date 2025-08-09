@@ -33,7 +33,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { Entry } from "@/lib/types";
-import { BillCategories } from "@/lib/types";
+import { BillCategories, RecurrenceOptions } from "@/lib/types";
 import { Checkbox } from "./ui/checkbox";
 
 const formSchema = z.object({
@@ -41,7 +41,7 @@ const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   amount: z.coerce.number().positive({ message: "Amount must be a positive number." }),
   date: z.date({ required_error: "A date is required." }),
-  recurrence: z.enum(["none", "weekly", "bi-weekly", "monthly", "bimonthly", "3months", "6months", "12months"]),
+  recurrence: z.enum(RecurrenceOptions),
   category: z.enum(BillCategories).optional(),
   isPaid: z.boolean().optional(),
   isAutoPay: z.boolean().optional(),
@@ -75,8 +75,8 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
    React.useEffect(() => {
     if (isOpen) {
       const resetDate = entry ? parseDateInTimezone(entry.date, timezone) : selectedDate;
-      const isInstancePaid = entry?.recurrence !== 'none' && entry?.recurrence
-        ? entry?.exceptions?.[entry.date]?.isPaid ?? false
+      const isInstancePaid = entry?.recurrence !== 'none'
+        ? entry?.exceptions?.[entry.date]?.isPaid ?? entry.isPaid
         : entry?.isPaid ?? false;
 
       form.reset({
@@ -277,7 +277,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
                             <SelectItem value="bimonthly">Every 2 months</SelectItem>
                             <SelectItem value="3months">Every 3 months</SelectItem>
                             <SelectItem value="6months">Every 6 months</SelectItem>
-                            <SelectItem value="12months">Every 12 months</SelectItem>
+                            <SelectItem value="12months">Annually</SelectItem>
                         </SelectContent>
                     </Select>
                     <FormMessage />
@@ -321,7 +321,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
                         </FormControl>
                         <div className="space-y-1 leading-none">
                             <FormLabel>
-                            Mark as Paid
+                            Mark as {entryType === 'bill' ? 'Paid' : 'Received'}
                             </FormLabel>
                         </div>
                         </FormItem>

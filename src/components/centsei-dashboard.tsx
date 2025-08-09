@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import useLocalStorage from "@/hooks/use-local-storage";
 import { useMedia } from "react-use";
-import { auth, googleProvider } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import type { User } from "firebase/auth";
 import { getRedirectResult, signInWithRedirect, signOut } from "firebase/auth";
 
@@ -15,7 +15,7 @@ import { MonthlyBreakdownDialog } from "./monthly-breakdown-dialog";
 import { MonthlySummaryDialog } from "./monthly-summary-dialog";
 import { CalculatorDialog } from "./calculator-dialog"; // Import the new component
 import { Logo } from "./icons";
-import { Settings, Menu, Plus, CalendarSync, Loader2, LogOut, Trash2, BarChartBig, PieChart, Repeat, CheckCircle2, Calculator } from "lucide-react";
+import { Settings, Menu, Plus, CalendarSync, Loader2, LogOut, Trash2, BarChartBig, PieChart, CheckCircle2, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
@@ -108,8 +108,8 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
         return instances;
     }
     
-    const recurrenceInterval = entry.recurrence ? recurrenceIntervalMonths[entry.recurrence as keyof typeof recurrenceIntervalMonths] : 0;
-    if (entry.recurrence && entry.recurrence !== 'none' && recurrenceInterval > 0) {
+    const recurrenceInterval = entry.recurrence ? recurrenceIntervalMonths[entry.recurrence] : 0;
+    if (entry.recurrence !== 'none' && recurrenceInterval > 0) {
         let currentDate = originalEntryDate;
         
         // Fast-forward to the relevant period
@@ -143,7 +143,7 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
     }
 
     // Handle non-recurring entries
-    if (entry.recurrence === 'none' || !entry.recurrence) {
+    if (entry.recurrence === 'none') {
         const entryDate = parseISO(entry.date);
         if (entryDate >= start && entryDate <= end) {
             instances.push(createInstance(entryDate));
@@ -187,6 +187,7 @@ export default function CentseiDashboard() {
   const [selectedInstances, setSelectedInstances] = useState<SelectedInstance[]>([]);
   const [isBulkDeleteAlertOpen, setBulkDeleteAlertOpen] = useState(false);
   const [isBulkCompleteAlertOpen, setBulkCompleteAlertOpen] = useState(false);
+  const [moveOperation, setMoveOperation] = useState<{ entry: Entry, newDate: string } | null>(null);
 
 
   const toggleSelectionMode = useCallback(() => {
@@ -202,6 +203,45 @@ export default function CentseiDashboard() {
     toast({ title: `${selectedInstances.length} entries deleted.` });
   };
   
+  const getOriginalIdFromInstance = (instanceId: string) => {
+    const parts = instanceId.split('-');
+    if (parts.length > 5) { // Assuming UUID is 5 parts for master
+        return parts.slice(0, 5).join('-');
+    }
+    return instanceId; // It's likely a non-recurring master ID
+  }
+
+  const handleConfirmMove = () => {
+    if (!moveOperation) return;
+
+    const { entry: movedEntry, newDate } = moveOperation;
+    const masterId = getOriginalIdFromInstance(movedEntry.id);
+
+    setEntries(prevEntries => {
+        const masterEntryIndex = prevEntries.findIndex(e => e.id === masterId);
+        if (masterEntryIndex === -1) return prevEntries;
+
+        const updatedEntries = [...prevEntries];
+        const masterEntry = { ...updatedEntries[masterEntryIndex] };
+
+        if (masterEntry.recurrence === 'none') {
+            // It's a non-recurring entry, just change its date
+            masterEntry.date = newDate;
+        } else {
+            // It's a recurring entry, create an exception
+            const updatedExceptions = { ...masterEntry.exceptions };
+            updatedExceptions[movedEntry.date] = { ...updatedExceptions[movedEntry.date], movedTo: newDate };
+            masterEntry.exceptions = updatedExceptions;
+        }
+
+        updatedEntries[masterEntryIndex] = masterEntry;
+        return updatedEntries;
+    });
+
+    setMoveOperation(null);
+    toast({ title: "Entry Moved", description: `Moved "${movedEntry.name}" to ${format(parseISO(newDate), 'PPP')}.` });
+  };
+  
   const handleBulkMarkAsComplete = () => {
     setEntries(prev => {
         const updatedEntries = [...prev];
@@ -209,7 +249,7 @@ export default function CentseiDashboard() {
             const masterEntryIndex = updatedEntries.findIndex(e => e.id === instance.masterId);
             if (masterEntryIndex !== -1) {
                 const masterEntry = updatedEntries[masterEntryIndex];
-                if (masterEntry.recurrence && masterEntry.recurrence !== 'none') {
+                if (masterEntry.recurrence !== 'none') {
                     // It's a recurring entry, add an exception
                     const updatedExceptions = { ...masterEntry.exceptions, [instance.date]: { isPaid: true } };
                     updatedEntries[masterEntryIndex] = { ...masterEntry, exceptions: updatedExceptions };
@@ -317,7 +357,7 @@ export default function CentseiDashboard() {
             const updatedEntries = [...prevEntries];
             const originalEntry = updatedEntries[entryIndex];
             
-            const isRecurring = originalEntry.recurrence && originalEntry.recurrence !== 'none';
+            const isRecurring = originalEntry.recurrence !== 'none';
             
             // If it's a recurring entry and we are changing its paid status
             if (isRecurring && typeof entryData.isPaid === 'boolean' && entryData.originalDate) {
@@ -387,7 +427,32 @@ export default function CentseiDashboard() {
     const viewEnd = endOfMonth(addMonths(new Date(), 12));
 
     return entries.flatMap((e) => {
-        return generateRecurringInstances(e, viewStart, viewEnd, timezone);
+        const instances = generateRecurringInstances(e, viewStart, viewEnd, timezone);
+        
+        // Handle moved exceptions
+        if (e.exceptions) {
+            Object.entries(e.exceptions).forEach(([originalDate, exception]) => {
+                if (exception.movedTo) {
+                    const originalInstanceIndex = instances.findIndex(inst => inst.date === originalDate && getOriginalIdFromInstance(inst.id) === e.id);
+                    if (originalInstanceIndex !== -1) {
+                        instances.splice(originalInstanceIndex, 1);
+                    }
+                    
+                    const movedDate = parseISO(exception.movedTo);
+                    if (movedDate >= viewStart && movedDate <= viewEnd) {
+                        instances.push({
+                            ...e,
+                            id: `${e.id}-${exception.movedTo}`,
+                            date: exception.movedTo,
+                            isPaid: exception.isPaid ?? e.isPaid,
+                            order: exception.order ?? e.order
+                        });
+                    }
+                }
+            });
+        }
+        
+        return instances;
     });
   }, [entries, isMounted, timezone]);
 
@@ -664,6 +729,7 @@ export default function CentseiDashboard() {
         selectedInstances={selectedInstances}
         setSelectedInstances={setSelectedInstances}
         onBulkDelete={() => setBulkDeleteAlertOpen(true)}
+        onMoveRequest={(entry, newDate) => setMoveOperation({ entry, newDate })}
       />
       
       <EntryDialog 
@@ -752,6 +818,23 @@ export default function CentseiDashboard() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleBulkMarkAsComplete}>
               Mark as Complete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+       <AlertDialog open={!!moveOperation} onOpenChange={(isOpen) => !isOpen && setMoveOperation(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Move</AlertDialogTitle>
+            <AlertDialogDescription>
+                Are you sure you want to move the entry <strong>{moveOperation?.entry.name}</strong> to <strong>{moveOperation && format(parseISO(moveOperation.newDate), 'PPP')}</strong>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setMoveOperation(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmMove}>
+              Confirm
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

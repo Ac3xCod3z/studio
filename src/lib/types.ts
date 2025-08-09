@@ -22,15 +22,18 @@ export const BillCategories = [
 
 export type BillCategory = (typeof BillCategories)[number];
 
-export type RecurrenceInterval =
-  | 'none'
-  | 'weekly'
-  | 'bi-weekly'
-  | 'monthly'
-  | 'bimonthly'
-  | '3months'
-  | '6months'
-  | '12months';
+export const RecurrenceOptions = [
+  'none',
+  'weekly',
+  'bi-weekly',
+  'monthly',
+  'bimonthly',
+  '3months',
+  '6months',
+  '12months'
+] as const;
+
+export type RecurrenceInterval = typeof RecurrenceOptions[number];
 
 export const EntrySchema = z.object({
   id: z.string(),
@@ -38,7 +41,7 @@ export const EntrySchema = z.object({
   name: z.string(),
   amount: z.number(),
   type: z.enum(['bill', 'income']),
-  recurrence: z.enum(["none", "weekly", "bi-weekly", "monthly", "bimonthly", "3months", "6months", "12months"]),
+  recurrence: z.enum(RecurrenceOptions),
   category: z.enum(BillCategories).optional(),
   order: z.number().optional(),
   isPaid: z.boolean().optional(),

@@ -3,7 +3,6 @@
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import {
-  add,
   addMonths,
   subMonths,
   format,
@@ -19,12 +18,9 @@ import {
   setYear,
   setMonth,
   getMonth,
-  isAfter,
-  isBefore,
-  parseISO,
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
-import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Trash2, TrendingUp, TrendingDown, Repeat, CalendarIcon, Check } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Trash2, TrendingUp, TrendingDown, Repeat, Check } from "lucide-react";
 import { gsap } from "gsap";
 import { MotionPathPlugin } from "gsap/MotionPathPlugin";
 
@@ -69,6 +65,7 @@ type CentseiCalendarProps = {
     selectedInstances: SelectedInstance[];
     setSelectedInstances: (instances: SelectedInstance[] | ((current: SelectedInstance[]) => SelectedInstance[])) => void;
     onBulkDelete: () => void;
+    onMoveRequest: (entry: Entry, newDate: string) => void;
 }
 
 export function CentseiCalendar({
@@ -89,6 +86,7 @@ export function CentseiCalendar({
     selectedInstances,
     setSelectedInstances,
     onBulkDelete,
+    onMoveRequest,
 }: CentseiCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -275,6 +273,14 @@ export function CentseiCalendar({
         handleDragEnd();
         return;
     }
+    
+    const isSameDayDrop = draggingEntry.date === targetDateStr;
+
+    if (!isSameDayDrop) {
+        onMoveRequest(draggingEntry, targetDateStr);
+        handleDragEnd();
+        return;
+    }
 
     const indicator = calendarRef.current?.querySelector('.drop-indicator');
     const masterId = getOriginalIdFromInstance(draggingEntry.id);
@@ -286,8 +292,6 @@ export function CentseiCalendar({
         if (masterEntryIndex === -1) {
             return prevEntries; 
         }
-
-        const isSameDayDrop = draggingEntry.date === targetDateStr;
 
         const entryContainer = indicator?.parentElement;
         const siblings = Array.from(entryContainer?.children || []).filter(c => c.hasAttribute('data-entry-id') && c !== draggedElementRef.current);
@@ -324,18 +328,22 @@ export function CentseiCalendar({
         }
 
         const masterEntry = { ...masterEntries[masterEntryIndex] };
-        if (!isSameDayDrop) {
-            if (masterEntry.recurrence === 'none') {
-                masterEntry.date = targetDateStr;
-                masterEntry.order = targetOrder;
-            } else {
-                const updatedExceptions = { ...masterEntry.exceptions };
-                updatedExceptions[draggingEntry.date] = { ...updatedExceptions[draggingEntry.date], movedTo: targetDateStr, order: targetOrder };
-                masterEntry.exceptions = updatedExceptions;
-            }
+        
+        // This is a reorder-on-same-day operation
+        if (masterEntry.recurrence === 'none') {
+            masterEntry.order = targetOrder;
+        } else {
+             masterEntry.exceptions = {
+                ...masterEntry.exceptions,
+                [targetDateStr]: {
+                    ...masterEntry.exceptions?.[targetDateStr],
+                    order: targetOrder
+                }
+            };
         }
         masterEntries[masterEntryIndex] = masterEntry;
 
+        // Re-normalize order for the day
         const allEntriesOnTargetDay = [
             ...generatedEntries.filter(ge => ge.date === targetDateStr && getOriginalIdFromInstance(ge.id) !== masterId),
             {...draggingEntry, order: targetOrder, date: targetDateStr } 
