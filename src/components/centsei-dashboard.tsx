@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Entry, RolloverPreference, WeeklyBalances, SelectedInstance } from "@/lib/types";
 import { CentseiCalendar, SidebarContent } from "./centsei-calendar";
-import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths, parseISO, differenceInCalendarMonths, isAfter, eachWeekOfInterval, lastDayOfMonth } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths, parseISO, differenceInCalendarMonths, isAfter, eachWeekOfInterval, lastDayOfMonth, set } from "date-fns";
 import { toZonedTime } from 'date-fns-tz';
 import { recurrenceIntervalMonths } from "@/lib/constants";
 import { ScrollArea } from "./ui/scroll-area";
@@ -51,7 +51,8 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
     const instances: Entry[] = [];
     if (!entry.date) return [];
     
-    const today = toZonedTime(new Date(), timezone);
+    const nowInTimezone = toZonedTime(new Date(), timezone);
+    const todayInTimezone = set(nowInTimezone, { hours: 0, minutes: 0, seconds: 0, milliseconds: 0 });
     const originalEntryDate = parseISO(entry.date);
     
     if (isAfter(originalEntryDate, end)) return [];
@@ -59,12 +60,19 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
     const createInstance = (date: Date): Entry => {
         const dateStr = format(date, 'yyyy-MM-dd');
         
-        const isPastOrToday = isBefore(date, today) || isSameDay(date, today);
-        const shouldBePaid = isPastOrToday && (entry.type === 'income' || entry.isAutoPay);
+        const isPast = isBefore(date, todayInTimezone);
+        const isToday = isSameDay(date, todayInTimezone);
+        const isAfter9AM = nowInTimezone.getHours() >= 9;
 
-        // An exception for this date takes precedence
+        let shouldBePaid = false;
+        if (isPast) {
+            shouldBePaid = entry.type === 'income' || !!entry.isAutoPay;
+        } else if (isToday && isAfter9AM) {
+            shouldBePaid = entry.type === 'income' || !!entry.isAutoPay;
+        }
+
         const exceptionIsPaid = entry.exceptions?.[dateStr]?.isPaid;
-        const isPaid = typeof exceptionIsPaid === 'boolean' ? exceptionIsPaid : (shouldBePaid || (entry.isPaid ?? false));
+        const isPaid = typeof exceptionIsPaid === 'boolean' ? exceptionIsPaid : shouldBePaid;
 
         return {
             ...entry,
@@ -305,10 +313,16 @@ export default function CentseiDashboard() {
                 const updatedExceptions = { ...originalEntry.exceptions };
 
                 if (entryData.isPaid) {
-                  updatedExceptions[entryData.originalDate] = { isPaid: true };
+                  updatedExceptions[entryData.originalDate] = { ...updatedExceptions[entryData.originalDate], isPaid: true };
                 } else {
-                  // If unchecking, remove the exception
-                  delete updatedExceptions[entryData.originalDate];
+                  // If unchecking, remove the paid status but keep other exception data
+                  if (updatedExceptions[entryData.originalDate]) {
+                    delete updatedExceptions[entryData.originalDate].isPaid;
+                    // If no other exception properties exist, remove the exception object
+                    if(Object.keys(updatedExceptions[entryData.originalDate]).length === 0){
+                        delete updatedExceptions[entryData.originalDate]
+                    }
+                  }
                 }
                 
                 updatedEntries[entryIndex] = {
@@ -336,6 +350,7 @@ export default function CentseiDashboard() {
             id: crypto.randomUUID(),
             order: entriesForDate.length,
             date: formattedDate,
+            recurrence: entryData.recurrence,
         };
         
         return [...prevEntries, newEntry];
@@ -733,3 +748,4 @@ export default function CentseiDashboard() {
     </div>
   );
 }
+
