@@ -64,6 +64,19 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
         const isToday = isSameDay(date, todayInTimezone);
         const isAfter9AM = nowInTimezone.getHours() >= 9;
 
+        const exceptionIsPaid = entry.exceptions?.[dateStr]?.isPaid;
+
+        // If there's an explicit exception for 'isPaid', it takes highest priority.
+        if (typeof exceptionIsPaid === 'boolean') {
+            return {
+                ...entry,
+                date: dateStr,
+                id: `${entry.id}-${dateStr}`,
+                isPaid: exceptionIsPaid,
+            };
+        }
+        
+        // Otherwise, apply automatic completion logic.
         let shouldBePaid = false;
         if (isPast) {
             shouldBePaid = entry.type === 'income' || !!entry.isAutoPay;
@@ -71,14 +84,11 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
             shouldBePaid = entry.type === 'income' || !!entry.isAutoPay;
         }
 
-        const exceptionIsPaid = entry.exceptions?.[dateStr]?.isPaid;
-        const isPaid = typeof exceptionIsPaid === 'boolean' ? exceptionIsPaid : shouldBePaid;
-
         return {
             ...entry,
             date: dateStr,
             id: `${entry.id}-${dateStr}`,
-            isPaid,
+            isPaid: shouldBePaid,
         };
     };
     
@@ -748,4 +758,5 @@ export default function CentseiDashboard() {
     </div>
   );
 }
+
 
