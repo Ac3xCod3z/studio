@@ -60,35 +60,47 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
     const createInstance = (date: Date): Entry => {
         const dateStr = format(date, 'yyyy-MM-dd');
         
-        let isPaid: boolean;
         const exception = entry.exceptions?.[dateStr];
 
+        // Priority 1: A manual exception exists for this date.
         if (exception && typeof exception.isPaid === 'boolean') {
-            // Priority 1: A manual exception exists for this date.
-            isPaid = exception.isPaid;
-        } else if (entry.recurrence === 'none') {
-            // Priority 2: For non-recurring entries, use the master isPaid flag.
-            isPaid = entry.isPaid ?? false;
-        } else {
-            // Priority 3: Apply automatic completion logic if no manual override exists.
-            const isPast = isBefore(date, todayInTimezone);
-            const isToday = isSameDay(date, todayInTimezone);
-            const isAfter9AM = nowInTimezone.getHours() >= 9;
+          return {
+            ...entry,
+            date: dateStr,
+            id: `${entry.id}-${dateStr}`,
+            isPaid: exception.isPaid,
+            order: exception?.order ?? entry.order,
+          };
+        }
+        
+        // Priority 2: For non-recurring entries, use the master isPaid flag.
+        if (entry.recurrence === 'none') {
+            return {
+                ...entry,
+                date: dateStr,
+                id: `${entry.id}-${dateStr}`, // Non-recurring still get a unique ID for consistency
+                isPaid: entry.isPaid ?? false,
+                order: exception?.order ?? entry.order,
+            };
+        }
+        
+        // Priority 3: Apply automatic completion logic if no manual override exists.
+        const isPast = isBefore(date, todayInTimezone);
+        const isToday = isSameDay(date, todayInTimezone);
+        const isAfter9AM = nowInTimezone.getHours() >= 9;
 
-            let shouldBePaid = false;
-            if (isPast) {
-                shouldBePaid = entry.type === 'income' || !!entry.isAutoPay;
-            } else if (isToday && isAfter9AM) {
-                shouldBePaid = entry.type === 'income' || !!entry.isAutoPay;
-            }
-            isPaid = shouldBePaid;
+        let shouldBePaid = false;
+        if (isPast) {
+            shouldBePaid = entry.type === 'income' || !!entry.isAutoPay;
+        } else if (isToday && isAfter9AM) {
+            shouldBePaid = entry.type === 'income' || !!entry.isAutoPay;
         }
 
         return {
             ...entry,
             date: dateStr,
             id: `${entry.id}-${dateStr}`,
-            isPaid: isPaid,
+            isPaid: shouldBePaid,
             order: exception?.order ?? entry.order,
         };
     };
@@ -412,6 +424,18 @@ export default function CentseiDashboard() {
     setEntries((prev) => prev.filter((e) => e.id !== id));
     setEntryDialogOpen(false);
     setEditingEntry(null);
+  };
+  
+  const handleEntryCopy = (entryToCopy: Entry) => {
+    setEditingEntry({
+      ...entryToCopy,
+      // Clear the ID to indicate it's a new entry
+      id: '', 
+      // Reset paid status for the copy
+      isPaid: false, 
+    });
+    // The dialog useEffect will handle resetting the date to selectedDate
+    setEntryDialogOpen(true);
   };
 
   const openNewEntryDialog = (date: Date) => {
@@ -737,6 +761,7 @@ export default function CentseiDashboard() {
         onClose={() => setEntryDialogOpen(false)}
         onSave={handleEntrySave}
         onDelete={handleEntryDelete}
+        onCopy={handleEntryCopy}
         entry={editingEntry}
         selectedDate={selectedDate}
         timezone={timezone}

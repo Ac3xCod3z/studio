@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { format } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
-import { CalendarIcon, Trash2 } from "lucide-react";
+import { CalendarIcon, Trash2, Copy } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +52,7 @@ type EntryFormProps = {
   onClose: () => void;
   onSave: (entry: Omit<Entry, "id" | 'date'> & { id?: string; date: Date; originalDate?: string }) => void;
   onDelete?: (id: string) => void;
+  onCopy?: (entry: Entry) => void;
   entry: Entry | null;
   selectedDate: Date;
   timezone: string;
@@ -64,7 +65,7 @@ const parseDateInTimezone = (dateString: string, timeZone: string) => {
 };
 
 
-export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selectedDate, timezone }: EntryFormProps) {
+export function EntryDialog({ isOpen, onClose, onSave, onDelete, onCopy, entry, selectedDate, timezone }: EntryFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
   });
@@ -74,7 +75,8 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
 
    React.useEffect(() => {
     if (isOpen) {
-      const resetDate = entry ? parseDateInTimezone(entry.date, timezone) : selectedDate;
+      // If we are copying (entry.id is empty), use the selected date from calendar
+      const resetDate = entry && entry.id ? parseDateInTimezone(entry.date, timezone) : selectedDate;
       const isInstancePaid = entry?.recurrence !== 'none'
         ? entry?.exceptions?.[entry.date]?.isPaid ?? entry.isPaid
         : entry?.isPaid ?? false;
@@ -86,7 +88,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
         date: resetDate,
         recurrence: entry?.recurrence || 'none',
         category: entry?.category,
-        isPaid: isInstancePaid,
+        isPaid: entry && !entry.id ? false : isInstancePaid, // Not paid if it's a new copy
         isAutoPay: entry?.isAutoPay || false,
       });
     }
@@ -104,23 +106,32 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
       dataToSave.isAutoPay = undefined;
     }
 
-    if (entry) {
+    if (entry && entry.id) {
       // The ID passed back is the ID of the original master entry
       const originalId = entry.id.includes('-') ? entry.id.split('-').slice(0, 5).join('-') : entry.id;
       onSave({ ...dataToSave, id: originalId });
     } else {
-      onSave(dataToSave);
+      // New entry or a copy (which has no id)
+      onSave({ ...dataToSave, id: undefined });
     }
     onClose();
   }
   
   const handleDelete = () => {
-    if (entry && onDelete) {
+    if (entry && entry.id && onDelete) {
         const originalId = entry.id.includes('-') ? entry.id.split('-').slice(0, 5).join('-') : entry.id;
         onDelete(originalId);
         onClose();
     }
   }
+
+  const handleCopy = () => {
+    if (entry && onCopy) {
+      onCopy(entry);
+    }
+  }
+
+  const isEditing = entry && entry.id;
 
   if (!isOpen) {
     return null;
@@ -130,9 +141,9 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
     <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-[425px]" onInteractOutside={(e) => e.preventDefault()}>
             <DialogHeader>
-            <DialogTitle>{entry ? "Edit Entry" : "Add New Entry"}</DialogTitle>
+            <DialogTitle>{isEditing ? "Edit Entry" : "Add New Entry"}</DialogTitle>
             <DialogDescription>
-                {entry ? "Update the details of your financial entry." : "Add a new bill or income to your calendar."}
+                {isEditing ? "Update the details of your financial entry." : "Add a new bill or income to your calendar."}
             </DialogDescription>
             </DialogHeader>
             <Form {...form}>
@@ -329,18 +340,31 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
                     />
                 )}
 
-                <DialogFooter className="pt-4 sm:justify-between">
-                {entry && onDelete && (
-                    <Button type="button" variant="destructive" onClick={handleDelete} className="mr-auto">
-                        <Trash2 className="mr-2 h-4 w-4" /> Delete
-                    </Button>
-                )}
-                <div className="flex gap-2 justify-end">
-                    <Button type="button" variant="outline" onClick={onClose}>
-                        Cancel
-                    </Button>
-                    <Button type="submit">Save</Button>
-                </div>
+                <DialogFooter className="pt-4 sm:justify-between flex-wrap">
+                    <div className="flex gap-2 justify-start">
+                        {isEditing && (
+                            <>
+                                {onCopy && (
+                                    <Button type="button" variant="outline" onClick={handleCopy} size="icon">
+                                        <Copy className="h-4 w-4" />
+                                        <span className="sr-only">Copy</span>
+                                    </Button>
+                                )}
+                                {onDelete && (
+                                    <Button type="button" variant="destructive" onClick={handleDelete} size="icon">
+                                        <Trash2 className="h-4 w-4" />
+                                        <span className="sr-only">Delete</span>
+                                    </Button>
+                                )}
+                            </>
+                        )}
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                        <Button type="button" variant="outline" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button type="submit">Save</Button>
+                    </div>
                 </DialogFooter>
             </form>
             </Form>
