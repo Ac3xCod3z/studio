@@ -98,13 +98,14 @@ export function CentseiCalendar({
   const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isDraggingRef = useRef(false);
   const draggedElementRef = useRef<HTMLDivElement | null>(null);
-  // Use a ref for the dragging entry to prevent re-renders, which cause flickering
   const draggingEntryRef = useRef<Entry | null>(null);
   const [dragVisual, setDragVisual] = useState<string | null>(null);
+  const scrollIntervalRef = useRef<number | null>(null);
+
 
   const selectedInstanceIds = useMemo(() => selectedInstances.map(i => i.instanceId), [selectedInstances]);
 
-  const { daysWithEntries, allGeneratedEntries } = useMemo(() => {
+  const { daysWithEntries } = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth));
     const end = endOfWeek(endOfMonth(currentMonth));
     const daysInMonth = eachDayOfInterval({ start, end });
@@ -116,8 +117,7 @@ export function CentseiCalendar({
         daysMap.set(dayKey, { day, entries: [] });
     });
     
-    const allEntries = generatedEntries;
-    allEntries.forEach(entry => {
+    generatedEntries.forEach(entry => {
         const entryDayStr = format(parseDateInTimezone(entry.date, timezone), 'yyyy-MM-dd');
         if (daysMap.has(entryDayStr)) {
             daysMap.get(entryDayStr)!.entries.push(entry);
@@ -128,8 +128,8 @@ export function CentseiCalendar({
         dayData.entries.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     });
 
-    return { daysWithEntries: Array.from(daysMap.values()), allGeneratedEntries: allEntries };
-}, [currentMonth, generatedEntries, timezone]);
+    return { daysWithEntries: Array.from(daysMap.values()) };
+  }, [currentMonth, generatedEntries, timezone]);
   
   const getOriginalIdFromInstance = (instanceId: string) => {
     const parts = instanceId.split('-');
@@ -191,7 +191,7 @@ export function CentseiCalendar({
     draggingEntryRef.current = entry;
     draggedElementRef.current = e.currentTarget;
     e.dataTransfer.setData('text/plain', entry.id); // Necessary for Firefox
-    setDragVisual(entry.id); // Use state only for visual ghosting
+    setTimeout(() => setDragVisual(entry.id), 0);
   };
   
   const handleDragEnd = () => {
@@ -227,7 +227,7 @@ export function CentseiCalendar({
         } else {
             dropTarget.parentNode?.insertBefore(indicator, dropTarget);
         }
-    } else if (!dropTarget) { // Dragging over empty space in day cell
+    } else if (!dropTarget) { 
         entryContainer.appendChild(indicator);
     }
   };
@@ -268,12 +268,11 @@ export function CentseiCalendar({
         const masterEntryIndex = masterEntries.findIndex(entry => entry.id === masterId);
 
         if (masterEntryIndex === -1) {
-            return prevEntries; // Should not happen
+            return prevEntries; 
         }
 
         const isSameDayDrop = draggingEntry.date === targetDateStr;
 
-        // --- Calculate new order based on indicator position ---
         const entryContainer = indicator?.parentElement;
         const siblings = Array.from(entryContainer?.children || []).filter(c => c.hasAttribute('data-entry-id') && c !== draggedElementRef.current);
         
@@ -284,7 +283,6 @@ export function CentseiCalendar({
             
             const getOrderFromEl = (el: Element | null) => {
                 const id = el?.getAttribute('data-entry-id');
-                // Find from all generated entries as it might be on a different day
                 const entry = generatedEntries.find(ge => ge.id === id);
                 return entry?.order;
             }
@@ -297,69 +295,55 @@ export function CentseiCalendar({
             } else if (typeof prevOrder === 'number') {
                 targetOrder = prevOrder + 1;
             } else if (typeof nextOrder === 'number') {
-                targetOrder = nextOrder - 1;
+                targetOrder = nextOrder - 1 > 0 ? nextOrder - 1 : nextOrder / 2;
             } else {
-                 targetOrder = 0; // It's the only item
+                 targetOrder = 1;
             }
         } else {
-            // No indicator, drop at the end
             targetOrder = siblings.length > 0 ? (Math.max(...siblings.map(s => {
                 const id = s.getAttribute('data-entry-id');
                 const entry = generatedEntries.find(ge => ge.id === id);
                 return entry?.order ?? 0;
-            })) + 1) : 0;
+            })) + 1) : 1;
         }
 
-
+        const masterEntry = { ...masterEntries[masterEntryIndex] };
         if (!isSameDayDrop) {
-            // Moving to a new day
-            const masterEntry = { ...masterEntries[masterEntryIndex] };
             if (masterEntry.recurrence === 'none') {
                 masterEntry.date = targetDateStr;
                 masterEntry.order = targetOrder;
-                masterEntries[masterEntryIndex] = masterEntry;
             } else {
-                // For recurring, create an exception for the move
                 const updatedExceptions = { ...masterEntry.exceptions };
                 updatedExceptions[draggingEntry.date] = { ...updatedExceptions[draggingEntry.date], movedTo: targetDateStr, order: targetOrder };
                 masterEntry.exceptions = updatedExceptions;
-                masterEntries[masterEntryIndex] = masterEntry;
-                // Note: The logic to actually RENDER this moved exception needs to be implemented
-                // in the generation logic. This is a complex change.
-                // For now, we simplify and just change the master date.
-                masterEntry.date = targetDateStr;
-                masterEntry.order = targetOrder;
-                masterEntries[masterEntryIndex] = masterEntry;
             }
         }
+        masterEntries[masterEntryIndex] = masterEntry;
 
-        // Reorder entries for the target day, including the dragged one
-        const entriesOnTargetDay = masterEntries
-            .filter(entry => entry.date === targetDateStr)
-            .map(e => e.id === masterId ? {...e, order: targetOrder} : e) // inject dragged entry with its new order
-            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        const allEntriesOnTargetDay = [
+            ...generatedEntries.filter(ge => ge.date === targetDateStr && getOriginalIdFromInstance(ge.id) !== masterId),
+            {...draggingEntry, order: targetOrder, date: targetDateStr } 
+        ].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-        // Renormalize ordering for the target day
-        entriesOnTargetDay.forEach((entry, index) => {
-            const idxToUpdate = masterEntries.findIndex(me => me.id === entry.id);
-            if (idxToUpdate !== -1) {
-                masterEntries[idxToUpdate].order = index;
+
+        allEntriesOnTargetDay.forEach((entry, index) => {
+            const originalId = getOriginalIdFromInstance(entry.id);
+            const entryToUpdateIndex = masterEntries.findIndex(me => me.id === originalId);
+            if (entryToUpdateIndex !== -1) {
+                const me = masterEntries[entryToUpdateIndex];
+                if (me.recurrence === 'none') {
+                    me.order = index + 1;
+                } else {
+                     me.exceptions = {
+                        ...me.exceptions,
+                        [entry.date]: {
+                            ...me.exceptions?.[entry.date],
+                            order: index + 1
+                        }
+                    };
+                }
             }
         });
-        
-        // Renormalize ordering for the source day if it was different
-        if (!isSameDayDrop) {
-            const entriesOnSourceDay = masterEntries
-                .filter(entry => entry.date === draggingEntry.date && entry.id !== masterId)
-                .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-            
-            entriesOnSourceDay.forEach((entry, index) => {
-                const idxToUpdate = masterEntries.findIndex(me => me.id === entry.id);
-                if (idxToUpdate !== -1) {
-                    masterEntries[idxToUpdate].order = index;
-                }
-            });
-        }
         
         return masterEntries;
     });
@@ -373,6 +357,13 @@ export function CentseiCalendar({
         dragTimeoutRef.current = null;
     }
   }, []);
+
+  const stopAutoScroll = () => {
+    if (scrollIntervalRef.current) {
+        window.cancelAnimationFrame(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
+    }
+  };
   
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>, entry: Entry) => {
     if (isReadOnly || isSelectionMode) return;
@@ -383,7 +374,6 @@ export function CentseiCalendar({
         isDraggingRef.current = true;
         draggingEntryRef.current = entry;
         draggedElementRef.current = e.currentTarget;
-        setDragVisual(entry.id);
         if (navigator.vibrate) navigator.vibrate(50);
         
         const clone = e.currentTarget.cloneNode(true) as HTMLElement;
@@ -392,8 +382,10 @@ export function CentseiCalendar({
         clone.style.pointerEvents = 'none';
         clone.style.zIndex = '1000';
         clone.style.opacity = '0.8';
+        clone.style.width = `${e.currentTarget.offsetWidth}px`;
         document.body.appendChild(clone);
-        
+        setDragVisual(entry.id);
+
         const touch = e.touches[0];
         clone.style.left = `${touch.clientX - clone.offsetWidth / 2}px`;
         clone.style.top = `${touch.clientY - clone.offsetHeight / 2}px`;
@@ -402,10 +394,8 @@ export function CentseiCalendar({
   };
   
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!isDraggingRef.current) {
-        cancelDragTimeout();
-        return;
-    }
+    cancelDragTimeout();
+    if (!isDraggingRef.current) return;
     
     e.preventDefault();
     e.stopPropagation();
@@ -420,22 +410,71 @@ export function CentseiCalendar({
     const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
     if (!targetElement) return;
 
-    const syntheticEvent = {
-        preventDefault: () => {},
-        target: targetElement,
-        clientY: touch.clientY,
-    } as unknown as React.DragEvent<HTMLDivElement>;
+    calendarRef.current?.querySelectorAll('.drop-indicator').forEach(el => el.remove());
+    const dayCell = targetElement.closest('[data-day-cell]');
+    if (!dayCell) {
+        stopAutoScroll();
+        return;
+    }
 
-    handleDragOver(syntheticEvent);
+    const scrollContainer = dayCell.querySelector<HTMLElement>('[data-radix-scroll-area-viewport]');
+    if (scrollContainer) {
+        const rect = scrollContainer.getBoundingClientRect();
+        const threshold = 50; 
+        let scrollAmount = 0;
+        
+        if (touch.clientY < rect.top + threshold) {
+            scrollAmount = -5; // scroll up
+        } else if (touch.clientY > rect.bottom - threshold) {
+            scrollAmount = 5; // scroll down
+        }
+
+        if (scrollAmount !== 0) {
+            const scroll = () => {
+                scrollContainer.scrollTop += scrollAmount;
+                scrollIntervalRef.current = window.requestAnimationFrame(scroll);
+            };
+            if (!scrollIntervalRef.current) {
+                scrollIntervalRef.current = window.requestAnimationFrame(scroll);
+            }
+        } else {
+            stopAutoScroll();
+        }
+    }
+
+
+    const indicator = document.createElement('div');
+    indicator.className = 'drop-indicator h-1 bg-primary rounded-full my-1';
+    
+    const entryContainer = dayCell.querySelector('.entry-list-container');
+    if (!entryContainer) return;
+
+    const dropTarget = targetElement.closest('[data-entry-id]');
+    
+    if (dropTarget && dropTarget !== draggedElementRef.current) {
+        const rect = dropTarget.getBoundingClientRect();
+        const isAfter = touch.clientY > rect.top + rect.height / 2;
+        if (isAfter) {
+            dropTarget.parentNode?.insertBefore(indicator, dropTarget.nextSibling);
+        } else {
+            dropTarget.parentNode?.insertBefore(indicator, dropTarget);
+        }
+    } else if (!dropTarget) { 
+        entryContainer.appendChild(indicator);
+    }
   };
   
   const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
     cancelDragTimeout();
-    
+    stopAutoScroll();
+
     const clone = document.getElementById('drag-clone');
     if (clone) clone.remove();
 
-    if (!isDraggingRef.current) return;
+    if (!isDraggingRef.current) {
+      setDragVisual(null);
+      return;
+    }
     
     const touch = e.changedTouches[0];
     const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -529,7 +568,7 @@ export function CentseiCalendar({
             {WEEKDAYS.map((day) => (<div key={day} className="py-2">{day}</div>))}
           </div>
           <div className="grid grid-cols-7 grid-rows-5 gap-1.5 md:gap-2">
-            {daysWithEntries.map(({ day, entries: dayEntries }, index) => {
+            {daysWithEntries.map(({ day, entries: dayEntries }) => {
               const dayHasSelectedEntry = dayEntries.some(e => selectedInstanceIds.includes(e.id))
               const dayStr = format(day, 'yyyy-MM-dd');
 
@@ -539,7 +578,7 @@ export function CentseiCalendar({
                   data-day-cell
                   data-date={dayStr}
                   className={cn(
-                    "relative flex flex-col h-36 md:h-44 rounded-xl p-2 border transition-colors",
+                    "relative flex flex-col h-36 md:h-44 rounded-xl p-2 border transition-colors group",
                     !isReadOnly && "cursor-pointer",
                     !isSameMonth(day, currentMonth) ? "bg-muted/50 text-muted-foreground" : "bg-card",
                     !isReadOnly && isSameMonth(day, currentMonth) && !isSelectionMode && "hover:bg-accent/50",
