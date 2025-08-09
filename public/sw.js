@@ -1,25 +1,24 @@
-// public/sw.js
-
-self.addEventListener('push', event => {
-  const data = event.data.json();
-  self.registration.showNotification(data.title, {
-    body: data.body,
-    icon: data.icon,
-  });
+// This is a basic service worker
+self.addEventListener('install', (event) => {
+  console.log('Service Worker installing.');
 });
 
-self.addEventListener('notificationclick', event => {
+self.addEventListener('activate', (event) => {
+  console.log('Service Worker activating.');
+});
+
+self.addEventListener('fetch', (event) => {
+  // Basic cache-first strategy for demonstration
+  event.respondWith(
+    caches.match(event.request).then((response) => {
+      return response || fetch(event.request);
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   event.waitUntil(
     clients.openWindow('/')
   );
-});
-
-
-self.addEventListener("install", () => {
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil(clients.claim());
 });

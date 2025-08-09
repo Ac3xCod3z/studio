@@ -8,18 +8,18 @@ export default function TermsOfServicePage() {
       <header className="py-4 px-4 md:px-6 border-b">
         <Link href="/" className="flex items-center gap-2 text-xl font-bold">
             <Logo className="h-8 w-8 text-primary" />
-            <span>FiscalFlow</span>
+            <span>Centsei</span>
         </Link>
       </header>
       <main className="max-w-4xl mx-auto py-12 px-4 md:px-6">
         <div className="space-y-8 text-foreground">
-          <h1 className="text-4xl font-bold">Terms of Service for FiscalFlow</h1>
+          <h1 className="text-4xl font-bold">Terms of Service for Centsei</h1>
           <p className="text-muted-foreground">Last updated: {new Date().toLocaleDateString()}</p>
 
           <div className="space-y-4">
             <h2 className="text-2xl font-semibold">1. Acceptance of Terms</h2>
             <p>
-              By accessing and using FiscalFlow ("the Service"), you accept and agree to be bound by the terms and provision of this agreement. In addition, when using these particular services, you shall be subject to any posted guidelines or rules applicable to such services. Any participation in this service will constitute acceptance of this agreement. If you do not agree to abide by the above, please do not use this service.
+              By accessing and using Centsei ("the Service"), you accept and agree to be bound by the terms and provision of this agreement. In addition, when using these particular services, you shall be subject to any posted guidelines or rules applicable to such services. Any participation in this service will constitute acceptance of this agreement. If you do not agree to abide by the above, please do not use this service.
             </p>
           </div>
 
@@ -47,7 +47,7 @@ export default function TermsOfServicePage() {
            <div className="space-y-4">
             <h2 className="text-2xl font-semibold">5. Limitation of Liability</h2>
             <p>
-              In no event shall FiscalFlow be liable for any direct, indirect, incidental, special, consequential or exemplary damages, including but not limited to, damages for loss of profits, goodwill, use, data or other intangible losses resulting from the use of or inability to use the service.
+              In no event shall Centsei be liable for any direct, indirect, incidental, special, consequential or exemplary damages, including but not limited to, damages for loss of profits, goodwill, use, data or other intangible losses resulting from the use of or inability to use the service.
             </p>
           </div>
 

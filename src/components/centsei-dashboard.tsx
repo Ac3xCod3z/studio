@@ -30,7 +30,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { Entry, RolloverPreference, WeeklyBalances, SelectedInstance } from "@/lib/types";
-import { FiscalFlowCalendar, SidebarContent } from "./fiscal-flow-calendar";
+import { CentseiCalendar, SidebarContent } from "./centsei-calendar";
 import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths, parseISO, differenceInCalendarMonths, isAfter, eachWeekOfInterval, lastDayOfMonth } from "date-fns";
 import { toZonedTime } from 'date-fns-tz';
 import { recurrenceIntervalMonths } from "@/lib/constants";
@@ -140,7 +140,7 @@ const getOriginalIdFromInstance = (instanceId: string) => {
 }
 
 
-export default function FiscalFlowDashboard() {
+export default function CentseiDashboard() {
   const [entries, setEntries] = useLocalStorage<Entry[]>("centseiEntries", []);
   const [rollover, setRollover] = useLocalStorage<RolloverPreference>("centseiRollover", "carryover");
   const [timezone, setTimezone] = useLocalStorage<string>('centseiTimezone', 'UTC');
@@ -457,7 +457,7 @@ export default function FiscalFlowDashboard() {
             bills: monthlyBills,
             net: monthlyIncome - monthlyBills,
             startOfMonthBalance: startOfMonthBalance,
-            endOfMonthBalance: endOfMonthBalance,
+            endOfMonthBalance,
         }
       }
   }, [selectedDate, allGeneratedEntries, timezone, weeklyBalances]);
@@ -617,7 +617,7 @@ export default function FiscalFlowDashboard() {
         </div>
       </header>
       
-      <FiscalFlowCalendar 
+      <CentseiCalendar 
         entries={entries}
         setEntries={setEntries}
         generatedEntries={allGeneratedEntries}

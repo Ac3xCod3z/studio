@@ -9,7 +9,7 @@ import { MotionPathPlugin } from "gsap/MotionPathPlugin";
 import { Logo } from './icons';
 import { Skeleton } from './ui/skeleton';
 
-const FiscalFlowDashboard = dynamic(() => import('@/components/fiscal-flow-dashboard'), {
+const CentseiDashboard = dynamic(() => import('@/components/centsei-dashboard'), {
   ssr: false,
   loading: () => <DashboardSkeleton />,
 });
@@ -47,7 +47,7 @@ function DashboardSkeleton() {
   );
 }
 
-export default function FiscalFlowLoader() {
+export default function CentseiLoader() {
   const [animationComplete, setAnimationComplete] = useState(false);
   const logoRef = useRef(null);
   const nameRef = useRef(null);
@@ -95,7 +95,7 @@ export default function FiscalFlowLoader() {
   }, []);
 
   if (animationComplete) {
-    return <FiscalFlowDashboard />;
+    return <CentseiDashboard />;
   }
 
   return (

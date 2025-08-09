@@ -9,7 +9,7 @@ import { useMedia } from "react-use";
 import { Logo } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Entry, RolloverPreference, WeeklyBalances } from "@/lib/types";
-import { FiscalFlowCalendar, SidebarContent } from "@/components/fiscal-flow-calendar";
+import { CentseiCalendar, SidebarContent } from "@/components/centsei-calendar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
@@ -238,7 +238,7 @@ export default function ViewOnlyCalendar() {
       <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
         <div className="flex items-center gap-2">
           <Logo className="h-8 w-8 text-primary" />
-          <span className="text-xl font-bold">FiscalFlow (View Only)</span>
+          <span className="text-xl font-bold">Centsei (View Only)</span>
         </div>
         {isMobile && (
           <Sheet open={isMobileSheetOpen} onOpenChange={setMobileSheetOpen}>
@@ -263,7 +263,7 @@ export default function ViewOnlyCalendar() {
         )}
       </header>
 
-      <FiscalFlowCalendar
+      <CentseiCalendar
         entries={data.entries}
         generatedEntries={allGeneratedEntries}
         setEntries={() => {}} // No-op
@@ -279,8 +279,8 @@ export default function ViewOnlyCalendar() {
         weeklyTotals={weeklyTotals}
         isSelectionMode={false}
         toggleSelectionMode={() => {}}
-        selectedIds={[]}
-        setSelectedIds={() => {}}
+        selectedInstances={[]}
+        setSelectedInstances={() => {}}
         onBulkDelete={() => {}}
       />
     </div>
