@@ -51,8 +51,6 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry
     const instances: Entry[] = [];
     if (!entry.date) return [];
     
-    // Use parseISO to correctly handle YYYY-MM-DD as a UTC date
-    // to prevent off-by-one day errors due to timezone conversion.
     const originalEntryDate = parseISO(entry.date);
     
     if (isAfter(originalEntryDate, end)) return [];
@@ -130,14 +128,6 @@ const parseDateInTimezone = (dateString: string, timeZone: string) => {
     const [year, month, day] = dateString.split('-').map(Number);
     return toZonedTime(new Date(year, month - 1, day), timeZone);
 };
-
-const getOriginalIdFromInstance = (instanceId: string) => {
-  const parts = instanceId.split('-');
-  if (parts.length > 5) { // Assuming UUID is 5 parts
-      return parts.slice(0, 5).join('-');
-  }
-  return instanceId;
-}
 
 
 export default function CentseiDashboard() {
@@ -289,12 +279,13 @@ export default function CentseiDashboard() {
     const formattedDate = format(entryData.date, 'yyyy-MM-dd');
     
     setEntries(prev => {
+        let prevEntries = [...prev];
         if (entryData.id) {
             // This is an existing entry, find it
-            const entryIndex = prev.findIndex(e => e.id === entryData.id);
+            const entryIndex = prevEntries.findIndex(e => e.id === entryData.id);
             if (entryIndex === -1) return prev;
 
-            const updatedEntries = [...prev];
+            const updatedEntries = [...prevEntries];
             const originalEntry = updatedEntries[entryIndex];
             
             const isRecurring = originalEntry.recurrence && originalEntry.recurrence !== 'none';
@@ -302,7 +293,13 @@ export default function CentseiDashboard() {
             // If it's a recurring entry and we are changing its paid status
             if (isRecurring && typeof entryData.isPaid === 'boolean' && entryData.originalDate) {
                 const updatedExceptions = { ...originalEntry.exceptions };
-                updatedExceptions[entryData.originalDate] = { isPaid: entryData.isPaid };
+
+                if (entryData.isPaid) {
+                  updatedExceptions[entryData.originalDate] = { isPaid: true };
+                } else {
+                  // If unchecking, remove the exception
+                  delete updatedExceptions[entryData.originalDate];
+                }
                 
                 updatedEntries[entryIndex] = {
                     ...originalEntry,
@@ -311,7 +308,6 @@ export default function CentseiDashboard() {
                     exceptions: updatedExceptions,
                     isPaid: originalEntry.isPaid, // Keep master isPaid unchanged
                 };
-
             } else {
                  // For non-recurring entries or other property changes
                 updatedEntries[entryIndex] = {
@@ -324,7 +320,7 @@ export default function CentseiDashboard() {
         }
         
         // This is a new entry
-        const entriesForDate = prev.filter(e => e.date === formattedDate);
+        const entriesForDate = prevEntries.filter(e => e.date === formattedDate);
         const newEntry: Entry = {
             ...entryData,
             id: crypto.randomUUID(),
@@ -332,7 +328,7 @@ export default function CentseiDashboard() {
             date: formattedDate,
         };
         
-        return [...prev, newEntry];
+        return [...prevEntries, newEntry];
     });
   };
 
@@ -369,7 +365,6 @@ export default function CentseiDashboard() {
         const firstDate = parseISO(sortedEntries[0].date);
         const lastDate = parseISO(sortedEntries[sortedEntries.length - 1].date);
         
-        // Ensure the interval covers full weeks
         const weeks = eachWeekOfInterval({ start: firstDate, end: lastDate });
         let lastWeekBalance = 0;
 
@@ -396,7 +391,6 @@ export default function CentseiDashboard() {
         });
     }
     
-    // Only update state if the calculated object is different
     if (JSON.stringify(newWeeklyBalances) !== JSON.stringify(weeklyBalances)) {
         setWeeklyBalances(newWeeklyBalances);
     }
@@ -626,7 +620,6 @@ export default function CentseiDashboard() {
         setEditingEntry={setEditingEntry}
         setSelectedDate={setSelectedDate}
         setEntryDialogOpen={setEntryDialogOpen}
-        isMobile={isMobile}
         openDayEntriesDialog={() => setDayEntriesDialogOpen(true)}
         weeklyBalances={weeklyBalances}
         weeklyTotals={weeklyTotals}
@@ -658,7 +651,6 @@ export default function CentseiDashboard() {
         }}
         onEditEntry={(entry) => {
             setDayEntriesDialogOpen(false);
-            // We pass the instance itself to the edit dialog
             setEditingEntry(entry);
             setEntryDialogOpen(true);
         }}

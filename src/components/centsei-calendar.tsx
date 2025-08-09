@@ -1,4 +1,3 @@
-
 // src/components/centsei-calendar.tsx
 "use client";
 
@@ -95,6 +94,7 @@ export function CentseiCalendar({
   const calendarRef = useRef<HTMLDivElement>(null);
   const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isDraggingRef = useRef(false);
+  const draggedElementRef = useRef<HTMLDivElement | null>(null);
 
   const selectedInstanceIds = useMemo(() => selectedInstances.map(i => i.instanceId), [selectedInstances]);
 
@@ -119,14 +119,7 @@ export function CentseiCalendar({
     });
 
     daysMap.forEach(dayData => {
-        dayData.entries.sort((a, b) => {
-            if (a.order !== undefined && b.order !== undefined) {
-              return a.order - b.order;
-            }
-            if (a.type === 'income' && b.type === 'bill') return -1;
-            if (a.type === 'bill' && b.type === 'income') return 1;
-            return a.name.localeCompare(b.name);
-        });
+        dayData.entries.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     });
 
     return { daysWithEntries: Array.from(daysMap.values()), allGeneratedEntries: allEntries };
@@ -134,10 +127,10 @@ export function CentseiCalendar({
   
   const getOriginalIdFromInstance = (instanceId: string) => {
     const parts = instanceId.split('-');
-    if (parts.length > 5) { // Assuming UUID is 5 parts
+    if (parts.length > 5) { // Assuming UUID is 5 parts for master
         return parts.slice(0, 5).join('-');
     }
-    return instanceId;
+    return instanceId; // It's likely a non-recurring master ID
   }
 
   const handleDayClick = (day: Date, dayEntries: Entry[]) => {
@@ -176,9 +169,9 @@ export function CentseiCalendar({
     if (isReadOnly || isSelectionMode) return;
     const originalEntryId = getOriginalIdFromInstance(entry.id);
     const originalEntry = entries.find(e => e.id === originalEntryId) || entry;
-
-    setEditingEntry(originalEntry);
-    setGlobalSelectedDate(parseDateInTimezone(originalEntry.date, timezone));
+    const instanceWithDate = { ...originalEntry, date: entry.date, id: entry.id };
+    setEditingEntry(instanceWithDate);
+    setGlobalSelectedDate(parseDateInTimezone(entry.date, timezone));
     setEntryDialogOpen(true);
   }
 
@@ -190,40 +183,44 @@ export function CentseiCalendar({
     e.dataTransfer.effectAllowed = 'move';
     isDraggingRef.current = true;
     setDraggingEntry(entry);
+    draggedElementRef.current = e.currentTarget;
+    e.dataTransfer.setData('text/plain', entry.id); // Necessary for Firefox
   };
   
   const handleDragEnd = () => {
     isDraggingRef.current = false;
     setDraggingEntry(null);
+    draggedElementRef.current = null;
+    calendarRef.current?.querySelectorAll('.drop-indicator').forEach(el => el.remove());
   }
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     if (isReadOnly || isSelectionMode || !isDraggingRef.current) return;
     e.preventDefault();
-    const target = e.currentTarget;
-    calendarRef.current?.querySelectorAll('.drop-indicator').forEach(el => el.remove());
     
-    const dayCell = target.closest('[data-day-cell]') as HTMLElement;
-    if (dayCell) {
-        const dropTarget = target.closest('[data-entry-id]') as HTMLElement;
-        const indicator = document.createElement('div');
-        indicator.className = 'drop-indicator h-1 bg-primary rounded-full my-1';
+    calendarRef.current?.querySelectorAll('.drop-indicator').forEach(el => el.remove());
 
-        if (dropTarget) {
-            const rect = dropTarget.getBoundingClientRect();
-            const isAfter = e.clientY > rect.top + rect.height / 2;
-            if (isAfter) {
-                dropTarget.parentNode?.insertBefore(indicator, dropTarget.nextSibling);
-            } else {
-                dropTarget.parentNode?.insertBefore(indicator, dropTarget);
-            }
+    const dayCell = (e.target as HTMLElement).closest('[data-day-cell]');
+    if (!dayCell) return;
+
+    const indicator = document.createElement('div');
+    indicator.className = 'drop-indicator h-1 bg-primary rounded-full my-1';
+    
+    const entryContainer = dayCell.querySelector('.entry-list-container');
+    if (!entryContainer) return;
+
+    const dropTarget = (e.target as HTMLElement).closest('[data-entry-id]');
+
+    if (dropTarget && dropTarget !== draggedElementRef.current) {
+        const rect = dropTarget.getBoundingClientRect();
+        const isAfter = e.clientY > rect.top + rect.height / 2;
+        if (isAfter) {
+            dropTarget.parentNode?.insertBefore(indicator, dropTarget.nextSibling);
         } else {
-            // If dragging over a day cell but not a specific entry
-            const entryContainer = dayCell.querySelector('.space-y-1\\.5');
-            if (entryContainer) {
-                entryContainer.appendChild(indicator);
-            }
+            dropTarget.parentNode?.insertBefore(indicator, dropTarget);
         }
+    } else if (!dropTarget) { // Dragging over empty space in day cell
+        entryContainer.appendChild(indicator);
     }
   };
 
@@ -234,23 +231,19 @@ export function CentseiCalendar({
     calendarRef.current?.querySelectorAll('.drop-indicator').forEach(el => el.remove());
   }
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement> | { clientY: number, target: EventTarget }) => {
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     if (isReadOnly || isSelectionMode || !draggingEntry) return;
     
-    if ('preventDefault' in e) {
-        e.preventDefault();
-    }
-    calendarRef.current?.querySelectorAll('.drop-indicator').forEach(el => el.remove());
-
+    e.preventDefault();
+    const indicator = calendarRef.current?.querySelector('.drop-indicator');
+    
     const targetElement = e.target as HTMLElement;
-    const dayCell = targetElement.closest('[data-day-cell]') as HTMLElement;
-    const dropTargetEntryEl = targetElement.closest('[data-entry-id]') as HTMLElement;
-
+    const dayCell = targetElement.closest('[data-day-cell]');
     if (!dayCell) {
         handleDragEnd();
         return;
     }
-
+    
     const targetDateStr = dayCell.dataset.date;
     if (!targetDateStr) {
         handleDragEnd();
@@ -259,60 +252,109 @@ export function CentseiCalendar({
 
     const originalEntryId = getOriginalIdFromInstance(draggingEntry.id);
     
-
     setEntries(prevEntries => {
-        let allEntries = [...prevEntries];
-        const updatedEntryIndex = allEntries.findIndex(e => e.id === originalEntryId);
-        if (updatedEntryIndex === -1) return prevEntries;
+        let masterEntries = [...prevEntries];
+        const masterEntryIndex = masterEntries.findIndex(e => e.id === originalEntryId);
+        if (masterEntryIndex === -1) return prevEntries; // Should not happen
         
-        const updatedEntry = { ...allEntries[updatedEntryIndex] };
-        updatedEntry.date = targetDateStr;
-        
-        allEntries.splice(updatedEntryIndex, 1);
+        let masterEntry = { ...masterEntries[masterEntryIndex] };
 
-        const entriesOnTargetDay = allGeneratedEntries
-            .filter(e => e.date === targetDateStr && e.id !== draggingEntry.id)
-            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        // --- Generate current view of all instances to determine new order ---
+        const currentGeneratedEntries = masterEntries.flatMap(me => {
+            const viewStart = startOfMonth(subMonths(new Date(targetDateStr), 1));
+            const viewEnd = endOfMonth(addMonths(new Date(targetDateStr), 1));
+            const instances = [];
 
-        let newOrder: number;
-        if (dropTargetEntryEl) {
-            const dropTargetInstanceId = dropTargetEntryEl.dataset.entryId;
-            const dropTargetEntry = entriesOnTargetDay.find(e => e.id === dropTargetInstanceId);
-            const dropIndex = dropTargetEntry ? entriesOnTargetDay.indexOf(dropTargetEntry) : -1;
-            
-            if (dropIndex !== -1) {
-                const rect = dropTargetEntryEl.getBoundingClientRect();
-                const isAfter = 'clientY' in e ? e.clientY > rect.top + rect.height / 2 : false;
-                
-                if (isAfter) {
-                    newOrder = (dropTargetEntry?.order ?? dropIndex) + 0.5;
-                } else {
-                    newOrder = (dropTargetEntry?.order ?? dropIndex) - 0.5;
+             if (me.recurrence === 'none' || !me.recurrence) {
+                if (parseISO(me.date) >= viewStart && parseISO(me.date) <= viewEnd) {
+                    instances.push(me);
                 }
-
             } else {
-                 newOrder = entriesOnTargetDay.length;
+                // Simplified generation for drop logic context
+                 let currentDate = parseISO(me.date);
+                 while(isBefore(currentDate, viewEnd)) {
+                    if (isAfter(currentDate, viewStart)) {
+                        instances.push({
+                            ...me,
+                            id: `${me.id}-${format(currentDate, 'yyyy-MM-dd')}`,
+                            date: format(currentDate, 'yyyy-MM-dd'),
+                        });
+                    }
+                    if (me.recurrence === 'weekly') currentDate = add(currentDate, { weeks: 1 });
+                    else if (me.recurrence === 'bi-weekly') currentDate = add(currentDate, { weeks: 2 });
+                    else if (me.recurrence) {
+                        const interval = { 'monthly': 1, 'bimonthly': 2, '3months': 3, '6months': 6, '12months': 12 }[me.recurrence];
+                        if (interval) currentDate = add(currentDate, { months: interval });
+                        else break;
+                    } else break;
+                 }
+            }
+            return instances;
+        });
+
+        const entriesOnTargetDay = currentGeneratedEntries
+            .filter(entry => entry.date === targetDateStr && entry.id !== draggingEntry.id)
+            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        
+        // --- Calculate new order ---
+        let newOrder = 0;
+        if (indicator) {
+            const prevSibling = indicator.previousElementSibling as HTMLElement;
+            const nextSibling = indicator.nextElementSibling as HTMLElement;
+            
+            const getOrderFromElement = (el: HTMLElement) => {
+                const id = el.dataset.entryId;
+                const entry = entriesOnTargetDay.find(e => e.id === id);
+                return entry?.order;
+            };
+
+            const prevOrder = prevSibling ? getOrderFromElement(prevSibling) : undefined;
+            const nextOrder = nextSibling ? getOrderFromElement(nextSibling) : undefined;
+
+            if (prevOrder !== undefined && nextOrder !== undefined) {
+                newOrder = (prevOrder + nextOrder) / 2;
+            } else if (prevOrder !== undefined) {
+                newOrder = prevOrder + 1;
+            } else if (nextOrder !== undefined) {
+                newOrder = nextOrder - 1;
+            } else {
+                // Dropped in an empty day or as the only item
+                newOrder = 0;
             }
         } else {
+            // No indicator, drop at the end
             newOrder = entriesOnTargetDay.length;
         }
-        
-        updatedEntry.order = newOrder;
-        
-        allEntries.push(updatedEntry);
 
-        const finalEntriesForDay = allEntries
+        // --- Apply updates to the master entry ---
+        if (masterEntry.recurrence === 'none' || !masterEntry.recurrence) {
+            // It's a non-recurring entry. Change its date and order.
+            masterEntry.date = targetDateStr;
+            masterEntry.order = 0; // It will be the only one on the new day with this masterId
+        } else {
+            // This is complex. For now, we only support reordering, not changing date of recurring instances via D&D.
+            // Reordering a recurring item only affects that day.
+            // A more robust solution would be creating an exception.
+            // For now, let's assume D&D of recurring items changes the master date.
+            masterEntry.date = targetDateStr;
+        }
+        masterEntry.order = newOrder;
+
+        masterEntries[masterEntryIndex] = masterEntry;
+        
+        // --- Renormalize order on the target day ---
+        const finalEntriesForDay = masterEntries
             .filter(e => e.date === targetDateStr)
             .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
         
-        finalEntriesForDay.forEach((entry, index) => {
-            const originalIndexInAll = allEntries.findIndex(e => e.id === getOriginalIdFromInstance(entry.id));
-            if (originalIndexInAll !== -1) {
-                allEntries[originalIndexInAll].order = index;
+        finalEntriesForDay.forEach((entryToUpdate, index) => {
+            const idx = masterEntries.findIndex(e => e.id === entryToUpdate.id);
+            if (idx !== -1) {
+                masterEntries[idx].order = index;
             }
         });
         
-        return allEntries;
+        return masterEntries;
     });
 
     handleDragEnd();
@@ -331,12 +373,25 @@ export function CentseiCalendar({
     cancelDragTimeout();
     
     dragTimeoutRef.current = setTimeout(() => {
-        setDraggingEntry(entry);
         isDraggingRef.current = true;
-        if (navigator.vibrate) {
-            navigator.vibrate(50);
-        }
-    }, 500); // Reduced delay for better responsiveness
+        setDraggingEntry(entry);
+        draggedElementRef.current = e.currentTarget;
+        if (navigator.vibrate) navigator.vibrate(50);
+        
+        // Clone the element for visual feedback
+        const clone = e.currentTarget.cloneNode(true) as HTMLElement;
+        clone.id = 'drag-clone';
+        clone.style.position = 'absolute';
+        clone.style.pointerEvents = 'none';
+        clone.style.zIndex = '1000';
+        clone.style.opacity = '0.8';
+        document.body.appendChild(clone);
+        
+        const touch = e.touches[0];
+        clone.style.left = `${touch.clientX - clone.offsetWidth / 2}px`;
+        clone.style.top = `${touch.clientY - clone.offsetHeight / 2}px`;
+
+    }, 500); 
   };
   
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
@@ -345,54 +400,46 @@ export function CentseiCalendar({
         return;
     }
     
-    if (isDraggingRef.current && calendarRef.current) {
-        e.preventDefault();
-        e.stopPropagation();
+    e.preventDefault();
+    e.stopPropagation();
 
-        document.body.style.overflow = 'hidden';
-
-        const touch = e.touches[0];
-        const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
-        
-        calendarRef.current.querySelectorAll('.drop-indicator').forEach(el => el.remove());
-
-        if (targetElement) {
-            const dayCell = targetElement.closest('[data-day-cell]');
-            const dropTarget = targetElement.closest('[data-entry-id]') as HTMLElement;
-            if (dayCell) {
-                const indicator = document.createElement('div');
-                indicator.className = 'drop-indicator h-1 bg-primary rounded-full my-1';
-                
-                if(dropTarget) {
-                    const rect = dropTarget.getBoundingClientRect();
-                    const isAfter = touch.clientY > rect.top + rect.height / 2;
-                    if (isAfter) {
-                        dropTarget.parentNode?.insertBefore(indicator, dropTarget.nextSibling);
-                    } else {
-                        dropTarget.parentNode?.insertBefore(indicator, dropTarget);
-                    }
-                } else {
-                    const entryContainer = dayCell.querySelector('.space-y-1\\.5');
-                    if (entryContainer) {
-                        entryContainer.appendChild(indicator);
-                    }
-                }
-            }
-        }
+    const touch = e.touches[0];
+    const clone = document.getElementById('drag-clone');
+    if (clone) {
+        clone.style.left = `${touch.clientX - clone.offsetWidth / 2}px`;
+        clone.style.top = `${touch.clientY - clone.offsetHeight / 2}px`;
     }
+
+    const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!targetElement) return;
+
+    // Use a synthetic event object for handleDragOver
+    const syntheticEvent = {
+        preventDefault: () => {},
+        target: targetElement,
+        clientY: touch.clientY,
+    } as unknown as React.DragEvent<HTMLDivElement>;
+
+    handleDragOver(syntheticEvent);
   };
   
   const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
     cancelDragTimeout();
-    document.body.style.overflow = '';
+    
+    const clone = document.getElementById('drag-clone');
+    if (clone) clone.remove();
 
-    if (!isDraggingRef.current || !calendarRef.current) return;
+    if (!isDraggingRef.current) return;
     
     const touch = e.changedTouches[0];
     const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
     
     if (targetElement) {
-        handleDrop({ clientY: touch.clientY, target: targetElement, preventDefault: () => {} } as unknown as React.DragEvent<HTMLDivElement>);
+        const syntheticEvent = {
+            preventDefault: () => {},
+            target: targetElement,
+        } as React.DragEvent<HTMLDivElement>;
+        handleDrop(syntheticEvent);
     }
     
     handleDragEnd();
@@ -479,7 +526,6 @@ export function CentseiCalendar({
             {daysWithEntries.map(({ day, entries: dayEntries }, index) => {
               const dayHasSelectedEntry = dayEntries.some(e => selectedInstanceIds.includes(e.id))
               const dayStr = format(day, 'yyyy-MM-dd');
-              const isCorner = index === 0 || index === 6 || index === 28 || index === 34;
 
               return (
                 <div
@@ -487,11 +533,10 @@ export function CentseiCalendar({
                   data-day-cell
                   data-date={dayStr}
                   className={cn(
-                    "relative flex flex-col h-36 md:h-44 rounded-xl p-2 border transition-all duration-300 ease-in-out transform group",
+                    "relative flex flex-col h-36 md:h-44 rounded-xl p-2 border transition-colors",
                     !isReadOnly && "cursor-pointer",
                     !isSameMonth(day, currentMonth) ? "bg-muted/50 text-muted-foreground" : "bg-card",
-                    !isReadOnly && isSameMonth(day, currentMonth) && !isSelectionMode && "hover:bg-accent hover:shadow-md hover:-translate-y-1",
-                    isCorner && "border-primary/50",
+                    !isReadOnly && isSameMonth(day, currentMonth) && !isSelectionMode && "hover:bg-accent/50",
                     isSameDay(day, selectedDate) && !isSelectionMode && "ring-2 ring-primary ring-offset-2 ring-offset-background",
                     isSelectionMode && "hover:bg-primary/10",
                     isSelectionMode && dayHasSelectedEntry && "ring-2 ring-primary bg-primary/20",
@@ -515,16 +560,8 @@ export function CentseiCalendar({
                         />
                     )}
                   </div>
-                  <ScrollArea 
-                    className="flex-1 mt-1 -mx-2 px-2"
-                    onTouchStart={(e) => {
-                      if (isDraggingRef.current) e.stopPropagation();
-                    }}
-                    onTouchMove={(e) => {
-                      if (isDraggingRef.current) e.stopPropagation();
-                    }}
-                  >
-                    <div className="space-y-1.5 text-xs sm:text-sm">
+                  <ScrollArea className="flex-1 mt-1 -mx-2 px-2">
+                    <div className="space-y-1.5 text-xs sm:text-sm entry-list-container">
                       {dayEntries.map(entry => (
                           <div 
                               key={entry.id}
@@ -537,10 +574,10 @@ export function CentseiCalendar({
                               onTouchEnd={handleTouchEnd}
                               draggable={!isReadOnly && !isSelectionMode}
                               className={cn(
-                                  "px-2 py-1 rounded-full text-left flex items-center gap-2 transition-all duration-200",
+                                  "px-2 py-1 rounded-full text-left flex items-center gap-2 transition-all duration-200 group",
                                   isMobile ? 'touch-action-pan-y' : '',
                                   !isReadOnly && !isSelectionMode && "cursor-grab active:cursor-grabbing hover:shadow-lg",
-                                  (draggingEntry?.id === entry.id) && 'opacity-50 scale-105 shadow-xl',
+                                  (draggingEntry?.id === entry.id) && 'opacity-30',
                                   isSelectionMode && selectedInstanceIds.includes(entry.id) && "opacity-60",
                                   "bg-secondary/50 hover:bg-secondary",
                                   entry.isPaid && "opacity-50 bg-secondary/30",

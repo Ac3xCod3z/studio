@@ -73,7 +73,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
    React.useEffect(() => {
     if (isOpen) {
       const resetDate = entry ? parseDateInTimezone(entry.date, timezone) : selectedDate;
-      const isInstancePaid = entry?.recurrence !== 'none' 
+      const isInstancePaid = entry?.recurrence !== 'none' && entry?.recurrence
         ? entry?.exceptions?.[entry.date]?.isPaid ?? false
         : entry?.isPaid ?? false;
 
