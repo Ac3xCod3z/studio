@@ -3,6 +3,7 @@
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import {
+  add,
   addMonths,
   subMonths,
   format,
@@ -18,6 +19,9 @@ import {
   setYear,
   setMonth,
   getMonth,
+  isAfter,
+  isBefore,
+  parseISO,
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Trash2, TrendingUp, TrendingDown, Repeat, CalendarIcon, Check } from "lucide-react";
@@ -232,133 +236,102 @@ export function CentseiCalendar({
   }
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    if (isReadOnly || isSelectionMode || !draggingEntry) return;
-    
+    if (isReadOnly || isSelectionMode || !draggingEntry) {
+        handleDragEnd();
+        return;
+    }
     e.preventDefault();
-    const indicator = calendarRef.current?.querySelector('.drop-indicator');
-    
-    const targetElement = e.target as HTMLElement;
-    const dayCell = targetElement.closest('[data-day-cell]');
+
+    const dayCell = (e.target as HTMLElement).closest('[data-day-cell]');
     if (!dayCell) {
         handleDragEnd();
         return;
     }
-    
-    const targetDateStr = dayCell.dataset.date;
+
+    const targetDateStr = dayCell.getAttribute('data-date');
     if (!targetDateStr) {
         handleDragEnd();
         return;
     }
 
-    const originalEntryId = getOriginalIdFromInstance(draggingEntry.id);
+    const indicator = calendarRef.current?.querySelector('.drop-indicator');
+    const masterId = getOriginalIdFromInstance(draggingEntry.id);
     
     setEntries(prevEntries => {
         let masterEntries = [...prevEntries];
-        const masterEntryIndex = masterEntries.findIndex(e => e.id === originalEntryId);
-        if (masterEntryIndex === -1) return prevEntries; // Should not happen
+        const masterEntryIndex = masterEntries.findIndex(entry => entry.id === masterId);
+
+        if (masterEntryIndex === -1) {
+            return prevEntries; // Should not happen
+        }
+
+        const masterEntry = { ...masterEntries[masterEntryIndex] };
         
-        let masterEntry = { ...masterEntries[masterEntryIndex] };
-
-        // --- Generate current view of all instances to determine new order ---
-        const currentGeneratedEntries = masterEntries.flatMap(me => {
-            const viewStart = startOfMonth(subMonths(new Date(targetDateStr), 1));
-            const viewEnd = endOfMonth(addMonths(new Date(targetDateStr), 1));
-            const instances = [];
-
-             if (me.recurrence === 'none' || !me.recurrence) {
-                if (parseISO(me.date) >= viewStart && parseISO(me.date) <= viewEnd) {
-                    instances.push(me);
-                }
-            } else {
-                // Simplified generation for drop logic context
-                 let currentDate = parseISO(me.date);
-                 while(isBefore(currentDate, viewEnd)) {
-                    if (isAfter(currentDate, viewStart)) {
-                        instances.push({
-                            ...me,
-                            id: `${me.id}-${format(currentDate, 'yyyy-MM-dd')}`,
-                            date: format(currentDate, 'yyyy-MM-dd'),
-                        });
-                    }
-                    if (me.recurrence === 'weekly') currentDate = add(currentDate, { weeks: 1 });
-                    else if (me.recurrence === 'bi-weekly') currentDate = add(currentDate, { weeks: 2 });
-                    else if (me.recurrence) {
-                        const interval = { 'monthly': 1, 'bimonthly': 2, '3months': 3, '6months': 6, '12months': 12 }[me.recurrence];
-                        if (interval) currentDate = add(currentDate, { months: interval });
-                        else break;
-                    } else break;
-                 }
-            }
-            return instances;
-        });
-
-        const entriesOnTargetDay = currentGeneratedEntries
-            .filter(entry => entry.date === targetDateStr && entry.id !== draggingEntry.id)
-            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-        
-        // --- Calculate new order ---
+        // --- Calculate new order based on indicator position ---
+        const entryContainer = indicator?.parentElement;
+        const siblings = Array.from(entryContainer?.children || []).filter(c => c.hasAttribute('data-entry-id'));
         let newOrder = 0;
+
         if (indicator) {
-            const prevSibling = indicator.previousElementSibling as HTMLElement;
-            const nextSibling = indicator.nextElementSibling as HTMLElement;
-            
-            const getOrderFromElement = (el: HTMLElement) => {
-                const id = el.dataset.entryId;
-                const entry = entriesOnTargetDay.find(e => e.id === id);
-                return entry?.order;
-            };
-
-            const prevOrder = prevSibling ? getOrderFromElement(prevSibling) : undefined;
-            const nextOrder = nextSibling ? getOrderFromElement(nextSibling) : undefined;
-
-            if (prevOrder !== undefined && nextOrder !== undefined) {
-                newOrder = (prevOrder + nextOrder) / 2;
-            } else if (prevOrder !== undefined) {
-                newOrder = prevOrder + 1;
-            } else if (nextOrder !== undefined) {
-                newOrder = nextOrder - 1;
-            } else {
-                // Dropped in an empty day or as the only item
-                newOrder = 0;
+            const prevSibling = indicator.previousElementSibling;
+            if (prevSibling) {
+                const prevId = prevSibling.getAttribute('data-entry-id');
+                const prevEntry = generatedEntries.find(ge => ge.id === prevId);
+                newOrder = (prevEntry?.order ?? 0) + 1;
             }
         } else {
-            // No indicator, drop at the end
-            newOrder = entriesOnTargetDay.length;
+            newOrder = siblings.length > 0 ? (Math.max(...siblings.map(s => {
+                const id = s.getAttribute('data-entry-id');
+                const entry = generatedEntries.find(ge => ge.id === id);
+                return entry?.order ?? 0;
+            })) + 1) : 0;
         }
 
-        // --- Apply updates to the master entry ---
-        if (masterEntry.recurrence === 'none' || !masterEntry.recurrence) {
-            // It's a non-recurring entry. Change its date and order.
+        const isSameDayDrop = draggingEntry.date === targetDateStr;
+
+        if (masterEntry.recurrence === 'none' || !masterEntry.recurrence || !isSameDayDrop) {
             masterEntry.date = targetDateStr;
-            masterEntry.order = 0; // It will be the only one on the new day with this masterId
+            masterEntry.order = newOrder;
+            masterEntries[masterEntryIndex] = masterEntry;
         } else {
-            // This is complex. For now, we only support reordering, not changing date of recurring instances via D&D.
-            // Reordering a recurring item only affects that day.
-            // A more robust solution would be creating an exception.
-            // For now, let's assume D&D of recurring items changes the master date.
-            masterEntry.date = targetDateStr;
+            // Reordering a recurring item on the same day is not supported by changing the master.
+            // A more complex implementation would involve exceptions for order.
+            // For now, let's log that this action is simplified.
+            console.log("Reordering recurring instances on the same day is a visual-only operation for now.");
+            // To make it persistent, one would need to implement order exceptions.
         }
-        masterEntry.order = newOrder;
 
-        masterEntries[masterEntryIndex] = masterEntry;
-        
-        // --- Renormalize order on the target day ---
-        const finalEntriesForDay = masterEntries
-            .filter(e => e.date === targetDateStr)
+        // Renormalize ordering for the target day
+        const entriesOnTargetDay = masterEntries
+            .filter(entry => entry.date === targetDateStr)
             .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
         
-        finalEntriesForDay.forEach((entryToUpdate, index) => {
-            const idx = masterEntries.findIndex(e => e.id === entryToUpdate.id);
-            if (idx !== -1) {
-                masterEntries[idx].order = index;
+        entriesOnTargetDay.forEach((entry, index) => {
+            const idxToUpdate = masterEntries.findIndex(me => me.id === entry.id);
+            if (idxToUpdate !== -1) {
+                masterEntries[idxToUpdate].order = index;
             }
         });
+        
+        // Renormalize ordering for the source day if it was different
+        if (!isSameDayDrop) {
+            const entriesOnSourceDay = masterEntries
+                .filter(entry => entry.date === draggingEntry.date)
+                .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+            
+            entriesOnSourceDay.forEach((entry, index) => {
+                const idxToUpdate = masterEntries.findIndex(me => me.id === entry.id);
+                if (idxToUpdate !== -1) {
+                    masterEntries[idxToUpdate].order = index;
+                }
+            });
+        }
         
         return masterEntries;
     });
 
     handleDragEnd();
-  };
+};
   
   const cancelDragTimeout = useCallback(() => {
     if (dragTimeoutRef.current) {
@@ -438,7 +411,7 @@ export function CentseiCalendar({
         const syntheticEvent = {
             preventDefault: () => {},
             target: targetElement,
-        } as React.DragEvent<HTMLDivElement>;
+        } as unknown as React.DragEvent<HTMLDivElement>;
         handleDrop(syntheticEvent);
     }
     

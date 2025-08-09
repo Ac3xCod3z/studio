@@ -105,7 +105,9 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry
             const finalDate = setDate(currentDate, dayForMonth);
 
             if ((isAfter(finalDate, start) || isSameDay(finalDate, start)) && (isBefore(finalDate, end) || isSameDay(finalDate, end))) {
-                instances.push(createInstance(finalDate));
+                 if (isSameMonth(finalDate, currentDate)) {
+                    instances.push(createInstance(finalDate));
+                }
             }
 
             currentDate = add(currentDate, { months: recurrenceInterval });
