@@ -4,9 +4,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import useLocalStorage from "@/hooks/use-local-storage";
 import { useMedia } from "react-use";
-import { auth } from "@/lib/firebase";
-import type { User } from "firebase/auth";
-import { getRedirectResult, signInWithRedirect, signOut } from "firebase/auth";
 
 import { EntryDialog } from "./entry-dialog";
 import { SettingsDialog } from "./settings-dialog";
@@ -15,7 +12,7 @@ import { MonthlyBreakdownDialog } from "./monthly-breakdown-dialog";
 import { MonthlySummaryDialog } from "./monthly-summary-dialog";
 import { CalculatorDialog } from "./calculator-dialog"; // Import the new component
 import { Logo } from "./icons";
-import { Settings, Menu, Plus, CalendarSync, Loader2, LogOut, Trash2, BarChartBig, PieChart, CheckCircle2, Calculator } from "lucide-react";
+import { Settings, Menu, Plus, Trash2, BarChartBig, PieChart, CheckCircle2, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
@@ -37,14 +34,6 @@ import { recurrenceIntervalMonths } from "@/lib/constants";
 import { ScrollArea } from "./ui/scroll-area";
 import { scheduleNotifications, cancelAllNotifications } from "@/lib/notification-manager";
 import { useToast } from "@/hooks/use-toast";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-
 
 const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezone: string): Entry[] => {
     if (!entry.date) return [];
@@ -56,52 +45,34 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
     // A map to hold final instances, ensuring no duplicate dates.
     const instanceMap = new Map<string, Entry>();
 
-    const createInstance = (date: Date): Entry => {
+    const createInstance = (date: Date, overridePaidStatus?: boolean): Entry => {
         const dateStr = format(date, 'yyyy-MM-dd');
         
-        // This is a normal instance, so first check for exceptions on its date
         const exception = entry.exceptions?.[dateStr];
-        if (exception) {
-          // If an exception exists for paid status, it takes highest priority.
-          if (typeof exception.isPaid === 'boolean') {
-              return {
-                  ...entry,
-                  date: dateStr,
-                  id: `${entry.id}-${dateStr}`,
-                  isPaid: exception.isPaid,
-                  order: exception.order ?? entry.order,
-              };
-          }
-        }
+        
+        let isPaid = overridePaidStatus ?? false;
 
-        // If it's a non-recurring entry, its own isPaid flag is the next source of truth.
-        if (entry.recurrence === 'none') {
-            return {
-                ...entry,
-                date: dateStr,
-                id: entry.id, // Non-recurring entries have a stable ID.
-                isPaid: entry.isPaid ?? false,
-                order: entry.order,
-            };
+        if (exception && typeof exception.isPaid === 'boolean') {
+            isPaid = exception.isPaid;
+        } else if (entry.recurrence === 'none') {
+            isPaid = entry.isPaid ?? false;
+        } else {
+            const isPast = isBefore(date, todayInTimezone);
+            const isToday = isSameDay(date, todayInTimezone);
+            const isAfter9AM = nowInTimezone.getHours() >= 9;
+
+            if (isPast) {
+                isPaid = entry.type === 'income' || !!entry.isAutoPay;
+            } else if (isToday && isAfter9AM) {
+                isPaid = entry.type === 'income' || !!entry.isAutoPay;
+            }
         }
         
-        // For recurring entries without a manual paid exception, apply auto-completion logic.
-        const isPast = isBefore(date, todayInTimezone);
-        const isToday = isSameDay(date, todayInTimezone);
-        const isAfter9AM = nowInTimezone.getHours() >= 9;
-
-        let shouldBePaid = false;
-        if (isPast) {
-            shouldBePaid = entry.type === 'income' || !!entry.isAutoPay;
-        } else if (isToday && isAfter9AM) {
-            shouldBePaid = entry.type === 'income' || !!entry.isAutoPay;
-        }
-
         return {
             ...entry,
             date: dateStr,
             id: `${entry.id}-${dateStr}`,
-            isPaid: shouldBePaid,
+            isPaid: isPaid,
             order: exception?.order ?? entry.order,
         };
     };
@@ -157,24 +128,20 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
     const movedOrSkippedDates = new Set<string>();
     if (entry.exceptions) {
         Object.entries(entry.exceptions).forEach(([dateStr, exception]) => {
-             // An exception could move an instance TO a new date, or just modify it in-place.
-             movedOrSkippedDates.add(dateStr); // The original date is always affected.
+             movedOrSkippedDates.add(dateStr);
             
              if (exception.movedTo) {
-                // This instance was moved. Add it to its new location if within range.
                 const movedToDate = parseISO(exception.movedTo);
                 if (movedToDate >= start && movedToDate <= end) {
                     instanceMap.set(exception.movedTo, {
                         ...entry,
                         id: `${entry.id}-${exception.movedTo}`,
                         date: exception.movedTo,
-                        isPaid: exception.isPaid ?? entry.isPaid ?? false,
+                        isPaid: exception.isPaid ?? false,
                         order: exception.order ?? entry.order,
                     });
                 }
              } else if (exception.isPaid !== undefined || exception.order !== undefined) {
-                 // An in-place modification (paid, reorder) on a date that may or may not
-                 // be part of the regular series.
                  const exceptionDate = parseISO(dateStr);
                  if (exceptionDate >= start && exceptionDate <= end) {
                     instanceMap.set(dateStr, {
@@ -192,7 +159,8 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
     potentialDates.forEach(date => {
         const dateStr = format(date, 'yyyy-MM-dd');
         if (!movedOrSkippedDates.has(dateStr) && !instanceMap.has(dateStr)) {
-            instanceMap.set(dateStr, createInstance(date));
+            const instance = createInstance(date, entry.exceptions?.[dateStr]?.isPaid);
+            instanceMap.set(dateStr, instance);
         }
     });
 
@@ -212,7 +180,6 @@ export default function CentseiDashboard() {
   const [timezone, setTimezone] = useLocalStorage<string>('centseiTimezone', 'UTC');
   const [weeklyBalances, setWeeklyBalances] = useLocalStorage<WeeklyBalances>("centseiWeeklyBalances", {});
   const [notificationsEnabled, setNotificationsEnabled] = useLocalStorage('centseiNotificationsEnabled', false);
-  const [user, setUser] = useState<User | null>(null);
 
   const [isEntryDialogOpen, setEntryDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setSettingsDialogOpen] = useState(false);
@@ -227,8 +194,6 @@ export default function CentseiDashboard() {
   const [isMounted, setIsMounted] = useState(false);
   const isMobile = useMedia("(max-width: 1024px)", false);
   const { toast } = useToast();
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedInstances, setSelectedInstances] = useState<SelectedInstance[]>([]);
@@ -271,19 +236,15 @@ export default function CentseiDashboard() {
         const updatedEntries = [...prevEntries];
         const masterEntry = { ...updatedEntries[masterEntryIndex] };
         
-        if (masterEntry.recurrence === 'none') {
-             masterEntry.date = newDate;
-        } else {
-            // When moving a recurring entry, we change its master start date
-            masterEntry.date = newDate;
-            
-            // And clean up any now-irrelevant "movedTo" exceptions from the past
-            const originalDateStr = movedEntry.date;
-            if (masterEntry.exceptions && masterEntry.exceptions[originalDateStr]) {
-                delete masterEntry.exceptions[originalDateStr];
-                if (Object.keys(masterEntry.exceptions).length === 0) {
-                    delete masterEntry.exceptions;
-                }
+        // When moving a recurring entry, we change its master start date
+        masterEntry.date = newDate;
+        
+        // And clean up any now-irrelevant "movedTo" exceptions from the past
+        const originalDateStr = movedEntry.date;
+        if (masterEntry.exceptions && masterEntry.exceptions[originalDateStr]) {
+            delete masterEntry.exceptions[originalDateStr];
+            if (Object.keys(masterEntry.exceptions).length === 0) {
+                delete masterEntry.exceptions;
             }
         }
 
@@ -319,45 +280,10 @@ export default function CentseiDashboard() {
     toggleSelectionMode();
   };
 
-
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-        setUser(user);
-        setIsAuthLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
-  
-  useEffect(() => {
-      const handleRedirectResult = async () => {
-          try {
-              const result = await getRedirectResult(auth);
-              if (result) {
-                  setUser(result.user);
-                  toast({ title: "Signed in successfully!" });
-              }
-          } catch (error: any) {
-              console.error("Google Sign-In Redirect Error:", error);
-              toast({ title: "Sign-in failed", description: error.message, variant: "destructive" });
-          } finally {
-              setIsAuthLoading(false);
-          }
-      };
-      if(isAuthLoading) {
-        handleRedirectResult();
-      }
-  }, [toast, isAuthLoading]);
-
   const handleNotificationsToggle = (enabled: boolean) => {
     setNotificationsEnabled(enabled);
   };
   
-  const handleSignOut = async () => {
-    await signOut(auth);
-    setUser(null);
-    toast({ title: "Signed out." });
-  };
-
   useEffect(() => {
     if (!isMounted) return;
     if (notificationsEnabled) {
@@ -595,34 +521,8 @@ export default function CentseiDashboard() {
       }
   }, [selectedDate, allGeneratedEntries, timezone, weeklyBalances]);
 
-  const handleSyncCalendar = async () => {
-    if (!user) {
-        toast({ title: "Not Signed In", description: "Please connect your Google Account in Settings first.", variant: "destructive" });
-        return;
-    }
-    setIsSyncing(true);
-    try {
-        const idToken = await user.getIdToken();
-        const result = await syncToGoogleCalendar({
-            entries: allGeneratedEntries.filter(e => isSameMonth(parseDateInTimezone(e.date, timezone), selectedDate)),
-            timezone,
-            accessToken: idToken,
-        });
 
-        toast({
-            title: "Sync Complete!",
-            description: `${result.syncedCount} events were synced to your Google Calendar.`,
-        });
-
-    } catch (error) {
-        console.error("Google Calendar Sync Error:", error);
-        toast({ title: "Sync Failed", description: "Could not sync events to Google Calendar.", variant: "destructive" });
-    } finally {
-        setIsSyncing(false);
-    }
-  };
-
-  if (!isMounted || isAuthLoading) {
+  if (!isMounted) {
     return (
       <div className="flex h-screen w-full flex-col bg-background">
         <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
@@ -691,32 +591,6 @@ export default function CentseiDashboard() {
             <Settings className="h-5 w-5" />
           </Button>
 
-          {user && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                  <Avatar>
-                    <AvatarImage src={user.photoURL || ''} alt={user.displayName || 'User'} />
-                    <AvatarFallback>{user.displayName?.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuItem onClick={handleSyncCalendar} disabled={isSyncing}>
-                  {isSyncing ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                      <CalendarSync className="mr-2 h-4 w-4" />
-                  )}
-                  <span>Sync Calendar</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleSignOut}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
 
           {isMobile && (
             <Sheet open={isMobileSheetOpen} onOpenChange={setMobileSheetOpen}>
@@ -825,7 +699,6 @@ export default function CentseiDashboard() {
         timezone={timezone}
         onTimezoneChange={setTimezone}
         onNotificationsToggle={handleNotificationsToggle}
-        user={user}
       />
 
        <AlertDialog open={isBulkDeleteAlertOpen} onOpenChange={setBulkDeleteAlertOpen}>
@@ -881,5 +754,3 @@ export default function CentseiDashboard() {
     </div>
   );
 }
-
-    

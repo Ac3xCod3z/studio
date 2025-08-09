@@ -45,8 +45,6 @@ import { useToast } from "@/hooks/use-toast";
 import { timezones } from "@/lib/timezones";
 import { ScrollArea } from "./ui/scroll-area";
 import useLocalStorage from "@/hooks/use-local-storage";
-import { auth, googleProvider } from "@/lib/firebase";
-import { signInWithRedirect, type User } from "firebase/auth";
 import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
 
 const formSchema = z.object({
@@ -62,7 +60,6 @@ type SettingsDialogProps = {
   timezone: string;
   onTimezoneChange: (timezone: string) => void;
   onNotificationsToggle: (enabled: boolean) => void;
-  user: User | null;
 };
 
 export function SettingsDialog({
@@ -73,7 +70,6 @@ export function SettingsDialog({
   timezone,
   onTimezoneChange,
   onNotificationsToggle,
-  user,
 }: SettingsDialogProps) {
   const [recommendation, setRecommendation] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -96,15 +92,6 @@ export function SettingsDialog({
     }
   }, [isOpen]);
 
-  const handleGoogleSignIn = async () => {
-    try {
-      await signInWithRedirect(auth, googleProvider);
-    } catch (error) {
-      console.error("Google Sign-In Error:", error);
-      toast({ title: "Sign-in failed", description: "Could not sign in with Google.", variant: "destructive" });
-    }
-  };
-  
   const handleExportData = () => {
     try {
       const dataToExport = {
@@ -303,20 +290,6 @@ export function SettingsDialog({
               
               <Separator />
               
-              <div className="space-y-2">
-                  <h3 className="font-semibold">Google Calendar</h3>
-                  <p className="text-sm text-muted-foreground">
-                      {user ? `Connected as ${user.displayName}. Sync and sign out via the user menu in the header.` : "Connect your account to sync your financial entries."}
-                  </p>
-                  {!user && (
-                      <Button onClick={handleGoogleSignIn} className="w-full btn-primary-hover">
-                          Connect Google Calendar
-                      </Button>
-                  )}
-              </div>
-
-              <Separator />
-
               <div className="space-y-2">
                   <h3 className="font-semibold">Share Calendar</h3>
                   <p className="text-sm text-muted-foreground">Generate a read-only link to share your calendar with others.</p>
