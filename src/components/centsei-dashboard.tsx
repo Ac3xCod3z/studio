@@ -60,35 +60,36 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
     const createInstance = (date: Date): Entry => {
         const dateStr = format(date, 'yyyy-MM-dd');
         
-        const isPast = isBefore(date, todayInTimezone);
-        const isToday = isSameDay(date, todayInTimezone);
-        const isAfter9AM = nowInTimezone.getHours() >= 9;
+        let isPaid: boolean;
+        const exception = entry.exceptions?.[dateStr];
 
-        const exceptionIsPaid = entry.exceptions?.[dateStr]?.isPaid;
+        if (exception && typeof exception.isPaid === 'boolean') {
+            // Priority 1: A manual exception exists for this date.
+            isPaid = exception.isPaid;
+        } else if (entry.recurrence === 'none') {
+            // Priority 2: For non-recurring entries, use the master isPaid flag.
+            isPaid = entry.isPaid ?? false;
+        } else {
+            // Priority 3: Apply automatic completion logic if no manual override exists.
+            const isPast = isBefore(date, todayInTimezone);
+            const isToday = isSameDay(date, todayInTimezone);
+            const isAfter9AM = nowInTimezone.getHours() >= 9;
 
-        // If there's an explicit exception for 'isPaid', it takes highest priority.
-        if (typeof exceptionIsPaid === 'boolean') {
-            return {
-                ...entry,
-                date: dateStr,
-                id: `${entry.id}-${dateStr}`,
-                isPaid: exceptionIsPaid,
-            };
-        }
-        
-        // Otherwise, apply automatic completion logic.
-        let shouldBePaid = false;
-        if (isPast) {
-            shouldBePaid = entry.type === 'income' || !!entry.isAutoPay;
-        } else if (isToday && isAfter9AM) {
-            shouldBePaid = entry.type === 'income' || !!entry.isAutoPay;
+            let shouldBePaid = false;
+            if (isPast) {
+                shouldBePaid = entry.type === 'income' || !!entry.isAutoPay;
+            } else if (isToday && isAfter9AM) {
+                shouldBePaid = entry.type === 'income' || !!entry.isAutoPay;
+            }
+            isPaid = shouldBePaid;
         }
 
         return {
             ...entry,
             date: dateStr,
             id: `${entry.id}-${dateStr}`,
-            isPaid: shouldBePaid,
+            isPaid: isPaid,
+            order: exception?.order ?? entry.order,
         };
     };
     
@@ -758,5 +759,3 @@ export default function CentseiDashboard() {
     </div>
   );
 }
-
-
