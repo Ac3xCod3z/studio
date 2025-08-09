@@ -47,17 +47,25 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 
-const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry[] => {
+const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezone: string): Entry[] => {
     const instances: Entry[] = [];
     if (!entry.date) return [];
     
+    const today = toZonedTime(new Date(), timezone);
     const originalEntryDate = parseISO(entry.date);
     
     if (isAfter(originalEntryDate, end)) return [];
 
     const createInstance = (date: Date): Entry => {
         const dateStr = format(date, 'yyyy-MM-dd');
-        const isPaid = entry.exceptions?.[dateStr]?.isPaid ?? entry.isPaid ?? false;
+        
+        const isPastOrToday = isBefore(date, today) || isSameDay(date, today);
+        const shouldBePaid = isPastOrToday && (entry.type === 'income' || entry.isAutoPay);
+
+        // An exception for this date takes precedence
+        const exceptionIsPaid = entry.exceptions?.[dateStr]?.isPaid;
+        const isPaid = typeof exceptionIsPaid === 'boolean' ? exceptionIsPaid : (shouldBePaid || (entry.isPaid ?? false));
+
         return {
             ...entry,
             date: dateStr,
@@ -119,7 +127,7 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date): Entry
     if (entry.recurrence === 'none' || !entry.recurrence) {
         const entryDate = parseISO(entry.date);
         if (entryDate >= start && entryDate <= end) {
-            instances.push(entry);
+            instances.push(createInstance(entryDate));
         }
     }
     return instances;
@@ -353,9 +361,9 @@ export default function CentseiDashboard() {
     const viewEnd = endOfMonth(addMonths(new Date(), 12));
 
     return entries.flatMap((e) => {
-        return generateRecurringInstances(e, viewStart, viewEnd);
+        return generateRecurringInstances(e, viewStart, viewEnd, timezone);
     });
-  }, [entries, isMounted]);
+  }, [entries, isMounted, timezone]);
 
   useEffect(() => {
     if (!isMounted) return;

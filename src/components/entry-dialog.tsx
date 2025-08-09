@@ -41,9 +41,10 @@ const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   amount: z.coerce.number().positive({ message: "Amount must be a positive number." }),
   date: z.date({ required_error: "A date is required." }),
-  recurrence: z.enum(["none", "weekly", "bi-weekly", "monthly", "bimonthly", "3months", "6months", "12months"]).default("none"),
+  recurrence: z.enum(["none", "weekly", "bi-weekly", "monthly", "bimonthly", "3months", "6months", "12months"]),
   category: z.enum(BillCategories).optional(),
   isPaid: z.boolean().optional(),
+  isAutoPay: z.boolean().optional(),
 });
 
 type EntryFormProps = {
@@ -69,6 +70,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
   });
   
   const entryType = form.watch("type");
+  const isAutoPay = form.watch("isAutoPay");
 
    React.useEffect(() => {
     if (isOpen) {
@@ -85,6 +87,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
         recurrence: entry?.recurrence || 'none',
         category: entry?.category,
         isPaid: isInstancePaid,
+        isAutoPay: entry?.isAutoPay || false,
       });
     }
   }, [isOpen, selectedDate, entry, timezone, form]);
@@ -98,6 +101,7 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
     
     if (values.type !== 'bill') {
       dataToSave.category = undefined;
+      dataToSave.isAutoPay = undefined;
     }
 
     if (entry) {
@@ -280,25 +284,51 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, entry, selected
                     </FormItem>
                 )}
                 />
-                <FormField
-                  control={form.control}
-                  name="isPaid"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>
-                          Mark as Paid
-                        </FormLabel>
-                      </div>
-                    </FormItem>
-                  )}
-                />
+
+                {entryType === 'bill' && (
+                  <FormField
+                    control={form.control}
+                    name="isAutoPay"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            Set up as Auto-Pay
+                          </FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                )}
+                
+                {(!isAutoPay || entryType === 'income') && (
+                    <FormField
+                    control={form.control}
+                    name="isPaid"
+                    render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
+                        <FormControl>
+                            <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                            <FormLabel>
+                            Mark as Paid
+                            </FormLabel>
+                        </div>
+                        </FormItem>
+                    )}
+                    />
+                )}
+
                 <DialogFooter className="pt-4 sm:justify-between">
                 {entry && onDelete && (
                     <Button type="button" variant="destructive" onClick={handleDelete} className="mr-auto">

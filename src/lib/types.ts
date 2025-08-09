@@ -42,6 +42,7 @@ export const EntrySchema = z.object({
   category: z.enum(BillCategories).optional(),
   order: z.number().optional(),
   isPaid: z.boolean().optional(),
+  isAutoPay: z.boolean().optional(),
   // For recurring entries, this can track exceptions like specific dates being paid or moved.
   exceptions: z.record(z.object({ 
     isPaid: z.boolean().optional(),
