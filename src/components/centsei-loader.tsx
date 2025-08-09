@@ -51,6 +51,7 @@ export default function CentseiLoader() {
   const [animationComplete, setAnimationComplete] = useState(false);
   const logoRef = useRef(null);
   const nameRef = useRef(null);
+  const taglineRef = useRef(null);
   const containerRef = useRef(null);
 
   useEffect(() => {
@@ -65,8 +66,8 @@ export default function CentseiLoader() {
       },
     });
 
-    // 1. Fade in logo and name
-    tl.fromTo([logoRef.current, nameRef.current], 
+    // 1. Fade in logo, name, and tagline
+    tl.fromTo([logoRef.current, nameRef.current, taglineRef.current], 
         { opacity: 0, y: 20 },
         { opacity: 1, y: 0, duration: 0.8, ease: 'power2.out', stagger: 0.2 }
     )
@@ -84,7 +85,8 @@ export default function CentseiLoader() {
         ease: 'power1.in',
         transformOrigin: "center center",
     }, "swirl")
-    .to(logoRef.current, 
+    // 3. Fade out logo and tagline together
+    .to([logoRef.current, taglineRef.current], 
         { opacity: 0, scale: 0.8, duration: 0.5, ease: 'power2.in' },
         "-=0.5" 
     )
@@ -99,12 +101,17 @@ export default function CentseiLoader() {
   }
 
   return (
-    <div ref={containerRef} className="flex h-screen w-full items-center justify-center bg-background flex-col gap-4 overflow-hidden">
-      <div ref={logoRef}>
-        <Logo className="h-20 w-20 text-primary" />
+    <div ref={containerRef} className="relative flex h-screen w-full items-center justify-center bg-background flex-col gap-4 overflow-hidden">
+      <div className='flex flex-col items-center justify-center gap-4'>
+        <div ref={logoRef}>
+            <Logo className="h-20 w-20 text-primary" />
+        </div>
+        <div ref={nameRef}>
+            <h1 className="text-4xl font-bold tracking-tight">Centsei</h1>
+        </div>
       </div>
-      <div ref={nameRef}>
-        <h1 className="text-4xl font-bold tracking-tight">Centsei</h1>
+      <div ref={taglineRef} className="absolute bottom-10">
+        <p className="text-muted-foreground text-lg">Your Wallets Mr.Miyagi</p>
       </div>
     </div>
   );
