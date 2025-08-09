@@ -125,7 +125,23 @@ export function CentseiCalendar({
     });
 
     daysMap.forEach(dayData => {
-        dayData.entries.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        dayData.entries.sort((a, b) => {
+            // Prioritize manual order if it exists
+            const aHasOrder = a.order !== undefined && a.order !== null;
+            const bHasOrder = b.order !== undefined && b.order !== null;
+            
+            if (aHasOrder && bHasOrder) return a.order! - b.order!;
+            if (aHasOrder) return -1; // a comes first if it has order
+            if (bHasOrder) return 1;  // b comes first if it has order
+
+            // If no manual order, apply default sorting logic
+            // 1. Income comes before bills
+            if (a.type === 'income' && b.type === 'bill') return -1;
+            if (a.type === 'bill' && b.type === 'income') return 1;
+            
+            // 2. Sort by amount descending (highest to lowest)
+            return b.amount - a.amount;
+        });
     });
 
     return { daysWithEntries: Array.from(daysMap.values()) };
