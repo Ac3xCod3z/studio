@@ -56,6 +56,7 @@ export function CalculatorDialog({ isOpen, onClose }: CalculatorDialogProps) {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (!event.key) return;
       if (/[0-9]/.test(event.key)) {
         inputDigit(event.key);
       } else if (event.key === '.') {
