@@ -77,7 +77,7 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
             return {
                 ...entry,
                 date: dateStr,
-                id: `${entry.id}-${dateStr}`, // Non-recurring still get a unique ID for consistency
+                id: entry.id, // Non-recurring entries have a stable ID.
                 isPaid: entry.isPaid ?? false,
                 order: exception?.order ?? entry.order,
             };
@@ -163,6 +163,7 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
     if (entry.exceptions) {
         Object.entries(entry.exceptions).forEach(([dateStr, exception]) => {
             const exceptionDate = parseISO(dateStr);
+
              // If an entry was moved, we add it to its new date
             if (exception.movedTo) {
                 const movedDate = parseISO(exception.movedTo);
@@ -180,8 +181,15 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
             // If there's a paid exception for a date that might be outside the new recurring schedule,
             // ensure it's still shown if it's within the viewable calendar range.
             if (typeof exception.isPaid === 'boolean' && (exceptionDate >= start && exceptionDate <= end)) {
-                const alreadyExists = instances.some(inst => inst.date === dateStr);
-                if (!alreadyExists) {
+                const instanceIndex = instances.findIndex(inst => inst.date === dateStr);
+                if (instanceIndex > -1) {
+                    // If instance already exists (from normal recurrence), update its paid status
+                    instances[instanceIndex].isPaid = exception.isPaid;
+                    if(exception.order) {
+                       instances[instanceIndex].order = exception.order;
+                    }
+                } else {
+                    // If it doesn't exist, it's likely an old paid entry we need to preserve
                     instances.push({
                         ...entry,
                         id: `${entry.id}-${dateStr}`,
@@ -268,9 +276,25 @@ export default function CentseiDashboard() {
 
         const updatedEntries = [...prevEntries];
         const masterEntry = { ...updatedEntries[masterEntryIndex] };
+        
+        if (masterEntry.recurrence === 'none') {
+             masterEntry.date = newDate;
+        } else {
+            // For recurring entries, create an exception for the original date
+            // to mark it as "moved" and then change the master date.
+            const originalDateStr = movedEntry.date;
+            masterEntry.exceptions = {
+                ...masterEntry.exceptions,
+                [originalDateStr]: {
+                    ...masterEntry.exceptions?.[originalDateStr],
+                    movedTo: newDate
+                }
+            };
+            // The master date change will reschedule future events.
+            // But we might want to just move the single instance
+             masterEntry.date = newDate;
+        }
 
-        // For all entries, update the master date to reschedule the series
-        masterEntry.date = newDate;
 
         updatedEntries[masterEntryIndex] = masterEntry;
         return updatedEntries;

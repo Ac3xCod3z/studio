@@ -77,8 +77,8 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, onCopy, entry, 
     if (isOpen) {
       // If we are copying (entry.id is empty), use the selected date from calendar
       const resetDate = entry && entry.id ? parseDateInTimezone(entry.date, timezone) : selectedDate;
-      const isInstancePaid = entry && entry.recurrence !== 'none'
-        ? entry.exceptions?.[entry.date]?.isPaid ?? entry.isPaid
+      const isInstancePaid = entry?.recurrence !== 'none'
+        ? entry?.exceptions?.[entry.date]?.isPaid ?? entry?.isPaid
         : entry?.isPaid ?? false;
 
       form.reset({
