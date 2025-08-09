@@ -1,4 +1,3 @@
-
 // src/lib/types.ts
 import { z } from 'zod';
 
@@ -39,12 +38,16 @@ export const EntrySchema = z.object({
   name: z.string(),
   amount: z.number(),
   type: z.enum(['bill', 'income']),
-  recurrence: z.enum(["none", "weekly", "bi-weekly", "monthly", "bimonthly", "3months", "6months", "12months"]).optional(),
+  recurrence: z.enum(["none", "weekly", "bi-weekly", "monthly", "bimonthly", "3months", "6months", "12months"]),
   category: z.enum(BillCategories).optional(),
   order: z.number().optional(),
   isPaid: z.boolean().optional(),
-  // New field to track exceptions for recurring entries, e.g., which dates are paid
-  exceptions: z.record(z.object({ isPaid: z.boolean() })).optional(), 
+  // For recurring entries, this can track exceptions like specific dates being paid or moved.
+  exceptions: z.record(z.object({ 
+    isPaid: z.boolean().optional(),
+    movedTo: z.string().optional(), // YYYY-MM-DD
+    order: z.number().optional(),
+  })).optional(),
 });
 
 export type Entry = z.infer<typeof EntrySchema>;
