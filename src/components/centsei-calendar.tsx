@@ -34,6 +34,7 @@ import { Checkbox } from "./ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { useMedia } from "react-use";
+import { parseISO } from "date-fns/fp";
 
 if (typeof window !== "undefined") {
     gsap.registerPlugin(MotionPathPlugin);
@@ -124,24 +125,25 @@ export function CentseiCalendar({
 
     daysMap.forEach(dayData => {
         dayData.entries.sort((a, b) => {
-            const aHasOrder = a.order !== undefined && a.order !== null;
-            const bHasOrder = b.order !== undefined && b.order !== null;
+             const aHasOrder = a.order !== undefined && a.order !== null;
+             const bHasOrder = b.order !== undefined && b.order !== null;
 
-            // If both have manual order, respect it.
-            if (aHasOrder && bHasOrder) {
-                return a.order! - b.order!;
-            }
-            // If only one has manual order, it comes first.
-            if (aHasOrder) return -1;
-            if (bHasOrder) return 1;
+             // If one has manual order and the other doesn't, the one with order comes first.
+             if (aHasOrder && !bHasOrder) return -1;
+             if (!aHasOrder && bHasOrder) return 1;
 
-            // --- Default Sorting Logic ---
-            // 1. Income comes before bills.
-            if (a.type === 'income' && b.type === 'bill') return -1;
-            if (a.type === 'bill' && b.type === 'income') return 1;
-            
-            // 2. Sort by amount descending (highest to lowest).
-            return b.amount - a.amount;
+             // If both have manual order, sort by that.
+             if (aHasOrder && bHasOrder) {
+                 return a.order! - b.order!;
+             }
+
+             // --- Default Sorting Logic (no manual order) ---
+             // 1. Income comes before bills.
+             if (a.type === 'income' && b.type === 'bill') return -1;
+             if (a.type === 'bill' && b.type === 'income') return 1;
+             
+             // 2. Sort by amount descending (highest to lowest).
+             return b.amount - a.amount;
         });
     });
 
