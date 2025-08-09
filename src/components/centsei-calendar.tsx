@@ -1,3 +1,4 @@
+
 // src/components/centsei-calendar.tsx
 "use client";
 
@@ -219,10 +220,7 @@ export function CentseiCalendar({
         } else {
             // If dragging over a day cell but not a specific entry
             const entryContainer = dayCell.querySelector('.space-y-1\\.5');
-            if (entryContainer && entryContainer.children.length > 0) {
-                 // default to end of list if not over anything specific
-                 entryContainer.appendChild(indicator);
-            } else if (entryContainer) {
+            if (entryContainer) {
                 entryContainer.appendChild(indicator);
             }
         }
@@ -260,7 +258,7 @@ export function CentseiCalendar({
     }
 
     const originalEntryId = getOriginalIdFromInstance(draggingEntry.id);
-    const dropTargetInstanceId = dropTargetEntryEl?.dataset.entryId ? getOriginalIdFromInstance(dropTargetEntryEl.dataset.entryId) : null;
+    
 
     setEntries(prevEntries => {
         let allEntries = [...prevEntries];
@@ -270,22 +268,28 @@ export function CentseiCalendar({
         const updatedEntry = { ...allEntries[updatedEntryIndex] };
         updatedEntry.date = targetDateStr;
         
-        // Remove the entry to be re-inserted later
         allEntries.splice(updatedEntryIndex, 1);
 
-        const entriesOnTargetDay = allEntries
-            .filter(e => e.date === targetDateStr)
+        const entriesOnTargetDay = allGeneratedEntries
+            .filter(e => e.date === targetDateStr && e.id !== draggingEntry.id)
             .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
         let newOrder: number;
-        if (dropTargetEntryEl && dropTargetInstanceId) {
-            const dropTargetOriginalEntry = entriesOnTargetDay.find(e => e.id === dropTargetInstanceId);
-            const dropIndex = dropTargetOriginalEntry ? entriesOnTargetDay.indexOf(dropTargetOriginalEntry) : -1;
+        if (dropTargetEntryEl) {
+            const dropTargetInstanceId = dropTargetEntryEl.dataset.entryId;
+            const dropTargetEntry = entriesOnTargetDay.find(e => e.id === dropTargetInstanceId);
+            const dropIndex = dropTargetEntry ? entriesOnTargetDay.indexOf(dropTargetEntry) : -1;
             
             if (dropIndex !== -1) {
                 const rect = dropTargetEntryEl.getBoundingClientRect();
                 const isAfter = 'clientY' in e ? e.clientY > rect.top + rect.height / 2 : false;
-                newOrder = isAfter ? dropIndex + 0.5 : dropIndex - 0.5;
+                
+                if (isAfter) {
+                    newOrder = (dropTargetEntry?.order ?? dropIndex) + 0.5;
+                } else {
+                    newOrder = (dropTargetEntry?.order ?? dropIndex) - 0.5;
+                }
+
             } else {
                  newOrder = entriesOnTargetDay.length;
             }
@@ -295,16 +299,14 @@ export function CentseiCalendar({
         
         updatedEntry.order = newOrder;
         
-        // Add the updated entry back
         allEntries.push(updatedEntry);
 
-        // Re-order all entries on the target day to have integer order values
         const finalEntriesForDay = allEntries
             .filter(e => e.date === targetDateStr)
             .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
         
         finalEntriesForDay.forEach((entry, index) => {
-            const originalIndexInAll = allEntries.findIndex(e => e.id === entry.id);
+            const originalIndexInAll = allEntries.findIndex(e => e.id === getOriginalIdFromInstance(entry.id));
             if (originalIndexInAll !== -1) {
                 allEntries[originalIndexInAll].order = index;
             }
@@ -334,41 +336,47 @@ export function CentseiCalendar({
         if (navigator.vibrate) {
             navigator.vibrate(50);
         }
-    }, 1000);
+    }, 500); // Reduced delay for better responsiveness
   };
   
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    cancelDragTimeout();
+    if (!isDraggingRef.current) {
+        cancelDragTimeout();
+        return;
+    }
     
-    if (!isDraggingRef.current || !calendarRef.current) return;
+    if (isDraggingRef.current && calendarRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
 
-    document.body.style.overflow = 'hidden';
+        document.body.style.overflow = 'hidden';
 
-    const touch = e.touches[0];
-    const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
-    
-    calendarRef.current.querySelectorAll('.drop-indicator').forEach(el => el.remove());
+        const touch = e.touches[0];
+        const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
+        
+        calendarRef.current.querySelectorAll('.drop-indicator').forEach(el => el.remove());
 
-    if (targetElement) {
-        const dayCell = targetElement.closest('[data-day-cell]');
-        const dropTarget = targetElement.closest('[data-entry-id]') as HTMLElement;
-        if (dayCell) {
-            const indicator = document.createElement('div');
-            indicator.className = 'drop-indicator h-1 bg-primary rounded-full my-1';
-            
-            if(dropTarget) {
-                const rect = dropTarget.getBoundingClientRect();
-                const isAfter = touch.clientY > rect.top + rect.height / 2;
-                 if (isAfter) {
-                    dropTarget.parentNode?.insertBefore(indicator, dropTarget.nextSibling);
+        if (targetElement) {
+            const dayCell = targetElement.closest('[data-day-cell]');
+            const dropTarget = targetElement.closest('[data-entry-id]') as HTMLElement;
+            if (dayCell) {
+                const indicator = document.createElement('div');
+                indicator.className = 'drop-indicator h-1 bg-primary rounded-full my-1';
+                
+                if(dropTarget) {
+                    const rect = dropTarget.getBoundingClientRect();
+                    const isAfter = touch.clientY > rect.top + rect.height / 2;
+                    if (isAfter) {
+                        dropTarget.parentNode?.insertBefore(indicator, dropTarget.nextSibling);
+                    } else {
+                        dropTarget.parentNode?.insertBefore(indicator, dropTarget);
+                    }
                 } else {
-                    dropTarget.parentNode?.insertBefore(indicator, dropTarget);
+                    const entryContainer = dayCell.querySelector('.space-y-1\\.5');
+                    if (entryContainer) {
+                        entryContainer.appendChild(indicator);
+                    }
                 }
-            } else {
-                 const entryContainer = dayCell.querySelector('.space-y-1\\.5');
-                 if (entryContainer) {
-                    entryContainer.appendChild(indicator);
-                 }
             }
         }
     }
