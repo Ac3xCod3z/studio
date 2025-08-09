@@ -13,8 +13,9 @@ import { SettingsDialog } from "./settings-dialog";
 import { DayEntriesDialog } from "./day-entries-dialog";
 import { MonthlyBreakdownDialog } from "./monthly-breakdown-dialog";
 import { MonthlySummaryDialog } from "./monthly-summary-dialog";
+import { CalculatorDialog } from "./calculator-dialog"; // Import the new component
 import { Logo } from "./icons";
-import { Settings, Menu, Plus, CalendarSync, Loader2, LogOut, Trash2, BarChartBig, PieChart, Repeat, CheckCircle2 } from "lucide-react";
+import { Settings, Menu, Plus, CalendarSync, Loader2, LogOut, Trash2, BarChartBig, PieChart, Repeat, CheckCircle2, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
@@ -153,6 +154,7 @@ export default function FiscalFlowDashboard() {
   const [isDayEntriesDialogOpen, setDayEntriesDialogOpen] = useState(false);
   const [isBreakdownDialogOpen, setBreakdownDialogOpen] = useState(false);
   const [isSummaryDialogOpen, setSummaryDialogOpen] = useState(false);
+  const [isCalculatorDialogOpen, setCalculatorDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -549,6 +551,9 @@ export default function FiscalFlowDashboard() {
                 </Button>
             </div>
            )}
+          <Button onClick={() => setCalculatorDialogOpen(true)} variant="ghost" size="icon">
+            <Calculator className="h-5 w-5" />
+          </Button>
           <Button onClick={() => setSettingsDialogOpen(true)} variant="ghost" size="icon">
             <Settings className="h-5 w-5" />
           </Button>
@@ -674,6 +679,10 @@ export default function FiscalFlowDashboard() {
         currentMonth={selectedDate}
       />
 
+      <CalculatorDialog
+        isOpen={isCalculatorDialogOpen}
+        onClose={() => setCalculatorDialogOpen(false)}
+      />
 
       <SettingsDialog 
         isOpen={isSettingsDialogOpen}
