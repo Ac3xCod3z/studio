@@ -34,6 +34,7 @@ import type { Entry, WeeklyBalances, SelectedInstance } from "@/lib/types";
 import { Checkbox } from "./ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { useMedia } from "react-use";
 
 if (typeof window !== "undefined") {
     gsap.registerPlugin(MotionPathPlugin);
@@ -56,7 +57,6 @@ type CentseiCalendarProps = {
     setEditingEntry: (entry: Entry | null) => void;
     setSelectedDate: (date: Date) => void;
     setEntryDialogOpen: (isOpen: boolean) => void;
-    isMobile: boolean;
     openDayEntriesDialog: () => void;
     isReadOnly?: boolean;
     weeklyBalances: WeeklyBalances;
@@ -77,7 +77,6 @@ export function CentseiCalendar({
     setEditingEntry,
     setSelectedDate: setGlobalSelectedDate,
     setEntryDialogOpen,
-    isMobile,
     openDayEntriesDialog,
     isReadOnly = false,
     weeklyBalances,
@@ -91,7 +90,7 @@ export function CentseiCalendar({
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isMonthPickerOpen, setMonthPickerOpen] = useState(false);
-
+  const isMobile = useMedia("(max-width: 1024px)", false);
   const [draggingEntry, setDraggingEntry] = useState<Entry | null>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
   const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -99,7 +98,7 @@ export function CentseiCalendar({
 
   const selectedInstanceIds = useMemo(() => selectedInstances.map(i => i.instanceId), [selectedInstances]);
 
-  const { daysWithEntries } = useMemo(() => {
+  const { daysWithEntries, allGeneratedEntries } = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth));
     const end = endOfWeek(endOfMonth(currentMonth));
     const daysInMonth = eachDayOfInterval({ start, end });
@@ -111,7 +110,8 @@ export function CentseiCalendar({
         daysMap.set(dayKey, { day, entries: [] });
     });
     
-    generatedEntries.forEach(entry => {
+    const allEntries = generatedEntries;
+    allEntries.forEach(entry => {
         const entryDayStr = format(parseDateInTimezone(entry.date, timezone), 'yyyy-MM-dd');
         if (daysMap.has(entryDayStr)) {
             daysMap.get(entryDayStr)!.entries.push(entry);
@@ -129,7 +129,7 @@ export function CentseiCalendar({
         });
     });
 
-    return { daysWithEntries: Array.from(daysMap.values()) };
+    return { daysWithEntries: Array.from(daysMap.values()), allGeneratedEntries: allEntries };
 }, [currentMonth, generatedEntries, timezone]);
   
   const getOriginalIdFromInstance = (instanceId: string) => {
