@@ -47,29 +47,28 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 
 const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezone: string): Entry[] => {
-    const instances: Entry[] = [];
     if (!entry.date) return [];
-    
+
     const nowInTimezone = toZonedTime(new Date(), timezone);
     const todayInTimezone = set(nowInTimezone, { hours: 0, minutes: 0, seconds: 0, milliseconds: 0 });
     const originalEntryDate = parseISO(entry.date);
     
-    if (isAfter(originalEntryDate, end)) return [];
+    // A map to hold final instances, ensuring no duplicate dates.
+    const instanceMap = new Map<string, Entry>();
 
     const createInstance = (date: Date): Entry => {
         const dateStr = format(date, 'yyyy-MM-dd');
-        
         const exception = entry.exceptions?.[dateStr];
 
-        // Priority 1: A manual exception exists for this date.
+        // Priority 1: A manual exception exists for this date for isPaid.
         if (exception && typeof exception.isPaid === 'boolean') {
-          return {
-            ...entry,
-            date: dateStr,
-            id: `${entry.id}-${dateStr}`,
-            isPaid: exception.isPaid,
-            order: exception?.order ?? entry.order,
-          };
+            return {
+                ...entry,
+                date: dateStr,
+                id: `${entry.id}-${dateStr}`,
+                isPaid: exception.isPaid,
+                order: exception?.order ?? entry.order,
+            };
         }
         
         // Priority 2: For non-recurring entries, use the master isPaid flag.
@@ -103,8 +102,15 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
             order: exception?.order ?? entry.order,
         };
     };
-    
-    if (entry.recurrence === 'weekly' || entry.recurrence === 'bi-weekly') {
+
+    // First, generate all potential dates based on recurrence rule
+    const potentialDates: Date[] = [];
+    if (entry.recurrence === 'none') {
+        const entryDate = parseISO(entry.date);
+        if (entryDate >= start && entryDate <= end) {
+            potentialDates.push(entryDate);
+        }
+    } else if (entry.recurrence === 'weekly' || entry.recurrence === 'bi-weekly') {
         const weeksToAdd = entry.recurrence === 'weekly' ? 1 : 2;
         let currentDate = startOfWeek(originalEntryDate, { weekStartsOn: getDay(originalEntryDate) });
         while (isBefore(currentDate, start)) {
@@ -112,21 +118,20 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
         }
         while (isBefore(currentDate, end) || isSameDay(currentDate, end)) {
             if (!isBefore(currentDate, start)) {
-                instances.push(createInstance(currentDate));
+                potentialDates.push(currentDate);
             }
             currentDate = add(currentDate, { weeks: weeksToAdd });
         }
-    } else if (entry.recurrence !== 'none') {
+    } else { // Monthly and other recurrence types
         const recurrenceInterval = entry.recurrence ? recurrenceIntervalMonths[entry.recurrence] : 0;
         if (recurrenceInterval > 0) {
             let currentDate = originalEntryDate;
             
-            // Fast-forward to the relevant period
             if (isBefore(currentDate, start)) {
                 const monthsDiff = differenceInCalendarMonths(start, currentDate);
                 const numIntervals = Math.floor(monthsDiff / recurrenceInterval);
                 if (numIntervals > 0) {
-                  currentDate = add(currentDate, { months: numIntervals * recurrenceInterval });
+                    currentDate = add(currentDate, { months: numIntervals * recurrenceInterval });
                 }
             }
 
@@ -142,67 +147,60 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
 
                 if ((isAfter(finalDate, start) || isSameDay(finalDate, start)) && (isBefore(finalDate, end) || isSameDay(finalDate, end))) {
                      if (isSameMonth(finalDate, currentDate)) {
-                        instances.push(createInstance(finalDate));
+                        potentialDates.push(finalDate);
                     }
                 }
-
                 currentDate = add(currentDate, { months: recurrenceInterval });
             }
         }
     }
 
-    // Handle non-recurring entries
-    if (entry.recurrence === 'none') {
-        const entryDate = parseISO(entry.date);
-        if (entryDate >= start && entryDate <= end) {
-            instances.push(createInstance(entryDate));
-        }
-    }
-    
-    // Process exceptions separately to add moved entries and preserve paid history
+    // Now, handle exceptions. This map tracks which dates have been handled.
+    const movedOrExceptedDates = new Set<string>();
+
     if (entry.exceptions) {
         Object.entries(entry.exceptions).forEach(([dateStr, exception]) => {
             const exceptionDate = parseISO(dateStr);
+            
+            // Mark this date as handled by an exception
+            movedOrExceptedDates.add(dateStr);
 
-             // If an entry was moved, we add it to its new date
             if (exception.movedTo) {
-                const movedDate = parseISO(exception.movedTo);
-                if (movedDate >= start && movedDate <= end) {
-                    instances.push({
+                // This instance was moved. Add it to its new location.
+                const movedToDate = parseISO(exception.movedTo);
+                if (movedToDate >= start && movedToDate <= end) {
+                    const newInstance = {
                         ...entry,
                         id: `${entry.id}-${exception.movedTo}`,
                         date: exception.movedTo,
-                        isPaid: exception.isPaid ?? entry.isPaid,
+                        isPaid: exception.isPaid ?? entry.isPaid ?? false,
                         order: exception.order ?? entry.order,
-                    });
+                    };
+                    instanceMap.set(exception.movedTo, newInstance);
                 }
-            }
-            
-            // If there's a paid exception for a date that might be outside the new recurring schedule,
-            // ensure it's still shown if it's within the viewable calendar range.
-            if (typeof exception.isPaid === 'boolean' && (exceptionDate >= start && exceptionDate <= end)) {
-                const instanceIndex = instances.findIndex(inst => inst.date === dateStr);
-                if (instanceIndex > -1) {
-                    // If instance already exists (from normal recurrence), update its paid status
-                    instances[instanceIndex].isPaid = exception.isPaid;
-                    if(exception.order) {
-                       instances[instanceIndex].order = exception.order;
-                    }
-                } else {
-                    // If it doesn't exist, it's likely an old paid entry we need to preserve
-                    instances.push({
-                        ...entry,
-                        id: `${entry.id}-${dateStr}`,
-                        date: dateStr,
-                        isPaid: exception.isPaid,
-                        order: exception.order ?? entry.order,
-                    });
-                }
+            } else if (exceptionDate >= start && exceptionDate <= end) {
+                // This is a regular exception (paid, reordered). Create instance.
+                const newInstance = {
+                    ...entry,
+                    date: dateStr,
+                    id: `${entry.id}-${dateStr}`,
+                    isPaid: exception.isPaid ?? entry.isPaid ?? false,
+                    order: exception.order ?? entry.order,
+                };
+                instanceMap.set(dateStr, newInstance);
             }
         });
     }
 
-    return instances;
+    // Finally, create instances for all regularly scheduled dates that were NOT handled by an exception.
+    potentialDates.forEach(date => {
+        const dateStr = format(date, 'yyyy-MM-dd');
+        if (!movedOrExceptedDates.has(dateStr) && !instanceMap.has(dateStr)) {
+            instanceMap.set(dateStr, createInstance(date));
+        }
+    });
+
+    return Array.from(instanceMap.values());
 };
 
 
@@ -280,9 +278,14 @@ export default function CentseiDashboard() {
         if (masterEntry.recurrence === 'none') {
              masterEntry.date = newDate;
         } else {
-            // For recurring entries, create an exception for the original date
-            // to mark it as "moved" and then change the master date.
             const originalDateStr = movedEntry.date;
+            // The logic here is tricky. If we just move the master date,
+            // past paid entries might disappear from the calendar view.
+            // A robust solution would be to create an exception for the move
+            // and adjust the master date to reschedule future events.
+            // This example simplifies by updating the master date.
+            
+            // Mark the original instance date as "moved"
             masterEntry.exceptions = {
                 ...masterEntry.exceptions,
                 [originalDateStr]: {
@@ -290,9 +293,9 @@ export default function CentseiDashboard() {
                     movedTo: newDate
                 }
             };
-            // The master date change will reschedule future events.
-            // But we might want to just move the single instance
-             masterEntry.date = newDate;
+
+            // A more intuitive action for users might be to shift the entire series.
+            masterEntry.date = newDate;
         }
 
 
@@ -890,3 +893,5 @@ export default function CentseiDashboard() {
     </div>
   );
 }
+
+    
