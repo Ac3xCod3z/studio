@@ -37,7 +37,6 @@ import { recurrenceIntervalMonths } from "@/lib/constants";
 import { ScrollArea } from "./ui/scroll-area";
 import { scheduleNotifications, cancelAllNotifications } from "@/lib/notification-manager";
 import { useToast } from "@/hooks/use-toast";
-import { syncToGoogleCalendar } from "@/ai/flows/sync-to-google-calendar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -117,41 +116,39 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
             }
             currentDate = add(currentDate, { weeks: weeksToAdd });
         }
-        return instances;
-    }
-    
-    const recurrenceInterval = entry.recurrence ? recurrenceIntervalMonths[entry.recurrence] : 0;
-    if (entry.recurrence !== 'none' && recurrenceInterval > 0) {
-        let currentDate = originalEntryDate;
-        
-        // Fast-forward to the relevant period
-        if (isBefore(currentDate, start)) {
-            const monthsDiff = differenceInCalendarMonths(start, currentDate);
-            const numIntervals = Math.floor(monthsDiff / recurrenceInterval);
-            if (numIntervals > 0) {
-              currentDate = add(currentDate, { months: numIntervals * recurrenceInterval });
-            }
-        }
-
-        while(isBefore(currentDate, start)) {
-            currentDate = add(currentDate, { months: recurrenceInterval });
-        }
-        
-        while (isBefore(currentDate, end) || isSameDay(currentDate, end)) {
-            const originalDay = getDate(originalEntryDate);
-            const lastDayInCurrentMonth = lastDayOfMonth(currentDate).getDate();
-            const dayForMonth = Math.min(originalDay, lastDayInCurrentMonth);
-            const finalDate = setDate(currentDate, dayForMonth);
-
-            if ((isAfter(finalDate, start) || isSameDay(finalDate, start)) && (isBefore(finalDate, end) || isSameDay(finalDate, end))) {
-                 if (isSameMonth(finalDate, currentDate)) {
-                    instances.push(createInstance(finalDate));
+    } else if (entry.recurrence !== 'none') {
+        const recurrenceInterval = entry.recurrence ? recurrenceIntervalMonths[entry.recurrence] : 0;
+        if (recurrenceInterval > 0) {
+            let currentDate = originalEntryDate;
+            
+            // Fast-forward to the relevant period
+            if (isBefore(currentDate, start)) {
+                const monthsDiff = differenceInCalendarMonths(start, currentDate);
+                const numIntervals = Math.floor(monthsDiff / recurrenceInterval);
+                if (numIntervals > 0) {
+                  currentDate = add(currentDate, { months: numIntervals * recurrenceInterval });
                 }
             }
 
-            currentDate = add(currentDate, { months: recurrenceInterval });
+            while(isBefore(currentDate, start)) {
+                currentDate = add(currentDate, { months: recurrenceInterval });
+            }
+            
+            while (isBefore(currentDate, end) || isSameDay(currentDate, end)) {
+                const originalDay = getDate(originalEntryDate);
+                const lastDayInCurrentMonth = lastDayOfMonth(currentDate).getDate();
+                const dayForMonth = Math.min(originalDay, lastDayInCurrentMonth);
+                const finalDate = setDate(currentDate, dayForMonth);
+
+                if ((isAfter(finalDate, start) || isSameDay(finalDate, start)) && (isBefore(finalDate, end) || isSameDay(finalDate, end))) {
+                     if (isSameMonth(finalDate, currentDate)) {
+                        instances.push(createInstance(finalDate));
+                    }
+                }
+
+                currentDate = add(currentDate, { months: recurrenceInterval });
+            }
         }
-        return instances;
     }
 
     // Handle non-recurring entries
@@ -161,6 +158,42 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
             instances.push(createInstance(entryDate));
         }
     }
+    
+    // Process exceptions separately to add moved entries and preserve paid history
+    if (entry.exceptions) {
+        Object.entries(entry.exceptions).forEach(([dateStr, exception]) => {
+            const exceptionDate = parseISO(dateStr);
+             // If an entry was moved, we add it to its new date
+            if (exception.movedTo) {
+                const movedDate = parseISO(exception.movedTo);
+                if (movedDate >= start && movedDate <= end) {
+                    instances.push({
+                        ...entry,
+                        id: `${entry.id}-${exception.movedTo}`,
+                        date: exception.movedTo,
+                        isPaid: exception.isPaid ?? entry.isPaid,
+                        order: exception.order ?? entry.order,
+                    });
+                }
+            }
+            
+            // If there's a paid exception for a date that might be outside the new recurring schedule,
+            // ensure it's still shown if it's within the viewable calendar range.
+            if (typeof exception.isPaid === 'boolean' && (exceptionDate >= start && exceptionDate <= end)) {
+                const alreadyExists = instances.some(inst => inst.date === dateStr);
+                if (!alreadyExists) {
+                    instances.push({
+                        ...entry,
+                        id: `${entry.id}-${dateStr}`,
+                        date: dateStr,
+                        isPaid: exception.isPaid,
+                        order: exception.order ?? entry.order,
+                    });
+                }
+            }
+        });
+    }
+
     return instances;
 };
 
@@ -236,22 +269,15 @@ export default function CentseiDashboard() {
         const updatedEntries = [...prevEntries];
         const masterEntry = { ...updatedEntries[masterEntryIndex] };
 
-        if (masterEntry.recurrence === 'none') {
-            // It's a non-recurring entry, just change its date
-            masterEntry.date = newDate;
-        } else {
-            // It's a recurring entry, create an exception
-            const updatedExceptions = { ...masterEntry.exceptions };
-            updatedExceptions[movedEntry.date] = { ...updatedExceptions[movedEntry.date], movedTo: newDate };
-            masterEntry.exceptions = updatedExceptions;
-        }
+        // For all entries, update the master date to reschedule the series
+        masterEntry.date = newDate;
 
         updatedEntries[masterEntryIndex] = masterEntry;
         return updatedEntries;
     });
 
     setMoveOperation(null);
-    toast({ title: "Entry Moved", description: `Moved "${movedEntry.name}" to ${format(parseISO(newDate), 'PPP')}.` });
+    toast({ title: "Entry Rescheduled", description: `All future occurrences of "${movedEntry.name}" will now start from ${format(parseISO(newDate), 'PPP')}.` });
   };
   
   const handleBulkMarkAsComplete = () => {
@@ -263,7 +289,7 @@ export default function CentseiDashboard() {
                 const masterEntry = updatedEntries[masterEntryIndex];
                 if (masterEntry.recurrence !== 'none') {
                     // It's a recurring entry, add an exception
-                    const updatedExceptions = { ...masterEntry.exceptions, [instance.date]: { isPaid: true } };
+                    const updatedExceptions = { ...masterEntry.exceptions, [instance.date]: { ...masterEntry.exceptions?.[instance.date], isPaid: true } };
                     updatedEntries[masterEntryIndex] = { ...masterEntry, exceptions: updatedExceptions };
                 } else {
                     // It's a non-recurring entry
@@ -450,34 +476,7 @@ export default function CentseiDashboard() {
     const viewStart = startOfMonth(subMonths(new Date(), 6));
     const viewEnd = endOfMonth(addMonths(new Date(), 12));
 
-    return entries.flatMap((e) => {
-        const instances = generateRecurringInstances(e, viewStart, viewEnd, timezone);
-        
-        // Handle moved exceptions
-        if (e.exceptions) {
-            Object.entries(e.exceptions).forEach(([originalDate, exception]) => {
-                if (exception.movedTo) {
-                    const originalInstanceIndex = instances.findIndex(inst => inst.date === originalDate && getOriginalIdFromInstance(inst.id) === e.id);
-                    if (originalInstanceIndex !== -1) {
-                        instances.splice(originalInstanceIndex, 1);
-                    }
-                    
-                    const movedDate = parseISO(exception.movedTo);
-                    if (movedDate >= viewStart && movedDate <= viewEnd) {
-                        instances.push({
-                            ...e,
-                            id: `${e.id}-${exception.movedTo}`,
-                            date: exception.movedTo,
-                            isPaid: exception.isPaid ?? e.isPaid,
-                            order: exception.order ?? e.order
-                        });
-                    }
-                }
-            });
-        }
-        
-        return instances;
-    });
+    return entries.flatMap((e) => generateRecurringInstances(e, viewStart, viewEnd, timezone));
   }, [entries, isMounted, timezone]);
 
   useEffect(() => {
@@ -853,7 +852,7 @@ export default function CentseiDashboard() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Move</AlertDialogTitle>
             <AlertDialogDescription>
-                Are you sure you want to move the entry <strong>{moveOperation?.entry.name}</strong> to <strong>{moveOperation && format(parseISO(moveOperation.newDate), 'PPP')}</strong>?
+                Are you sure you want to move the entry <strong>{moveOperation?.entry.name}</strong> to <strong>{moveOperation && format(parseISO(moveOperation.newDate), 'PPP')}</strong>? This will reschedule all future occurrences.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
