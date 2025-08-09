@@ -179,9 +179,13 @@ export function CalculatorDialog({ isOpen, onClose }: CalculatorDialogProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md p-0" onInteractOutside={(e) => e.preventDefault()}>
+      <DialogContent className={cn("sm:max-w-md p-0", showHistory && "sm:max-w-[550px]")} onInteractOutside={(e) => e.preventDefault()}>
         <div className='flex'>
           <div className="p-4 space-y-4">
+            <DialogHeader className="px-2">
+              <DialogTitle>Calculator</DialogTitle>
+              <DialogDescription>A simple calculator for your convenience.</DialogDescription>
+            </DialogHeader>
             <div className="bg-muted text-right p-4 rounded-lg break-all">
                 <div className="text-4xl font-mono text-foreground">{displayValue}</div>
                 <div className="text-muted-foreground text-sm h-5">
