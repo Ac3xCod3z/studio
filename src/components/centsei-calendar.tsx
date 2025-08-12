@@ -95,6 +95,7 @@ export function CentseiCalendar({
   const isMobile = useMedia("(max-width: 1024px)", false);
   const calendarRef = useRef<HTMLDivElement>(null);
   const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isDraggingRef = useRef(false);
   const draggedElementRef = useRef<HTMLDivElement | null>(null);
   const draggingEntryRef = useRef<Entry | null>(null);
@@ -164,7 +165,8 @@ export function CentseiCalendar({
       setSelectedDate(day);
       setGlobalSelectedDate(day);
       
-      if (dayEntries.length > 0 && !isSelectionMode) {
+      // On desktop, a simple click opens the dialog. Mobile uses long press.
+      if (!isMobile && dayEntries.length > 0 && !isSelectionMode) {
           openDayEntriesDialog();
           return;
       }
@@ -201,7 +203,7 @@ export function CentseiCalendar({
   }
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, entry: Entry) => {
-    if (isReadOnly || isSelectionMode) {
+    if (isReadOnly || isSelectionMode || isMobile) {
         e.preventDefault();
         return;
     }
@@ -222,7 +224,7 @@ export function CentseiCalendar({
   }
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    if (isReadOnly || isSelectionMode || !isDraggingRef.current) return;
+    if (isReadOnly || isSelectionMode || !isDraggingRef.current || isMobile) return;
     e.preventDefault();
     
     calendarRef.current?.querySelectorAll('.drop-indicator').forEach(el => el.remove());
@@ -259,7 +261,7 @@ export function CentseiCalendar({
   }
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    if (isReadOnly || isSelectionMode || !draggingEntryRef.current) {
+    if (isReadOnly || isSelectionMode || !draggingEntryRef.current || isMobile) {
         handleDragEnd();
         return;
     }
@@ -386,6 +388,13 @@ export function CentseiCalendar({
         dragTimeoutRef.current = null;
     }
   }, []);
+  
+  const clearLongPressTimeout = useCallback(() => {
+    if (longPressTimeoutRef.current) {
+      clearTimeout(longPressTimeoutRef.current);
+      longPressTimeoutRef.current = null;
+    }
+  }, []);
 
   const stopAutoScroll = () => {
     if (scrollIntervalRef.current) {
@@ -395,7 +404,7 @@ export function CentseiCalendar({
   };
   
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>, entry: Entry) => {
-    if (isReadOnly || isSelectionMode) return;
+    if (isReadOnly || isSelectionMode || !isMobile) return;
     
     cancelDragTimeout();
     
@@ -424,6 +433,8 @@ export function CentseiCalendar({
   
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     cancelDragTimeout();
+    clearLongPressTimeout();
+
     if (!isDraggingRef.current) return;
     
     e.preventDefault();
@@ -496,6 +507,8 @@ export function CentseiCalendar({
   const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
     cancelDragTimeout();
     stopAutoScroll();
+    clearLongPressTimeout();
+
 
     const clone = document.getElementById('drag-clone');
     if (clone) clone.remove();
@@ -518,6 +531,20 @@ export function CentseiCalendar({
     
     handleDragEnd();
   };
+  
+  // Handlers for mobile day long press
+  const handleDayTouchStart = (day: Date) => {
+    if (!isMobile || isReadOnly) return;
+    
+    clearLongPressTimeout();
+    
+    longPressTimeoutRef.current = setTimeout(() => {
+        setSelectedDate(day);
+        setGlobalSelectedDate(day);
+        openDayEntriesDialog();
+        if (navigator.vibrate) navigator.vibrate(50);
+    }, 500);
+  }
 
   const Sidebar = () => (
     <SidebarContent 
@@ -619,6 +646,9 @@ export function CentseiCalendar({
                   onClick={() => handleDayClick(day, dayEntries)}
                   onDragOver={handleDragOver}
                   onDrop={handleDrop}
+                  onTouchStart={() => handleDayTouchStart(day)}
+                  onTouchMove={clearLongPressTimeout}
+                  onTouchEnd={clearLongPressTimeout}
                 >
                   <div className="flex justify-between items-start">
                     <span className={cn("font-bold text-xs sm:text-base", isToday(day) && "text-primary")}>{format(day, "d")}</span>
@@ -646,11 +676,10 @@ export function CentseiCalendar({
                               onTouchStart={(e) => handleTouchStart(e, entry)}
                               onTouchMove={handleTouchMove}
                               onTouchEnd={handleTouchEnd}
-                              draggable={!isReadOnly && !isSelectionMode}
+                              draggable={!isReadOnly && !isSelectionMode && !isMobile}
                               className={cn(
                                   "px-2 py-1 rounded-full text-left flex items-center gap-2 transition-all duration-200 group",
-                                  isMobile ? 'touch-action-pan-y' : '',
-                                  !isReadOnly && !isSelectionMode && "cursor-grab active:cursor-grabbing hover:shadow-lg",
+                                  !isReadOnly && !isSelectionMode && !isMobile && "cursor-grab active:cursor-grabbing hover:shadow-lg",
                                   (dragVisual === entry.id) && 'opacity-30',
                                   isSelectionMode && selectedInstanceIds.includes(entry.id) && "opacity-60",
                                   "bg-secondary/50 hover:bg-secondary",
@@ -663,7 +692,7 @@ export function CentseiCalendar({
                             )}>
                                {entry.isPaid ? <Check className="h-3 w-3" /> : entry.type === 'bill' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />}
                             </div>
-                            <span className={cn("flex-1 truncate font-medium", entry.isPaid && "line-through")}>{entry.name}</span>
+                            <span className={cn("flex-1 truncate font-medium", entry.isPaid && "line-through", isMobile && 'hidden')}>{entry.name}</span>
                             <span className={cn("font-semibold", entry.isPaid && "line-through")}>{formatCurrency(entry.amount)}</span>
                           </div>
                       ))}
