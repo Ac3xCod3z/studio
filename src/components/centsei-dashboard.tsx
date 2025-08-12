@@ -531,7 +531,8 @@ export default function CentseiDashboard() {
       <div className="flex h-screen w-full flex-col bg-background">
         <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
             <div className="flex items-center gap-2">
-                <Logo height={40} width={120} />
+                <Logo height={40} width={40} />
+                <span className="font-bold text-lg">Centsei</span>
             </div>
             <div className="flex items-center gap-2">
                 <Skeleton className="h-9 w-28 hidden md:flex" />
@@ -562,7 +563,8 @@ export default function CentseiDashboard() {
     <div className="flex h-screen w-full flex-col bg-background">
       <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
         <div className="flex items-center gap-2">
-            <Logo height={50} width={150} />
+            <Logo height={50} width={50} />
+            <span className="text-xl font-bold">Centsei</span>
         </div>
         <div className="flex items-center gap-2">
           {!isSelectionMode && (

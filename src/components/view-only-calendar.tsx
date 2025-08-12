@@ -310,7 +310,8 @@ export default function ViewOnlyCalendar() {
     <div className="flex h-screen w-full flex-col bg-background">
       <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
         <div className="flex items-center gap-2">
-           <Logo height={50} width={150} />
+           <Logo height={50} width={50} />
+           <span className="text-xl font-bold">Centsei</span>
         </div>
         {isMobile && (
           <Sheet open={isMobileSheetOpen} onOpenChange={setMobileSheetOpen}>

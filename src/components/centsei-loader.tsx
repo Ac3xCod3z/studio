@@ -19,7 +19,8 @@ function DashboardSkeleton() {
     <div className="flex h-screen w-full flex-col bg-background">
       <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
         <div className="flex items-center gap-2">
-          <Logo />
+          <Logo height={40} width={40} />
+          <span className="font-bold text-lg">Centsei</span>
         </div>
         <div className="flex items-center gap-2">
           <Skeleton className="h-9 w-28 hidden md:flex" />
@@ -50,10 +51,10 @@ export default function CentseiLoader() {
   const [animationComplete, setAnimationComplete] = useState(false);
   const logoRef = useRef(null);
   const containerRef = useRef(null);
+  const textRef = useRef(null);
   const taglineRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Ensure MotionPathPlugin is registered on the client
     if (typeof window !== "undefined") {
         gsap.registerPlugin(MotionPathPlugin);
     }
@@ -64,14 +65,12 @@ export default function CentseiLoader() {
       },
     });
 
-    // 1. Fade in logo, name, and tagline
-    tl.fromTo([logoRef.current, taglineRef.current], 
+    tl.fromTo([logoRef.current, textRef.current, taglineRef.current], 
         { opacity: 0, y: 20 },
         { opacity: 1, y: 0, duration: 0.8, ease: 'power2.out', stagger: 0.2 }
     )
     .add("end", "+=1.5")
-    // 3. Fade out logo and tagline together
-    .to([logoRef.current, taglineRef.current], 
+    .to([logoRef.current, textRef.current, taglineRef.current], 
         { opacity: 0, scale: 0.8, duration: 0.5, ease: 'power2.in' },
         "end" 
     )
@@ -94,6 +93,7 @@ export default function CentseiLoader() {
                 height={200}
             />
         </div>
+         <h1 ref={textRef} className="text-4xl font-bold">Centsei</h1>
       </div>
       <div ref={taglineRef} className='absolute bottom-20'>
           <p className='text-muted-foreground'>Your Wallets Mr.Miyagi</p>
