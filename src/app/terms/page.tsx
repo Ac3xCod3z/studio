@@ -8,6 +8,7 @@ export default function TermsOfServicePage() {
       <header className="py-4 px-4 md:px-6 border-b">
         <Link href="/" className="flex items-center gap-2 text-xl font-bold">
             <Logo height={50} width={50} />
+            <span className="text-2xl font-bold text-white">Centsei</span>
         </Link>
       </header>
       <main className="max-w-4xl mx-auto py-12 px-4 md:px-6">
