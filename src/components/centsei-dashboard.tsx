@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
@@ -39,7 +40,6 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
 
     const nowInTimezone = toZonedTime(new Date(), timezone);
     const todayInTimezone = set(nowInTimezone, { hours: 0, minutes: 0, seconds: 0, milliseconds: 0 });
-    const originalEntryDate = parseISO(entry.date);
     
     // A map to hold final instances, ensuring no duplicate dates.
     const instanceMap = new Map<string, Entry>();
@@ -83,6 +83,7 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
             potentialDates.push(entryDate);
         }
     } else {
+        const originalEntryDate = parseISO(entry.date);
         const recurrenceInterval = entry.recurrence ? recurrenceIntervalMonths[entry.recurrence] : 0;
         if (recurrenceInterval > 0) {
             let currentDate = originalEntryDate;
@@ -124,14 +125,38 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
         }
     }
 
-    const movedOrSkippedDates = new Set<string>();
+    potentialDates.forEach(date => {
+        const dateStr = format(date, 'yyyy-MM-dd');
+        if (!instanceMap.has(dateStr)) {
+            const instance = createInstance(date, entry.exceptions?.[dateStr]?.isPaid);
+            instanceMap.set(dateStr, instance);
+        }
+    });
+    
     if (entry.exceptions) {
         Object.entries(entry.exceptions).forEach(([dateStr, exception]) => {
-             movedOrSkippedDates.add(dateStr);
-            
+             const exceptionDate = parseISO(dateStr);
+             if (exceptionDate >= start && exceptionDate <= end) {
+                const existingInstance = instanceMap.get(dateStr);
+                if (existingInstance) {
+                    // Update existing instance with exception data
+                    if (exception.isPaid !== undefined) existingInstance.isPaid = exception.isPaid;
+                    if (exception.order !== undefined) existingInstance.order = exception.order;
+                } else {
+                    // This could be a moved entry, or a paid instance from the past we want to preserve
+                     instanceMap.set(dateStr, {
+                        ...entry,
+                        date: dateStr,
+                        id: `${entry.id}-${dateStr}`,
+                        isPaid: exception.isPaid ?? false,
+                        order: exception.order ?? entry.order,
+                    });
+                }
+             }
+
              if (exception.movedTo) {
                 const movedToDate = parseISO(exception.movedTo);
-                if (movedToDate >= start && movedToDate <= end) {
+                if (movedToDate >= start && movedToDate <= end && !instanceMap.has(exception.movedTo)) {
                     instanceMap.set(exception.movedTo, {
                         ...entry,
                         id: `${entry.id}-${exception.movedTo}`,
@@ -140,28 +165,9 @@ const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezo
                         order: exception.order ?? entry.order,
                     });
                 }
-             } else if (exception.isPaid !== undefined || exception.order !== undefined) {
-                 const exceptionDate = parseISO(dateStr);
-                 if (exceptionDate >= start && exceptionDate <= end) {
-                    instanceMap.set(dateStr, {
-                        ...entry,
-                        date: dateStr,
-                        id: `${entry.id}-${dateStr}`,
-                        isPaid: exception.isPaid ?? false,
-                        order: exception.order ?? entry.order,
-                    });
-                 }
              }
         });
     }
-
-    potentialDates.forEach(date => {
-        const dateStr = format(date, 'yyyy-MM-dd');
-        if (!movedOrSkippedDates.has(dateStr) && !instanceMap.has(dateStr)) {
-            const instance = createInstance(date, entry.exceptions?.[dateStr]?.isPaid);
-            instanceMap.set(dateStr, instance);
-        }
-    });
 
     return Array.from(instanceMap.values());
 };
@@ -227,6 +233,7 @@ export default function CentseiDashboard() {
 
     const { entry: movedEntry, newDate } = moveOperation;
     const masterId = getOriginalIdFromInstance(movedEntry.id);
+    const originalDateStr = movedEntry.date;
 
     setEntries(prevEntries => {
         const masterEntryIndex = prevEntries.findIndex(e => e.id === masterId);
@@ -235,18 +242,22 @@ export default function CentseiDashboard() {
         const updatedEntries = [...prevEntries];
         const masterEntry = { ...updatedEntries[masterEntryIndex] };
         
-        // When moving a recurring entry, we change its master start date
-        masterEntry.date = newDate;
-        
-        // And clean up any now-irrelevant "movedTo" exceptions from the past
-        const originalDateStr = movedEntry.date;
-        if (masterEntry.exceptions && masterEntry.exceptions[originalDateStr]) {
-            delete masterEntry.exceptions[originalDateStr];
-            if (Object.keys(masterEntry.exceptions).length === 0) {
-                delete masterEntry.exceptions;
+        if (masterEntry.recurrence === 'none') {
+            // Simple date change for non-recurring entries
+            masterEntry.date = newDate;
+        } else {
+            // Update the master date to reschedule all future occurrences
+            masterEntry.date = newDate;
+
+            // Clean up the exception for the date it was moved *from*
+            if (masterEntry.exceptions && masterEntry.exceptions[originalDateStr]) {
+                delete masterEntry.exceptions[originalDateStr];
+                if (Object.keys(masterEntry.exceptions).length === 0) {
+                    delete masterEntry.exceptions;
+                }
             }
         }
-
+        
         updatedEntries[masterEntryIndex] = masterEntry;
         return updatedEntries;
     });
@@ -557,7 +568,7 @@ export default function CentseiDashboard() {
     <div className="flex h-screen w-full flex-col bg-background">
       <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
         <div className="flex items-center gap-2">
-            <Logo />
+            <Logo width={120} height={40}/>
         </div>
         <div className="flex items-center gap-2">
           {!isSelectionMode && (

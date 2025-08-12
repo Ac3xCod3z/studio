@@ -25,7 +25,7 @@ export default function TermsOfServicePage() {
           <div className="space-y-4">
             <h2 className="text-2xl font-semibold">2. Description of Service</h2>
             <p>
-              The Service is a personal budgeting application that allows users to track their income and expenses. The data you enter is stored in your web browser's local storage and is not transmitted to our servers. If you choose to integrate with Google Calendar, your data will be handled in accordance with Google's terms and privacy policies.
+              The Service is a personal budgeting application that allows users to track their income and expenses. The data you enter is stored in your web browser's local storage and is not transmitted to our servers.
             </p>
           </div>
 
@@ -46,7 +46,7 @@ export default function TermsOfServicePage() {
            <div className="space-y-4">
             <h2 className="text-2xl font-semibold">5. Limitation of Liability</h2>
             <p>
-              In no event shall Centsei be liable for any direct, indirect, incidental, special, consequential or exemplary damages, including but not limited to, damages for loss of profits, goodwill, use, data or other intangible losses resulting from the use of or inability to use the service.
+              In no event shall Centsei be liable for any direct, indirect, incidental, special, consequential or exemplary damages, including but not to, damages for loss of profits, goodwill, use, data or other intangible losses resulting from the use of or inability to use the service.
             </p>
           </div>
 

@@ -279,3 +279,9 @@ export default function ViewOnlyCalendar() {
         toggleSelectionMode={() => {}}
         selectedInstances={[]}
         setSelectedInstances={() => {}}
+        onBulkDelete={() => {}}
+        onMoveRequest={() => {}}
+      />
+    </div>
+  );
+}

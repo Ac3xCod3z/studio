@@ -104,12 +104,9 @@ export default function CentseiLoader() {
     <div ref={containerRef} className="relative flex h-screen w-full items-center justify-center bg-background flex-col gap-4 overflow-hidden">
       <div className='flex flex-col items-center justify-center gap-4'>
         <div ref={logoRef}>
-             <Image
-                src="/logo.png"
+             <Logo
                 width={160}
                 height={160}
-                alt="Centsei Logo"
-                className="object-contain"
             />
         </div>
         <div ref={nameRef} className="hidden">

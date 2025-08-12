@@ -31,9 +31,6 @@ export default function PrivacyPolicyPage() {
               <li>
                 <strong>Locally Stored Data:</strong> All financial entries (bills, income, etc.) that you create are stored exclusively in your browser's local storage. We do not have a server, and we do not see, collect, or store this data. It remains on your computer or device.
               </li>
-              <li>
-                <strong>Google Calendar Integration:</strong> If you choose to connect your Google Account, we will request permission to access and create events in your Google Calendar. This is solely for the purpose of syncing your financial entries as calendar events. We do not store your Google account information, other than what is necessary for the authentication session. The management of that data is subject to Google's Privacy Policy.
-              </li>
             </ul>
           </div>
 
@@ -44,7 +41,6 @@ export default function PrivacyPolicyPage() {
             </p>
             <ul className="list-disc list-inside space-y-2">
               <li>To provide and maintain the core functionality of the Centsei application.</li>
-              <li>To allow you to sync your financial entries with your Google Calendar, if you choose to enable this feature.</li>
               <li>To enable AI-powered features within the app, which process your input to provide recommendations. This data is not stored long-term.</li>
             </ul>
           </div>
@@ -52,18 +48,8 @@ export default function PrivacyPolicyPage() {
           <div className="space-y-4">
             <h2 className="text-2xl font-semibold">Data Storage and Security</h2>
             <p>
-              Your personal financial data is stored on your device's local storage and is not transmitted to us. Data shared with Google for Calendar synchronization is handled according to Google's security practices. We recommend using a secure device and browser to protect your local data.
+              Your personal financial data is stored on your device's local storage and is not transmitted to us. We recommend using a secure device and browser to protect your local data.
             </p>
-          </div>
-
-          <div className="space-y-4">
-            <h2 className="text-2xl font-semibold">Third-Party Services</h2>
-            <p>
-              Our service relies on Google for authentication and calendar integration. We are not responsible for the privacy practices of Google. We encourage you to review their privacy policy.
-            </p>
-            <ul className="list-disc list-inside">
-                <li><a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Google Privacy Policy</a></li>
-            </ul>
           </div>
           
            <div className="space-y-4">
