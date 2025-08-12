@@ -90,8 +90,8 @@ export default function CentseiLoader() {
       <div className='flex flex-col items-center justify-center gap-4'>
         <div ref={logoRef}>
              <Logo
-                width={160}
-                height={120}
+                width={200}
+                height={200}
             />
         </div>
       </div>

@@ -562,7 +562,7 @@ export default function CentseiDashboard() {
     <div className="flex h-screen w-full flex-col bg-background">
       <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
         <div className="flex items-center gap-2">
-            <Logo height={40} width={120} />
+            <Logo height={50} width={150} />
         </div>
         <div className="flex items-center gap-2">
           {!isSelectionMode && (
