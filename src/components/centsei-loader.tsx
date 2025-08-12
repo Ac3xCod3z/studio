@@ -8,7 +8,6 @@ import { gsap } from 'gsap';
 import { MotionPathPlugin } from "gsap/MotionPathPlugin";
 import { Logo } from './icons';
 import { Skeleton } from './ui/skeleton';
-import Image from 'next/image';
 
 const CentseiDashboard = dynamic(() => import('@/components/centsei-dashboard'), {
   ssr: false,
@@ -50,9 +49,8 @@ function DashboardSkeleton() {
 export default function CentseiLoader() {
   const [animationComplete, setAnimationComplete] = useState(false);
   const logoRef = useRef(null);
-  const nameRef = useRef(null);
-  const taglineRef = useRef(null);
   const containerRef = useRef(null);
+  const taglineRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Ensure MotionPathPlugin is registered on the client
@@ -67,28 +65,15 @@ export default function CentseiLoader() {
     });
 
     // 1. Fade in logo, name, and tagline
-    tl.fromTo([logoRef.current, nameRef.current], 
+    tl.fromTo([logoRef.current, taglineRef.current], 
         { opacity: 0, y: 20 },
         { opacity: 1, y: 0, duration: 0.8, ease: 'power2.out', stagger: 0.2 }
     )
-    .add("swirl", "+=0.5") 
-    // 2. Animate name in a circular path into the logo
-    .to(nameRef.current, {
-        duration: 1.2,
-        opacity: 0,
-        scale: 0.1,
-        motionPath: {
-            path: [{x: 0, y: 0}, {x: 60, y: -30}, {x: 0, y: -60}, {x: -60, y: -30}, {x: 0, y: 0}],
-            curviness: 1.25,
-            autoRotate: false,
-        },
-        ease: 'power1.in',
-        transformOrigin: "center center",
-    }, "swirl")
+    .add("end", "+=1.5")
     // 3. Fade out logo and tagline together
-    .to([logoRef.current], 
+    .to([logoRef.current, taglineRef.current], 
         { opacity: 0, scale: 0.8, duration: 0.5, ease: 'power2.in' },
-        "-=0.5" 
+        "end" 
     )
     .to(containerRef.current, 
         { opacity: 0, duration: 0.3, ease: 'power2.in' },
@@ -106,12 +91,12 @@ export default function CentseiLoader() {
         <div ref={logoRef}>
              <Logo
                 width={160}
-                height={160}
+                height={120}
             />
         </div>
-        <div ref={nameRef}>
-            <h1 className="text-4xl font-bold tracking-tight">Centsei</h1>
-        </div>
+      </div>
+      <div ref={taglineRef} className='absolute bottom-20'>
+          <p className='text-muted-foreground'>Your Wallets Mr.Miyagi</p>
       </div>
     </div>
   );

@@ -13,7 +13,7 @@ import { CentseiCalendar, SidebarContent } from "@/components/centsei-calendar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
-import { format, subMonths, startOfMonth, endOfMonth, isBefore, getDay, add, setDate, getDate, startOfWeek, endOfWeek, isSameDay, addMonths, parseISO, isSameMonth, differenceInCalendarMonths, isAfter, eachWeekOfInterval, lastDayOfMonth } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, isBefore, getDay, add, setDate, getDate, startOfWeek, endOfWeek, isSameDay, addMonths, parseISO, isSameMonth, differenceInCalendarMonths, isAfter, eachWeekOfInterval, lastDayOfMonth, set } from "date-fns";
 import { toZonedTime } from 'date-fns-tz';
 import { recurrenceIntervalMonths } from "@/lib/constants";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -310,8 +310,7 @@ export default function ViewOnlyCalendar() {
     <div className="flex h-screen w-full flex-col bg-background">
       <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
         <div className="flex items-center gap-2">
-          <Logo />
-           <h1 className="text-xl font-bold tracking-tight hidden md:block">Centsei</h1>
+           <Logo height={40} width={120} />
         </div>
         {isMobile && (
           <Sheet open={isMobileSheetOpen} onOpenChange={setMobileSheetOpen}>
