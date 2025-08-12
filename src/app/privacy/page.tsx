@@ -8,6 +8,7 @@ export default function PrivacyPolicyPage() {
       <header className="py-4 px-4 md:px-6 border-b">
         <Link href="/" className="flex items-center gap-2 text-xl font-bold">
             <Logo />
+            Centsei
         </Link>
       </header>
       <main className="max-w-4xl mx-auto py-12 px-4 md:px-6">

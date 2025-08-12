@@ -246,16 +246,14 @@ export default function CentseiDashboard() {
             // Simple date change for non-recurring entries
             masterEntry.date = newDate;
         } else {
-            // Update the master date to reschedule all future occurrences
-            masterEntry.date = newDate;
-
-            // Clean up the exception for the date it was moved *from*
-            if (masterEntry.exceptions && masterEntry.exceptions[originalDateStr]) {
-                delete masterEntry.exceptions[originalDateStr];
-                if (Object.keys(masterEntry.exceptions).length === 0) {
-                    delete masterEntry.exceptions;
+            // It's a recurring entry, create an exception
+             masterEntry.exceptions = {
+                ...masterEntry.exceptions,
+                [originalDateStr]: {
+                    ...masterEntry.exceptions?.[originalDateStr],
+                    movedTo: newDate
                 }
-            }
+            };
         }
         
         updatedEntries[masterEntryIndex] = masterEntry;
@@ -263,7 +261,7 @@ export default function CentseiDashboard() {
     });
 
     setMoveOperation(null);
-    toast({ title: "Entry Rescheduled", description: `All future occurrences of "${movedEntry.name}" will now start from ${format(parseISO(newDate), 'PPP')}.` });
+    toast({ title: "Entry Moved", description: `Moved "${movedEntry.name}" to ${format(parseISO(newDate), 'PPP')}.` });
   };
   
   const handleBulkMarkAsComplete = () => {
@@ -538,6 +536,7 @@ export default function CentseiDashboard() {
         <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
             <div className="flex items-center gap-2">
                 <Logo />
+                 <h1 className="text-xl font-bold tracking-tight hidden md:block">Centsei</h1>
             </div>
             <div className="flex items-center gap-2">
                 <Skeleton className="h-9 w-28 hidden md:flex" />
@@ -568,7 +567,8 @@ export default function CentseiDashboard() {
     <div className="flex h-screen w-full flex-col bg-background">
       <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
         <div className="flex items-center gap-2">
-            <Logo width={120} height={40}/>
+            <Logo />
+            <h1 className="text-xl font-bold tracking-tight hidden md:block">Centsei</h1>
         </div>
         <div className="flex items-center gap-2">
           {!isSelectionMode && (
@@ -748,7 +748,7 @@ export default function CentseiDashboard() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Move</AlertDialogTitle>
             <AlertDialogDescription>
-                Are you sure you want to move the entry <strong>{moveOperation?.entry.name}</strong> to <strong>{moveOperation && format(parseISO(moveOperation.newDate), 'PPP')}</strong>? This will reschedule all future occurrences.
+                This will move the entry and all its future recurrences. Are you sure you want to move <strong>{moveOperation?.entry.name}</strong> to <strong>{moveOperation && format(parseISO(moveOperation.newDate), 'PPP')}</strong>?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

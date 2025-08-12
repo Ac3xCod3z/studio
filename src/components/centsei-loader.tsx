@@ -67,7 +67,7 @@ export default function CentseiLoader() {
     });
 
     // 1. Fade in logo, name, and tagline
-    tl.fromTo([logoRef.current, nameRef.current, taglineRef.current], 
+    tl.fromTo([logoRef.current, nameRef.current], 
         { opacity: 0, y: 20 },
         { opacity: 1, y: 0, duration: 0.8, ease: 'power2.out', stagger: 0.2 }
     )
@@ -86,7 +86,7 @@ export default function CentseiLoader() {
         transformOrigin: "center center",
     }, "swirl")
     // 3. Fade out logo and tagline together
-    .to([logoRef.current, taglineRef.current], 
+    .to([logoRef.current], 
         { opacity: 0, scale: 0.8, duration: 0.5, ease: 'power2.in' },
         "-=0.5" 
     )
@@ -109,12 +109,9 @@ export default function CentseiLoader() {
                 height={160}
             />
         </div>
-        <div ref={nameRef} className="hidden">
+        <div ref={nameRef}>
             <h1 className="text-4xl font-bold tracking-tight">Centsei</h1>
         </div>
-      </div>
-      <div ref={taglineRef} className="absolute bottom-[80px]">
-        <p className="text-muted-foreground text-lg">Your Wallets Mr.Miyagi</p>
       </div>
     </div>
   );
