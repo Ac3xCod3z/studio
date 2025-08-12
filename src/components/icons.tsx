@@ -1,7 +1,7 @@
 import Image from "next/image";
-import type { SVGProps } from "react";
+import type { ComponentProps } from "react";
 
-export const Logo = (props: Omit<SVGProps<SVGSVGElement>, 'src'> & { src?: string, width?: number, height?: number, alt?: string }) => (
+export const Logo = (props: Omit<ComponentProps<typeof Image>, 'src'> & { src?: string }) => (
     <Image
         src="/logo.png"
         width={120}
