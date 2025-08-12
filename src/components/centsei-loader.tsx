@@ -95,8 +95,8 @@ export default function CentseiLoader() {
         </div>
         <h1 ref={textRef} className="text-5xl font-bold text-white">Centsei</h1>
       </div>
-      <div ref={taglineRef} className='absolute bottom-20'>
-          <p className='text-muted-foreground'>Your Wallets Mr.Miyagi</p>
+      <div ref={taglineRef} className='absolute bottom-44'>
+          <p className='text-muted-foreground text-lg'>Your Wallets Mr.Miyagi</p>
       </div>
     </div>
   );
