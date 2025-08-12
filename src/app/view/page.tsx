@@ -33,4 +33,10 @@ function ViewPageSkeleton() {
 }
 
 export default function ViewPage() {
-  return (
+  return () => (
+    <Suspense fallback={<ViewPageSkeleton />}>
+      <ViewOnlyCalendar />
+    </Suspense>
+  );
+}
+
