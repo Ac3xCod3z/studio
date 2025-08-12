@@ -20,7 +20,6 @@ function DashboardSkeleton() {
       <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
         <div className="flex items-center gap-2">
           <Logo height={40} width={40} />
-          <span className="font-bold text-lg">Centsei</span>
         </div>
         <div className="flex items-center gap-2">
           <Skeleton className="h-9 w-28 hidden md:flex" />
@@ -93,7 +92,6 @@ export default function CentseiLoader() {
                 height={200}
             />
         </div>
-         <h1 ref={textRef} className="text-4xl font-bold">Centsei</h1>
       </div>
       <div ref={taglineRef} className='absolute bottom-20'>
           <p className='text-muted-foreground'>Your Wallets Mr.Miyagi</p>
