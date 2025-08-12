@@ -22,8 +22,8 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#38A3A5" media="(prefers-color-scheme: dark)" />
-        <meta name="theme-color" content="#E0E5D9" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#d02f27" media="(prefers-color-scheme: dark)" />
+        <meta name="theme-color" content="#d02f27" media="(prefers-color-scheme: light)" />
       </head>
       <body className="font-body antialiased">
         <ThemeProvider
