@@ -9,8 +9,7 @@ function ViewPageSkeleton() {
       <div className="flex h-screen w-full flex-col bg-background">
         <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
           <div className="flex items-center gap-2">
-            <Logo className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold">Centsei</span>
+            <Logo />
           </div>
           <Skeleton className="h-10 w-10 md:hidden" />
         </header>
@@ -35,8 +34,3 @@ function ViewPageSkeleton() {
 
 export default function ViewPage() {
   return (
-    <Suspense fallback={<ViewPageSkeleton />}>
-        <ViewOnlyCalendar />
-    </Suspense>
-  )
-}

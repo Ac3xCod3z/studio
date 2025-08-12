@@ -237,8 +237,7 @@ export default function ViewOnlyCalendar() {
     <div className="flex h-screen w-full flex-col bg-background">
       <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
         <div className="flex items-center gap-2">
-          <Logo className="h-8 w-8 text-primary" />
-          <span className="text-xl font-bold">Centsei (View Only)</span>
+          <Logo />
         </div>
         {isMobile && (
           <Sheet open={isMobileSheetOpen} onOpenChange={setMobileSheetOpen}>
@@ -272,7 +271,6 @@ export default function ViewOnlyCalendar() {
         setEditingEntry={() => {}} // No-op
         setSelectedDate={setSelectedDate}
         setEntryDialogOpen={() => {}} // No-op
-        isMobile={isMobile}
         openDayEntriesDialog={() => {}} // No-op for read-only view
         isReadOnly={true}
         weeklyBalances={weeklyBalances}
@@ -281,8 +279,3 @@ export default function ViewOnlyCalendar() {
         toggleSelectionMode={() => {}}
         selectedInstances={[]}
         setSelectedInstances={() => {}}
-        onBulkDelete={() => {}}
-      />
-    </div>
-  );
-}

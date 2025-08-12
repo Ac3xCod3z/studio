@@ -8,6 +8,7 @@ import { gsap } from 'gsap';
 import { MotionPathPlugin } from "gsap/MotionPathPlugin";
 import { Logo } from './icons';
 import { Skeleton } from './ui/skeleton';
+import Image from 'next/image';
 
 const CentseiDashboard = dynamic(() => import('@/components/centsei-dashboard'), {
   ssr: false,
@@ -19,8 +20,7 @@ function DashboardSkeleton() {
     <div className="flex h-screen w-full flex-col bg-background">
       <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
         <div className="flex items-center gap-2">
-          <Logo className="h-8 w-8 text-primary" />
-          <span className="text-xl font-bold">Centsei</span>
+          <Logo />
         </div>
         <div className="flex items-center gap-2">
           <Skeleton className="h-9 w-28 hidden md:flex" />
@@ -104,13 +104,19 @@ export default function CentseiLoader() {
     <div ref={containerRef} className="relative flex h-screen w-full items-center justify-center bg-background flex-col gap-4 overflow-hidden">
       <div className='flex flex-col items-center justify-center gap-4'>
         <div ref={logoRef}>
-            <Logo className="h-20 w-20 text-primary" />
+             <Image
+                src="/logo.png"
+                width={160}
+                height={160}
+                alt="Centsei Logo"
+                className="object-contain"
+            />
         </div>
-        <div ref={nameRef}>
+        <div ref={nameRef} className="hidden">
             <h1 className="text-4xl font-bold tracking-tight">Centsei</h1>
         </div>
       </div>
-      <div ref={taglineRef} className="absolute bottom-32">
+      <div ref={taglineRef} className="absolute bottom-[80px]">
         <p className="text-muted-foreground text-lg">Your Wallets Mr.Miyagi</p>
       </div>
     </div>

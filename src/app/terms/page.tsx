@@ -7,8 +7,7 @@ export default function TermsOfServicePage() {
     <div className="bg-background min-h-screen">
       <header className="py-4 px-4 md:px-6 border-b">
         <Link href="/" className="flex items-center gap-2 text-xl font-bold">
-            <Logo className="h-8 w-8 text-primary" />
-            <span>Centsei</span>
+            <Logo />
         </Link>
       </header>
       <main className="max-w-4xl mx-auto py-12 px-4 md:px-6">
@@ -62,11 +61,3 @@ export default function TermsOfServicePage() {
             <h2 className="text-2xl font-semibold">Contact Us</h2>
             <p>
                 If you have any questions about these Terms of Service, you can contact us through the support channels provided by Firebase Studio.
-            </p>
-          </div>
-
-        </div>
-      </main>
-    </div>
-  );
-}
