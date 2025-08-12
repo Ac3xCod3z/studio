@@ -1,7 +1,7 @@
 import Image from "next/image";
 import type { ComponentProps } from "react";
 
-export const Logo = (props: Omit<ComponentProps<typeof Image>, 'src'> & { src?: string }) => (
+export const Logo = (props: Omit<ComponentProps<typeof Image>, 'src' | 'alt' | 'width' | 'height'> & { src?: string }) => (
     <Image
         src="/logo.png"
         width={120}

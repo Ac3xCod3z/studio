@@ -61,3 +61,10 @@ export default function TermsOfServicePage() {
             <h2 className="text-2xl font-semibold">Contact Us</h2>
             <p>
                 If you have any questions about these Terms of Service, you can contact us through the support channels provided by Firebase Studio.
+            </p>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}

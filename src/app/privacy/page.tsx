@@ -77,4 +77,10 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-2xl font-semibold">Contact Us</h2>
             <p>
                 If you have any questions about this Privacy Policy, you can contact us through the support channels provided by Firebase Studio.
-            </
+            </p>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
