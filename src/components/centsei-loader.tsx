@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -96,7 +95,7 @@ export default function CentseiLoader() {
         <h1 ref={textRef} className="text-5xl font-bold text-white">Centsei</h1>
       </div>
       <div ref={taglineRef} className='absolute bottom-44'>
-          <p className='text-muted-foreground text-lg'>Your Wallets Mr.Miyagi</p>
+          <p className='text-muted-foreground text-lg'>Your Wallets Personal Mr.Miyagi</p>
       </div>
     </div>
   );
