@@ -38,7 +38,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { useMedia } from "react-use";
 import { BudgetScoreWidget } from "./budget-score-widget";
-import useLocalStorage from "@/hooks/use-local-storage";
 
 if (typeof window !== "undefined") {
     gsap.registerPlugin(MotionPathPlugin);
@@ -72,6 +71,8 @@ type CentseiCalendarProps = {
     onBulkDelete: () => void;
     onMoveRequest: (entry: Entry, newDate: string) => void;
     budgetScore: BudgetScore | null;
+    onInfoClick: () => void;
+    onHistoryClick: () => void;
 }
 
 export function CentseiCalendar({
@@ -93,7 +94,9 @@ export function CentseiCalendar({
     setSelectedInstances,
     onBulkDelete,
     onMoveRequest,
-    budgetScore
+    budgetScore,
+    onInfoClick,
+    onHistoryClick
 }: CentseiCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -557,6 +560,8 @@ export function CentseiCalendar({
       weeklyTotals={weeklyTotals}
       selectedDate={selectedDate}
       budgetScore={budgetScore}
+      onInfoClick={onInfoClick}
+      onHistoryClick={onHistoryClick}
     />
   )
 
@@ -740,14 +745,18 @@ export const SidebarContent = ({
   weeklyTotals,
   selectedDate,
   budgetScore,
+  onInfoClick,
+  onHistoryClick,
 }: {
   weeklyTotals: any;
   selectedDate: Date;
   budgetScore: BudgetScore | null;
+  onInfoClick: () => void;
+  onHistoryClick: () => void;
 }) => {
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
-        {budgetScore && <BudgetScoreWidget score={budgetScore} />}
+        {budgetScore && <BudgetScoreWidget score={budgetScore} onInfoClick={onInfoClick} onHistoryClick={onHistoryClick} />}
         <div className="space-y-4">
             <h3 className="font-semibold text-lg">Week of {format(startOfWeek(selectedDate), "MMM d")}</h3>
             <SummaryCard title="Starting Balance" amount={weeklyTotals.startOfWeekBalance} icon={<Repeat className="h-4 w-4 text-muted-foreground" />} description="From previous week" />

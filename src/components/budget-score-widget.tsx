@@ -2,14 +2,24 @@
 "use client";
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
-import { TrendingUp } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from './ui/card';
+import { TrendingUp, Info } from 'lucide-react';
 import { PieChart, Pie, Cell } from 'recharts';
 import { cn } from '@/lib/utils';
 import type { BudgetScore } from '@/lib/types';
+import { Button } from './ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+
 
 interface BudgetScoreWidgetProps {
   score: BudgetScore;
+  onInfoClick: () => void;
+  onHistoryClick: () => void;
 }
 
 const getScoreColor = (scoreValue: number) => {
@@ -18,7 +28,7 @@ const getScoreColor = (scoreValue: number) => {
   return 'hsl(var(--destructive))'; // Red
 };
 
-export const BudgetScoreWidget: React.FC<BudgetScoreWidgetProps> = ({ score }) => {
+export const BudgetScoreWidget: React.FC<BudgetScoreWidgetProps> = ({ score, onInfoClick, onHistoryClick }) => {
   const scoreColor = getScoreColor(score.score);
   
   const chartData = [
@@ -27,7 +37,25 @@ export const BudgetScoreWidget: React.FC<BudgetScoreWidgetProps> = ({ score }) =
   ];
 
   return (
-    <Card className="bg-background/50 backdrop-blur-sm">
+    <Card className="bg-background/50 backdrop-blur-sm relative">
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 h-7 w-7 text-muted-foreground"
+              onClick={onInfoClick}
+            >
+              <Info className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>What is this score?</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
             <TrendingUp className="h-5 w-5" />
@@ -63,6 +91,11 @@ export const BudgetScoreWidget: React.FC<BudgetScoreWidgetProps> = ({ score }) =
             </div>
         </div>
       </CardContent>
+      <CardFooter>
+          <Button variant="outline" className="w-full" onClick={onHistoryClick}>
+            View History
+          </Button>
+      </CardFooter>
     </Card>
   );
 };

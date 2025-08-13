@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -42,6 +43,8 @@ import { scheduleNotifications, cancelAllNotifications } from "@/lib/notificatio
 import { useToast } from "@/hooks/use-toast";
 import { welcomeMessages } from "@/lib/messages";
 import { calculateBudgetScore } from "@/lib/budget-score";
+import { BudgetScoreInfoDialog } from "./budget-score-info-dialog";
+import { BudgetScoreHistoryDialog } from "./budget-score-history-dialog";
 
 const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezone: string): Entry[] => {
     if (!entry.date) return [];
@@ -203,6 +206,8 @@ export default function CentseiDashboard() {
   const [isBreakdownDialogOpen, setBreakdownDialogOpen] = useState(false);
   const [isSummaryDialogOpen, setSummaryDialogOpen] = useState(false);
   const [isCalculatorDialogOpen, setCalculatorDialogOpen] = useState(false);
+  const [isScoreInfoDialogOpen, setScoreInfoDialogOpen] = useState(false);
+  const [isScoreHistoryDialogOpen, setScoreHistoryDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -678,6 +683,8 @@ export default function CentseiDashboard() {
                     weeklyTotals={weeklyTotals}
                     selectedDate={selectedDate}
                     budgetScore={budgetScore}
+                    onInfoClick={() => setScoreInfoDialogOpen(true)}
+                    onHistoryClick={() => setScoreHistoryDialogOpen(true)}
                   />
                    <div className="p-4 flex flex-col gap-2 border-t">
                      <Button onClick={() => { setSummaryDialogOpen(true); setMobileSheetOpen(false); }} variant="outline" className="w-full">
@@ -713,6 +720,8 @@ export default function CentseiDashboard() {
         onBulkDelete={() => setBulkDeleteAlertOpen(true)}
         onMoveRequest={(entry, newDate) => setMoveOperation({ entry, newDate })}
         budgetScore={budgetScore}
+        onInfoClick={() => setScoreInfoDialogOpen(true)}
+        onHistoryClick={() => setScoreHistoryDialogOpen(true)}
       />
       
       <EntryDialog 
@@ -822,6 +831,17 @@ export default function CentseiDashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <BudgetScoreInfoDialog
+        isOpen={isScoreInfoDialogOpen}
+        onClose={() => setScoreInfoDialogOpen(false)}
+      />
+
+      <BudgetScoreHistoryDialog
+        isOpen={isScoreHistoryDialogOpen}
+        onClose={() => setScoreHistoryDialogOpen(false)}
+        history={budgetScores}
+      />
     </div>
   );
 }
