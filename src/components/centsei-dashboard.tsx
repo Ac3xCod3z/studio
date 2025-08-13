@@ -220,7 +220,7 @@ export default function CentseiDashboard() {
   const [isBulkDeleteAlertOpen, setBulkDeleteAlertOpen] = useState(false);
   const [isBulkCompleteAlertOpen, setBulkCompleteAlertOpen] = useState(false);
   const [moveOperation, setMoveOperation] = useState<{ entry: Entry, newDate: string } | null>(null);
-  const isInitialLoad = useRef(true);
+  const previousScoreRef = useRef<number | null>(null);
 
 
   const toggleSelectionMode = useCallback(() => {
@@ -463,26 +463,43 @@ export default function CentseiDashboard() {
   }, [allGeneratedEntries, isMounted]);
 
   useEffect(() => {
-      if (!isMounted || !budgetScore) return;
+    if (!isMounted || !budgetScore) return;
 
-      const todayStr = format(new Date(), 'yyyy-MM-dd');
-      const hasScoreForToday = budgetScores.some(s => s.date === todayStr);
-      
-      if (!hasScoreForToday) {
-         const newScores = [...budgetScores, budgetScore].slice(-30); // Keep last 30 days
-         setBudgetScores(newScores);
-      } else {
-        // Optional: update today's score if it has changed significantly
-        const todaysSavedScore = budgetScores.find(s => s.date === todayStr);
-        if (todaysSavedScore && Math.abs(todaysSavedScore.score - budgetScore.score) > 2) {
-             setBudgetScores(prevScores => {
-                const updatedScores = prevScores.filter(s => s.date !== todayStr);
-                return [...updatedScores, budgetScore];
-            });
-        }
+    if (previousScoreRef.current !== null) {
+      const scoreChange = budgetScore.score - previousScoreRef.current;
+      if (scoreChange >= 2) {
+        toast({
+          title: "Sensei sees your growth!",
+          description: `Your score improved by ${scoreChange} points!`,
+        });
+      } else if (scoreChange <= -2) {
+        toast({
+          title: "Beware, young grasshoppa...",
+          description: `Your score has fallen by ${Math.abs(scoreChange)} points.`,
+          variant: 'destructive',
+        });
       }
+    }
+    previousScoreRef.current = budgetScore.score;
 
-  }, [isMounted, budgetScore, budgetScores, setBudgetScores]);
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const hasScoreForToday = budgetScores.some(s => s.date === todayStr);
+    
+    if (!hasScoreForToday) {
+       const newScores = [...budgetScores, budgetScore].slice(-30); // Keep last 30 days
+       setBudgetScores(newScores);
+    } else {
+      // Optional: update today's score if it has changed significantly
+      const todaysSavedScore = budgetScores.find(s => s.date === todayStr);
+      if (todaysSavedScore && Math.abs(todaysSavedScore.score - budgetScore.score) > 2) {
+           setBudgetScores(prevScores => {
+              const updatedScores = prevScores.filter(s => s.date !== todayStr);
+              return [...updatedScores, budgetScore];
+          });
+      }
+    }
+  }, [isMounted, budgetScore, budgetScores, setBudgetScores, toast]);
+
 
   useEffect(() => {
     if (!isMounted) return;

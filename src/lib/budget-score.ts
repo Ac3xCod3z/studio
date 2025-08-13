@@ -1,6 +1,9 @@
+
 // src/lib/budget-score.ts
 import { subDays, format, isWithinInterval } from "date-fns";
-import type { Entry, BudgetScore } from "./types";
+import type { Entry, BudgetScore, Rank } from "./types";
+import { Award, Shield, Gem, Crown, Anchor } from 'lucide-react';
+import React from 'react';
 
 const DEBT_CATEGORIES = ["loans", "credit cards"];
 
@@ -13,6 +16,15 @@ const getSenseiCommentary = (score: number): string => {
   if (score >= 40) return "Your spending is swift like the wind... slow it down.";
   if (score >= 30) return "Beware, young grasshoppa... your wallet is out of balance.";
   return "Much to learn, you still have. The path to financial peace is long.";
+};
+
+export const getRank = (score: number): Rank => {
+  const className = "w-4 h-4";
+  if (score >= 90) return { title: "Sensei", icon: React.createElement(Crown, { className }) };
+  if (score >= 80) return { title: "Master", icon: React.createElement(Gem, { className }) };
+  if (score >= 60) return { title: "Adept", icon: React.createElement(Award, { className }) };
+  if (score >= 40) return { title: "Apprentice", icon: React.createElement(Shield, { className }) };
+  return { title: "Novice", icon: React.createElement(Anchor, { className }) };
 };
 
 export const calculateBudgetScore = (entries: Entry[]): BudgetScore => {

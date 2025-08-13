@@ -101,3 +101,8 @@ export type BudgetScore = {
     date: string; // YYYY-MM-DD
     commentary: string;
 }
+
+export type Rank = {
+    title: string;
+    icon: React.ReactNode;
+}
