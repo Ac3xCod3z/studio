@@ -1,5 +1,6 @@
 
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -27,15 +28,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { Entry, RolloverPreference, WeeklyBalances, SelectedInstance } from "@/lib/types";
+import type { Entry, RolloverPreference, WeeklyBalances, SelectedInstance, BudgetScore } from "@/lib/types";
 import { CentseiCalendar, SidebarContent } from "./centsei-calendar";
-import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths, parseISO, differenceInCalendarMonths, isAfter, eachWeekOfInterval, lastDayOfMonth, set } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths, parseISO, differenceInCalendarMonths, isAfter, eachWeekOfInterval, lastDayOfMonth, set, subDays } from "date-fns";
 import { toZonedTime } from 'date-fns-tz';
 import { recurrenceIntervalMonths } from "@/lib/constants";
 import { ScrollArea } from "./ui/scroll-area";
 import { scheduleNotifications, cancelAllNotifications } from "@/lib/notification-manager";
 import { useToast } from "@/hooks/use-toast";
 import { welcomeMessages } from "@/lib/messages";
+import { calculateBudgetScore } from "@/lib/budget-score";
+import { BudgetScoreWidget } from "./budget-score-widget";
 
 const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezone: string): Entry[] => {
     if (!entry.date) return [];
@@ -187,6 +190,8 @@ export default function CentseiDashboard() {
   const [timezone, setTimezone] = useLocalStorage<string>('centseiTimezone', 'UTC');
   const [weeklyBalances, setWeeklyBalances] = useLocalStorage<WeeklyBalances>("centseiWeeklyBalances", {});
   const [notificationsEnabled, setNotificationsEnabled] = useLocalStorage('centseiNotificationsEnabled', false);
+  const [budgetScores, setBudgetScores] = useLocalStorage<BudgetScore[]>('centseiBudgetScores', []);
+
 
   const [isEntryDialogOpen, setEntryDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setSettingsDialogOpen] = useState(false);
@@ -443,6 +448,33 @@ export default function CentseiDashboard() {
 
     return entries.flatMap((e) => generateRecurringInstances(e, viewStart, viewEnd, timezone));
   }, [entries, isMounted, timezone]);
+  
+  const budgetScore = useMemo(() => {
+      if (!isMounted) return null;
+      return calculateBudgetScore(allGeneratedEntries);
+  }, [allGeneratedEntries, isMounted]);
+
+  useEffect(() => {
+      if (!isMounted || !budgetScore) return;
+
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      const hasScoreForToday = budgetScores.some(s => s.date === todayStr);
+      
+      if (!hasScoreForToday) {
+         const newScores = [...budgetScores, budgetScore].slice(-30); // Keep last 30 days
+         setBudgetScores(newScores);
+      } else {
+        // Optional: update today's score if it has changed significantly
+        const todaysSavedScore = budgetScores.find(s => s.date === todayStr);
+        if (todaysSavedScore && Math.abs(todaysSavedScore.score - budgetScore.score) > 2) {
+             setBudgetScores(prevScores => {
+                const updatedScores = prevScores.filter(s => s.date !== todayStr);
+                return [...updatedScores, budgetScore];
+            });
+        }
+      }
+
+  }, [isMounted, budgetScore, budgetScores, setBudgetScores]);
 
   useEffect(() => {
     if (!isMounted) return;
@@ -629,6 +661,7 @@ export default function CentseiDashboard() {
                     </SheetDescription>
                 </SheetHeader>
                 <ScrollArea className="flex-1">
+                   {budgetScore && <BudgetScoreWidget score={budgetScore} />}
                   <SidebarContent
                     weeklyTotals={weeklyTotals}
                     selectedDate={selectedDate}

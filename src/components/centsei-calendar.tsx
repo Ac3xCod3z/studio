@@ -1,3 +1,4 @@
+
 // src/components/centsei-calendar.tsx
 "use client";
 
@@ -18,6 +19,7 @@ import {
   setYear,
   setMonth,
   getMonth,
+  parseISO
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { ChevronLeft, ChevronRight, Plus, ArrowUp, ArrowDown, Trash2, TrendingUp, TrendingDown, Repeat, Check } from "lucide-react";
@@ -29,12 +31,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn, formatCurrency } from "@/lib/utils";
-import type { Entry, WeeklyBalances, SelectedInstance } from "@/lib/types";
+import type { Entry, WeeklyBalances, SelectedInstance, BudgetScore } from "@/lib/types";
 import { Checkbox } from "./ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { useMedia } from "react-use";
-import { parseISO } from "date-fns/fp";
+import { BudgetScoreWidget } from "./budget-score-widget";
 
 if (typeof window !== "undefined") {
     gsap.registerPlugin(MotionPathPlugin);
@@ -101,6 +103,7 @@ export function CentseiCalendar({
   const draggingEntryRef = useRef<Entry | null>(null);
   const [dragVisual, setDragVisual] = useState<string | null>(null);
   const scrollIntervalRef = useRef<number | null>(null);
+  const [budgetScore, setBudgetScore] = useLocalStorage<BudgetScore | null>('centseiBudgetScore', null);
 
 
   const selectedInstanceIds = useMemo(() => selectedInstances.map(i => i.instanceId), [selectedInstances]);
@@ -550,6 +553,7 @@ export function CentseiCalendar({
     <SidebarContent 
       weeklyTotals={weeklyTotals}
       selectedDate={selectedDate}
+      budgetScore={budgetScore}
     />
   )
 
@@ -732,12 +736,15 @@ function SummaryCard({ title, amount, icon, description, variant = 'default', cl
 export const SidebarContent = ({
   weeklyTotals,
   selectedDate,
+  budgetScore,
 }: {
   weeklyTotals: any;
   selectedDate: Date;
+  budgetScore: BudgetScore | null;
 }) => {
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
+        {budgetScore && <BudgetScoreWidget score={budgetScore} />}
         <div className="space-y-4">
             <h3 className="font-semibold text-lg">Week of {format(startOfWeek(selectedDate), "MMM d")}</h3>
             <SummaryCard title="Starting Balance" amount={weeklyTotals.startOfWeekBalance} icon={<Repeat className="h-4 w-4 text-muted-foreground" />} description="From previous week" />

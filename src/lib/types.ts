@@ -95,3 +95,9 @@ export type WeeklyBalances = {
     end: number;
   }
 }
+
+export type BudgetScore = {
+    score: number;
+    date: string; // YYYY-MM-DD
+    commentary: string;
+}
