@@ -1,6 +1,5 @@
 
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -30,7 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Entry, RolloverPreference, WeeklyBalances, SelectedInstance, BudgetScore } from "@/lib/types";
 import { CentseiCalendar, SidebarContent } from "./centsei-calendar";
-import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths, parseISO, differenceInCalendarMonths, isAfter, eachWeekOfInterval, lastDayOfMonth, set, subDays } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, isBefore, getDate, setDate, startOfWeek, endOfWeek, add, getDay, isSameDay, addMonths, parseISO, differenceInCalendarMonths, isAfter, eachWeekOfInterval, lastDayOfMonth, set } from "date-fns";
 import { toZonedTime } from 'date-fns-tz';
 import { recurrenceIntervalMonths } from "@/lib/constants";
 import { ScrollArea } from "./ui/scroll-area";
@@ -38,7 +37,6 @@ import { scheduleNotifications, cancelAllNotifications } from "@/lib/notificatio
 import { useToast } from "@/hooks/use-toast";
 import { welcomeMessages } from "@/lib/messages";
 import { calculateBudgetScore } from "@/lib/budget-score";
-import { BudgetScoreWidget } from "./budget-score-widget";
 
 const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezone: string): Entry[] => {
     if (!entry.date) return [];
@@ -661,10 +659,10 @@ export default function CentseiDashboard() {
                     </SheetDescription>
                 </SheetHeader>
                 <ScrollArea className="flex-1">
-                   {budgetScore && <BudgetScoreWidget score={budgetScore} />}
                   <SidebarContent
                     weeklyTotals={weeklyTotals}
                     selectedDate={selectedDate}
+                    budgetScore={budgetScore}
                   />
                    <div className="p-4 flex flex-col gap-2 border-t">
                      <Button onClick={() => { setSummaryDialogOpen(true); setMobileSheetOpen(false); }} variant="outline" className="w-full">

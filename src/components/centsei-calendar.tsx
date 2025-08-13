@@ -1,4 +1,5 @@
 
+
 // src/components/centsei-calendar.tsx
 "use client";
 
@@ -104,7 +105,6 @@ export function CentseiCalendar({
   const draggingEntryRef = useRef<Entry | null>(null);
   const [dragVisual, setDragVisual] = useState<string | null>(null);
   const scrollIntervalRef = useRef<number | null>(null);
-  const [budgetScore, setBudgetScore] = useLocalStorage<BudgetScore | null>('centseiBudgetScore', null);
 
 
   const selectedInstanceIds = useMemo(() => selectedInstances.map(i => i.instanceId), [selectedInstances]);
@@ -550,7 +550,7 @@ export function CentseiCalendar({
     }, 500);
   }
 
-  const Sidebar = () => (
+  const Sidebar = ({ budgetScore }: { budgetScore: BudgetScore | null }) => (
     <SidebarContent 
       weeklyTotals={weeklyTotals}
       selectedDate={selectedDate}
@@ -710,7 +710,7 @@ export function CentseiCalendar({
         </main>
         {!isMobile && (
           <aside className="w-[350px] border-l bg-secondary/30 overflow-y-auto hidden lg:block">
-            <Sidebar />
+            <Sidebar budgetScore={weeklyTotals.budgetScore} />
           </aside>
         )}
       </div>
