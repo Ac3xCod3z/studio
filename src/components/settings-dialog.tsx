@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { Sparkles, Loader2, Bell, BellOff, Share2, Check, Copy, Moon, Sun, Repeat, Download, Upload } from "lucide-react";
+import { Sparkles, Loader2, Bell, BellOff, Share2, Check, Copy, Moon, Sun, Repeat, Download, Upload, Text, Smile } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
-import type { Entry, RolloverPreference } from "@/lib/types";
+import type { Entry, RolloverPreference, CategoryDisplayPreference } from "@/lib/types";
 import { getRolloverRecommendation } from "@/ai/flows/rollover-optimization";
 import { useToast } from "@/hooks/use-toast";
 import { timezones } from "@/lib/timezones";
@@ -76,6 +76,7 @@ export function SettingsDialog({
   const { toast } = useToast();
   const [notificationPermission, setNotificationPermission] = useState("default");
   const [notificationsEnabled, setNotificationsEnabled] = useLocalStorage('centseiNotificationsEnabled', false);
+  const [categoryDisplay, setCategoryDisplay] = useLocalStorage<CategoryDisplayPreference>('centseiCategoryDisplay', 'text');
   const [entries, setEntries] = useLocalStorage<Entry[]>("centseiEntries", []);
   const [shareLink, setShareLink] = useState('');
   const [hasCopied, setHasCopied] = useState(false);
@@ -262,6 +263,22 @@ export function SettingsDialog({
                               Dark
                           </TabsTrigger>
                           <TabsTrigger value="system">System</TabsTrigger>
+                      </TabsList>
+                  </Tabs>
+              </div>
+              
+               <div className="space-y-2">
+                  <h3 className="font-semibold">Category Display</h3>
+                  <Tabs value={categoryDisplay} onValueChange={(value) => setCategoryDisplay(value as CategoryDisplayPreference)} className="w-full">
+                      <TabsList className="grid w-full grid-cols-2">
+                          <TabsTrigger value="text">
+                              <Text className="mr-2 h-4 w-4" />
+                              Text
+                          </TabsTrigger>
+                          <TabsTrigger value="emoji">
+                              <Smile className="mr-2 h-4 w-4" />
+                              Emoji
+                          </TabsTrigger>
                       </TabsList>
                   </Tabs>
               </div>

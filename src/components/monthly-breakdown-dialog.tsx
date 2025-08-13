@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useMemo } from 'react';
@@ -28,7 +29,7 @@ import {
 } from "@/components/ui/accordion";
 import { format, isSameMonth } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
-import { type Entry, type BillCategory, BillCategories } from '@/lib/types';
+import { type Entry, type BillCategory, BillCategories, CategoryEmojis, CategoryDisplayPreference } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import {
   ChartContainer,
@@ -36,6 +37,7 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import { PieChart, Pie, Cell, Tooltip } from 'recharts';
+import useLocalStorage from '@/hooks/use-local-storage';
 
 type MonthlyBreakdownDialogProps = {
   isOpen: boolean;
@@ -64,6 +66,7 @@ export function MonthlyBreakdownDialog({
   currentMonth,
   timezone,
 }: MonthlyBreakdownDialogProps) {
+  const [categoryDisplay] = useLocalStorage<CategoryDisplayPreference>('centseiCategoryDisplay', 'text');
 
   const breakdownData = useMemo(() => {
     const monthlyBills = entries.filter(entry => {
@@ -98,10 +101,30 @@ export function MonthlyBreakdownDialog({
 
   const chartData = useMemo(() => {
     return breakdownData.breakdown.map(({ category, total }) => ({
-      name: category.charAt(0).toUpperCase() + category.slice(1),
+      name: categoryDisplay === 'emoji' ? CategoryEmojis[category] : category.charAt(0).toUpperCase() + category.slice(1),
       value: total,
+      textLabel: category.charAt(0).toUpperCase() + category.slice(1),
     }));
-  }, [breakdownData]);
+  }, [breakdownData, categoryDisplay]);
+  
+  const getCategoryLabel = (category: BillCategory) => {
+    if (categoryDisplay === 'emoji') {
+        return <span className="text-xl">{CategoryEmojis[category]}</span>;
+    }
+    return <span className="font-medium capitalize">{category}</span>;
+  };
+  
+  const CustomTooltip = ({ active, payload }: any) => {
+      if (active && payload && payload.length) {
+          const data = payload[0].payload;
+          return (
+              <div className="p-2 bg-background border rounded-lg shadow-lg">
+                  <p className="font-bold">{`${data.textLabel}: ${formatCurrency(data.value)}`}</p>
+              </div>
+          );
+      }
+      return null;
+  };
 
   if (!isOpen) {
     return null;
@@ -124,13 +147,7 @@ export function MonthlyBreakdownDialog({
                   <div className="w-full h-[250px] flex items-center justify-center">
                       <ChartContainer config={{}} className="mx-auto aspect-square h-full">
                           <PieChart>
-                              <Tooltip
-                                  cursor={false}
-                                  content={<ChartTooltipContent 
-                                      hideLabel 
-                                      formatter={(value) => formatCurrency(value as number)}
-                                  />}
-                              />
+                              <Tooltip content={<CustomTooltip />} />
                               <Pie
                                   data={chartData}
                                   dataKey="value"
@@ -159,8 +176,8 @@ export function MonthlyBreakdownDialog({
                     breakdownData.breakdown.map(({ category, total, entries }) => (
                       <AccordionItem value={category} key={category}>
                         <AccordionTrigger className="hover:no-underline">
-                            <div className="flex justify-between w-full pr-4">
-                                <span className="font-medium capitalize">{category}</span>
+                            <div className="flex justify-between items-center w-full pr-4">
+                                {getCategoryLabel(category)}
                                 <span>{formatCurrency(total)}</span>
                             </div>
                         </AccordionTrigger>

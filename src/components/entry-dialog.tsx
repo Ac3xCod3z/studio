@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React from "react";
@@ -32,9 +33,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import type { Entry } from "@/lib/types";
-import { BillCategories, RecurrenceOptions } from "@/lib/types";
+import type { Entry, CategoryDisplayPreference } from "@/lib/types";
+import { BillCategories, RecurrenceOptions, CategoryEmojis } from "@/lib/types";
 import { Checkbox } from "./ui/checkbox";
+import useLocalStorage from "@/hooks/use-local-storage";
 
 const formSchema = z.object({
   type: z.enum(["bill", "income"], { required_error: "You need to select an entry type." }),
@@ -66,6 +68,8 @@ const parseDateInTimezone = (dateString: string, timeZone: string) => {
 
 
 export function EntryDialog({ isOpen, onClose, onSave, onDelete, onCopy, entry, selectedDate, timezone }: EntryFormProps) {
+  const [categoryDisplay] = useLocalStorage<CategoryDisplayPreference>('centseiCategoryDisplay', 'text');
+  
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
   });
@@ -215,12 +219,21 @@ export function EntryDialog({ isOpen, onClose, onSave, onDelete, onCopy, entry, 
                         <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                             <SelectTrigger>
-                            <SelectValue placeholder="Select a category" />
+                               <SelectValue placeholder="Select a category" />
                             </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                             {BillCategories.map(cat => (
-                            <SelectItem key={cat} value={cat} className="capitalize">{cat}</SelectItem>
+                            <SelectItem key={cat} value={cat}>
+                               {categoryDisplay === 'emoji' ? (
+                                    <span className="flex items-center gap-2">
+                                        {CategoryEmojis[cat]}
+                                        <span className="capitalize">{cat}</span>
+                                    </span>
+                                ) : (
+                                    <span className="capitalize">{cat}</span>
+                                )}
+                            </SelectItem>
                             ))}
                         </SelectContent>
                         </Select>

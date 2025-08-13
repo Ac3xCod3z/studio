@@ -1,3 +1,4 @@
+
 // src/lib/types.ts
 import { z } from 'zod';
 
@@ -20,6 +21,24 @@ export const BillCategories = [
   "other",
 ] as const;
 
+export const CategoryEmojis: Record<BillCategory, string> = {
+  rent: "🏠",
+  utilities: "💡",
+  "phone bill": "📱",
+  vehicles: "🚗",
+  loans: "💰",
+  "credit cards": "💳",
+  groceries: "🛒",
+  "day care": "👶",
+  subscriptions: "🔄",
+  recreations: "🎭",
+  necessities: "🛍️",
+  vices: "🍸",
+  "personal maintenance": "💇‍♀️",
+  other: "📦",
+};
+
+
 export type BillCategory = (typeof BillCategories)[number];
 
 export const RecurrenceOptions = [
@@ -34,6 +53,7 @@ export const RecurrenceOptions = [
 ] as const;
 
 export type RecurrenceInterval = typeof RecurrenceOptions[number];
+export type CategoryDisplayPreference = 'text' | 'emoji';
 
 export const EntrySchema = z.object({
   id: z.string(),
