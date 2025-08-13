@@ -1,5 +1,5 @@
-import CentseiLoader from '@/components/centsei-loader';
+import CentseiDashboard from '@/components/centsei-dashboard';
 
 export default function Home() {
-  return <CentseiLoader />;
+  return <CentseiDashboard />;
 }
