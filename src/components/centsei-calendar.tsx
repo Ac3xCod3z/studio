@@ -37,6 +37,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { useMedia } from "react-use";
 import { BudgetScoreWidget } from "./budget-score-widget";
+import useLocalStorage from "@/hooks/use-local-storage";
 
 if (typeof window !== "undefined") {
     gsap.registerPlugin(MotionPathPlugin);
