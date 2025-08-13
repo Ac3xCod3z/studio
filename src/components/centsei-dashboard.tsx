@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import useLocalStorage from "@/hooks/use-local-storage";
 import { useMedia } from "react-use";
 
@@ -35,6 +35,7 @@ import { recurrenceIntervalMonths } from "@/lib/constants";
 import { ScrollArea } from "./ui/scroll-area";
 import { scheduleNotifications, cancelAllNotifications } from "@/lib/notification-manager";
 import { useToast } from "@/hooks/use-toast";
+import { welcomeMessages } from "@/lib/messages";
 
 const generateRecurringInstances = (entry: Entry, start: Date, end: Date, timezone: string): Entry[] => {
     if (!entry.date) return [];
@@ -206,6 +207,7 @@ export default function CentseiDashboard() {
   const [isBulkDeleteAlertOpen, setBulkDeleteAlertOpen] = useState(false);
   const [isBulkCompleteAlertOpen, setBulkCompleteAlertOpen] = useState(false);
   const [moveOperation, setMoveOperation] = useState<{ entry: Entry, newDate: string } | null>(null);
+  const isInitialLoad = useRef(true);
 
 
   const toggleSelectionMode = useCallback(() => {
@@ -302,10 +304,28 @@ export default function CentseiDashboard() {
     }
   }, [entries, timezone, notificationsEnabled, setNotificationsEnabled, toast, isMounted]);
 
+  const showWelcomeToast = useCallback(() => {
+    const randomIndex = Math.floor(Math.random() * welcomeMessages.length);
+    toast({ description: welcomeMessages[randomIndex] });
+  }, [toast]);
 
   useEffect(() => {
     setIsMounted(true);
-  }, []);
+    showWelcomeToast();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        showWelcomeToast();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [showWelcomeToast]);
+
 
   useEffect(() => {
     const registerServiceWorker = async () => {
@@ -563,7 +583,7 @@ export default function CentseiDashboard() {
     <div className="flex h-screen w-full flex-col bg-background">
       <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
         <div className="flex items-center gap-2">
-            <Logo height={50} width={50} />
+            <Logo height={50} width={50} viewBox="0 0 118 112"/>
             <h1 className="text-2xl font-bold text-white">Centsei</h1>
         </div>
         <div className="flex items-center gap-2">
