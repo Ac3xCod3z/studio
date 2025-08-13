@@ -1,10 +1,15 @@
-
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import useLocalStorage from "@/hooks/use-local-storage";
 import { useMedia } from "react-use";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import { EntryDialog } from "./entry-dialog";
 import { SettingsDialog } from "./settings-dialog";
@@ -13,7 +18,7 @@ import { MonthlyBreakdownDialog } from "./monthly-breakdown-dialog";
 import { MonthlySummaryDialog } from "./monthly-summary-dialog";
 import { CalculatorDialog } from "./calculator-dialog"; // Import the new component
 import { Logo } from "./icons";
-import { Settings, Menu, Plus, Trash2, BarChartBig, PieChart, CheckCircle2, Calculator } from "lucide-react";
+import { Settings, Menu, Plus, Trash2, BarChartBig, PieChart, CheckCircle2, Calculator, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
@@ -581,7 +586,7 @@ export default function CentseiDashboard() {
       <div className="flex h-screen w-full flex-col bg-background">
         <header className="flex h-16 items-center justify-between border-b px-4 md:px-6 shrink-0">
             <div className="flex items-center gap-2">
-                <Logo height={40} width={40} />
+                <Logo height={40} width={40} viewBox="0 0 118 112"/>
                  <h1 className="text-2xl font-bold text-white">Centsei</h1>
             </div>
             <div className="flex items-center gap-2">
@@ -618,16 +623,26 @@ export default function CentseiDashboard() {
         </div>
         <div className="flex items-center gap-2">
           {!isSelectionMode && (
-            <Button onClick={() => openNewEntryDialog(new Date())} size="sm" className="hidden md:flex">
-              <Plus className="-ml-1 mr-2 h-4 w-4" /> Add Entry
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" className="hidden md:flex">
+                  Actions <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onSelect={() => openNewEntryDialog(new Date())}>
+                  <Plus className="mr-2 h-4 w-4" /> Add Entry
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setSummaryDialogOpen(true)}>
+                  <BarChartBig className="mr-2 h-4 w-4" /> Monthly Summary
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setBreakdownDialogOpen(true)}>
+                  <PieChart className="mr-2 h-4 w-4" /> Category Breakdown
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
-           <Button onClick={() => setSummaryDialogOpen(true)} variant="outline" size="sm" className="hidden md:flex">
-              <BarChartBig className="mr-2 h-4 w-4" /> Monthly Summary
-            </Button>
-            <Button onClick={() => setBreakdownDialogOpen(true)} variant="outline" size="sm" className="hidden md:flex">
-              <PieChart className="mr-2 h-4 w-4" /> Category Breakdown
-            </Button>
            {isSelectionMode && selectedInstances.length > 0 && (
             <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" onClick={() => setBulkCompleteAlertOpen(true)}>
