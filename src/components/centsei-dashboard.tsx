@@ -697,6 +697,7 @@ export default function CentseiDashboard() {
         setSelectedInstances={setSelectedInstances}
         onBulkDelete={() => setBulkDeleteAlertOpen(true)}
         onMoveRequest={(entry, newDate) => setMoveOperation({ entry, newDate })}
+        budgetScore={budgetScore}
       />
       
       <EntryDialog 

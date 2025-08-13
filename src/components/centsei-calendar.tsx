@@ -71,6 +71,7 @@ type CentseiCalendarProps = {
     setSelectedInstances: (instances: SelectedInstance[] | ((current: SelectedInstance[]) => SelectedInstance[])) => void;
     onBulkDelete: () => void;
     onMoveRequest: (entry: Entry, newDate: string) => void;
+    budgetScore: BudgetScore | null;
 }
 
 export function CentseiCalendar({
@@ -92,6 +93,7 @@ export function CentseiCalendar({
     setSelectedInstances,
     onBulkDelete,
     onMoveRequest,
+    budgetScore
 }: CentseiCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -550,7 +552,7 @@ export function CentseiCalendar({
     }, 500);
   }
 
-  const Sidebar = ({ budgetScore }: { budgetScore: BudgetScore | null }) => (
+  const Sidebar = () => (
     <SidebarContent 
       weeklyTotals={weeklyTotals}
       selectedDate={selectedDate}
@@ -710,7 +712,7 @@ export function CentseiCalendar({
         </main>
         {!isMobile && (
           <aside className="w-[350px] border-l bg-secondary/30 overflow-y-auto hidden lg:block">
-            <Sidebar budgetScore={weeklyTotals.budgetScore} />
+            <Sidebar />
           </aside>
         )}
       </div>
