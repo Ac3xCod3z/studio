@@ -71,7 +71,7 @@ export function MonthlyBreakdownDialog({
   const breakdownData = useMemo(() => {
     const monthlyBills = entries.filter(entry => {
         if (!entry.date) return false;
-        const entryDate = toZonedTime(entry.date, timezone);
+        const entryDate = toZonedTime(parseISO(entry.date), timezone);
         return entry.type === 'bill' && isSameMonth(entryDate, currentMonth);
     });
 
@@ -194,7 +194,7 @@ export function MonthlyBreakdownDialog({
                                     {entries.sort((a,b) => a.date.localeCompare(b.date)).map((entry, idx) => (
                                         <TableRow key={`${entry.id}-${idx}`}>
                                             <TableCell>{entry.name}</TableCell>
-                                            <TableCell>{format(toZonedTime(entry.date, timezone), 'MMM d')}</TableCell>
+                                            <TableCell>{format(toZonedTime(parseISO(entry.date), timezone), 'MMM d')}</TableCell>
                                             <TableCell className="text-right">{formatCurrency(entry.amount)}</TableCell>
                                         </TableRow>
                                     ))}
@@ -224,3 +224,4 @@ export function MonthlyBreakdownDialog({
     </Dialog>
   );
 }
+
